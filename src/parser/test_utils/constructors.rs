@@ -72,7 +72,7 @@ macro_rules! tuple {
 
 macro_rules! set {
     ($($expr:expr),* $(,)?) => {
-        $crate::parser::types::Expr::Set(HashSet::from([
+        $crate::parser::types::Expr::Set(std::collections::HashSet::from([
             $($expr),*
         ]))
     };
