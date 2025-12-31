@@ -5044,6 +5044,8 @@ d = TypeError("a", "b")
         assert_type_error!(c, "a");
         let d = extract!(ctx, "d", Exception);
         assert_type_error_args!(d, ["a", "b"]);
+
+        assert_eval_eq!(r#"TypeError("a", 12).args"#, tuple![str!("a"), int!(12)]);
     }
 
     #[test]

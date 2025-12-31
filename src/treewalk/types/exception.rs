@@ -4,8 +4,8 @@ use crate::{
     treewalk::{
         macros::*,
         protocols::NonDataDescriptor,
-        types::{Class, Str, Traceback},
-        TreewalkResult, TreewalkValue,
+        types::{Class, Str, Traceback, Tuple},
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -120,15 +120,37 @@ impl From<Exception> for MemphisException {
 }
 
 impl_typed!(Exception, Type::Exception);
-impl_descriptor_provider!(Exception, [TracebackAttribute]);
+impl_descriptor_provider!(Exception, [ArgsAttribute, TracebackAttribute]);
 
 #[derive(Clone)]
+struct ArgsAttribute;
+#[derive(Clone)]
 struct TracebackAttribute;
+
+impl NonDataDescriptor for ArgsAttribute {
+    fn get_attr(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        instance: Option<TreewalkValue>,
+        _owner: Container<Class>,
+    ) -> TreewalkResult<TreewalkValue> {
+        Ok(match instance {
+            Some(TreewalkValue::Exception(e)) => {
+                TreewalkValue::Tuple(Tuple::new(e.payload.clone()))
+            }
+            _ => TreewalkValue::NonDataDescriptor(Box::new(self.clone())),
+        })
+    }
+
+    fn name(&self) -> String {
+        "args".into()
+    }
+}
 
 impl NonDataDescriptor for TracebackAttribute {
     fn get_attr(
         &self,
-        _interpreter: &crate::treewalk::TreewalkInterpreter,
+        _interpreter: &TreewalkInterpreter,
         _instance: Option<TreewalkValue>,
         _owner: Container<Class>,
     ) -> TreewalkResult<TreewalkValue> {
