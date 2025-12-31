@@ -14,8 +14,8 @@ use crate::{
             BuiltinFunction, Reference,
         },
     },
-    core::{floats_equal, Container, Voidable},
-    domain::{DomainResult, ExecutionError, MemphisValue, Type},
+    core::{floats_equal, Container},
+    domain::{MemphisValue, Type},
 };
 
 #[derive(Clone, Debug)]
@@ -71,12 +71,6 @@ impl PartialEq for VmValue {
             // Add Class/Object/Code/Function/etc handling later if needed
             _ => false,
         }
-    }
-}
-
-impl Voidable for VmValue {
-    fn is_none(&self) -> bool {
-        matches!(self, VmValue::None)
     }
 }
 
@@ -165,16 +159,6 @@ impl VmValue {
         }
     }
 
-    pub fn coerce_to_int(&self) -> DomainResult<i64> {
-        match self {
-            VmValue::Int(i) => Ok(*i),
-            VmValue::String(s) => s
-                .parse::<i64>()
-                .map_err(|_| ExecutionError::value_error("Invalid int literal")),
-            _ => Err(ExecutionError::type_error("Cannot coerce to an int")),
-        }
-    }
-
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             VmValue::Int(i) => Some(*i),
@@ -182,21 +166,11 @@ impl VmValue {
         }
     }
 
-    pub fn expect_integer(&self) -> DomainResult<i64> {
-        self.as_integer()
-            .ok_or_else(|| ExecutionError::type_error("Expected an integer"))
-    }
-
     pub fn as_float(&self) -> Option<f64> {
         match self {
             VmValue::Float(i) => Some(*i),
             _ => None,
         }
-    }
-
-    pub fn expect_float(&self) -> DomainResult<f64> {
-        self.as_float()
-            .ok_or_else(|| ExecutionError::type_error("Expected a float"))
     }
 
     pub fn to_boolean(&self) -> bool {
@@ -220,21 +194,11 @@ impl VmValue {
         }
     }
 
-    pub fn expect_code(&self) -> DomainResult<&CodeObject> {
-        self.as_code()
-            .ok_or_else(|| ExecutionError::type_error("Expected a code object"))
-    }
-
     pub fn as_function(&self) -> Option<&FunctionObject> {
         match self {
             VmValue::Function(i) => Some(i),
             _ => None,
         }
-    }
-
-    pub fn expect_function(&self) -> DomainResult<&FunctionObject> {
-        self.as_function()
-            .ok_or_else(|| ExecutionError::type_error("Expected a function object"))
     }
 
     pub fn as_object(&self) -> Option<&Object> {
@@ -258,21 +222,11 @@ impl VmValue {
         }
     }
 
-    pub fn expect_class(&self) -> DomainResult<&Class> {
-        self.as_class()
-            .ok_or_else(|| ExecutionError::type_error("Expected a class"))
-    }
-
     pub fn as_coroutine(&self) -> Option<&Container<Coroutine>> {
         match self {
             VmValue::Coroutine(i) => Some(i),
             _ => None,
         }
-    }
-
-    pub fn expect_coroutine(&self) -> DomainResult<&Container<Coroutine>> {
-        self.as_coroutine()
-            .ok_or_else(|| ExecutionError::type_error("Expected a coroutine"))
     }
 }
 
@@ -282,7 +236,7 @@ impl From<VmValue> for MemphisValue {
             VmValue::None => MemphisValue::None,
             VmValue::Int(val) => MemphisValue::Integer(val),
             VmValue::Float(val) => MemphisValue::Float(val),
-            VmValue::String(val) => MemphisValue::String(val),
+            VmValue::String(val) => MemphisValue::Str(val),
             VmValue::Bool(val) => MemphisValue::Boolean(val),
             VmValue::List(i) => {
                 let items = i

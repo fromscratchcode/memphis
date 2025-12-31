@@ -1,7 +1,6 @@
 use crate::{
     bytecode_vm::{VmContext, VmValue},
-    domain::{RuntimeError, Source},
-    errors::MemphisError,
+    domain::{RaisedMemphisError, Source},
 };
 
 fn init(text: &str) -> VmContext {
@@ -18,11 +17,11 @@ pub fn eval(text: &str) -> VmValue {
         .expect("Failed to evaluate test string")
 }
 
-pub fn eval_expect_error(text: &str) -> RuntimeError {
-    match init(text).run_inner() {
+pub fn eval_expect_error(text: &str) -> RaisedMemphisError {
+    let mut context = init(text);
+    match context.run_inner() {
         Ok(_) => panic!("Expected an error!"),
-        Err(MemphisError::Execution(e)) => return e,
-        Err(_) => panic!("Expected an execution error!"),
+        Err(e) => return e.normalize(context.vm()),
     };
 }
 
@@ -38,21 +37,11 @@ pub fn run_path(path: &str) -> VmContext {
     context
 }
 
-pub fn run_expect_error(text: &str) -> RuntimeError {
-    let mut context = init(text);
-    match context.run_inner() {
-        Ok(_) => panic!("Expected an error!"),
-        Err(MemphisError::Execution(e)) => return e,
-        Err(_) => panic!("Expected an execution error!"),
-    };
-}
-
-pub fn run_path_expect_error(path: &str) -> RuntimeError {
+pub fn run_path_expect_error(path: &str) -> RaisedMemphisError {
     let mut context = init_path(path);
     match context.run_inner() {
         Ok(_) => panic!("Expected an error!"),
-        Err(MemphisError::Execution(e)) => return e,
-        Err(_) => panic!("Expected an execution error!"),
+        Err(e) => return e.normalize(context.vm()),
     };
 }
 

@@ -57,7 +57,7 @@ elif x < 6:
     result = "mid"
 "#
     );
-    assert_crosscheck_eq!(session, "result", MemphisValue::String("none".to_string()));
+    assert_crosscheck_eq!(session, "result", MemphisValue::Str("none".to_string()));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -74,5 +74,5 @@ else:
     a = "other"
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::String("three".to_string()));
+    assert_crosscheck_eq!(session, "a", MemphisValue::Str("three".to_string()));
 }

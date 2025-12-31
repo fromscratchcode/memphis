@@ -19,11 +19,11 @@ mod tests_vm_interpreter {
 
         let text = "4 > x";
         let e = eval_expect_error(text);
-        assert_name_error!(e.execution_error, "x");
+        assert_name_error!(e.exception, "x");
 
         let text = "y()";
         let e = eval_expect_error(text);
-        assert_name_error!(e.execution_error, "y");
+        assert_name_error!(e.exception, "y");
     }
 
     #[test]
@@ -45,7 +45,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 + 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.execution_error, "Unsupported operand types for +");
+        assert_type_error!(e.exception, "Unsupported operand types for +");
     }
 
     #[test]
@@ -67,7 +67,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 - 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.execution_error, "Unsupported operand types for -");
+        assert_type_error!(e.exception, "Unsupported operand types for -");
     }
 
     #[test]
@@ -101,7 +101,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 * 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.execution_error, "Unsupported operand types for *");
+        assert_type_error!(e.exception, "Unsupported operand types for *");
     }
 
     #[test]
@@ -123,7 +123,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 / 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.execution_error, "Unsupported operand types for /");
+        assert_type_error!(e.exception, "Unsupported operand types for /");
     }
 
     #[test]
@@ -143,7 +143,7 @@ mod tests_vm_interpreter {
         let text = r#""a" in "a""#;
         let e = eval_expect_error(text);
         // TODO this shouldn't actually fail
-        assert_type_error!(e.execution_error, "'str' object is not iterable");
+        assert_type_error!(e.exception, "'str' object is not iterable");
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod tests_vm_interpreter {
         let text = r#""a" not in "a""#;
         let e = eval_expect_error(text);
         // TODO this shouldn't actually fail
-        assert_type_error!(e.execution_error, "'str' object is not iterable");
+        assert_type_error!(e.exception, "'str' object is not iterable");
     }
 
     #[test]
@@ -598,8 +598,8 @@ x = [2,"Hello"]
         );
 
         let text = "list(1,2)";
-        let e = run_expect_error(text);
-        assert_type_error!(e.execution_error, "list expected at most 1 argument, got 2");
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "list expected at most 1 argument, got 2");
     }
 
     #[test]
@@ -669,11 +669,8 @@ x = {"a": 22}
         );
 
         let text = "tuple(1,2)";
-        let e = run_expect_error(text);
-        assert_type_error!(
-            e.execution_error,
-            "tuple expected at most 1 argument, got 2"
-        );
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "tuple expected at most 1 argument, got 2");
     }
 
     #[test]
@@ -688,18 +685,12 @@ x = {"a": 22}
         assert_eval_eq!(text, VmValue::Range(Range::new(2, 5, 3)));
 
         let text = "range()";
-        let e = run_expect_error(text);
-        assert_type_error!(
-            e.execution_error,
-            "range expected at least 1 argument, got 0"
-        );
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "range expected at least 1 argument, got 0");
 
         let text = "range(1,1,1,1)";
-        let e = run_expect_error(text);
-        assert_type_error!(
-            e.execution_error,
-            "range expected at most 3 arguments, got 4"
-        );
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "range expected at most 3 arguments, got 4");
     }
 
     #[test]
@@ -813,8 +804,8 @@ c = next(it)
         assert_read_eq!(ctx, "c", int!(3));
 
         let text = "next([1])";
-        let e = run_expect_error(text);
-        assert_type_error!(e.execution_error, "'list' object is not an iterator");
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "'list' object is not an iterator");
     }
 
     #[test]
@@ -843,8 +834,8 @@ c = next(it)
         assert_read_eq!(ctx, "c", int!(3));
 
         let text = "next((1,))";
-        let e = run_expect_error(text);
-        assert_type_error!(e.execution_error, "'tuple' object is not an iterator");
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "'tuple' object is not an iterator");
     }
 
     #[test]
@@ -880,8 +871,8 @@ test()
         assert_eval_eq!(text, int!(0));
 
         let text = "next(range(5))";
-        let e = run_expect_error(text);
-        assert_type_error!(e.execution_error, "'range' object is not an iterator");
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "'range' object is not an iterator");
     }
 
     #[test]
@@ -907,8 +898,8 @@ g = gen()
 a = next(g)
 b = next(g)
 "#;
-        let e = run_expect_error(text);
-        assert_stop_iteration!(e.execution_error);
+        let e = eval_expect_error(text);
+        assert_stop_iteration!(e.exception);
     }
 
     #[test]
@@ -1297,8 +1288,8 @@ b = f.bar()
         let text = r#"
 import not_found
 "#;
-        let e = run_expect_error(text);
-        assert_import_error!(e.execution_error, "No module named not_found");
+        let e = eval_expect_error(text);
+        assert_import_error!(e.exception, "No module named not_found");
     }
 
     #[test]
@@ -1312,8 +1303,8 @@ def last_call():
 
 middle_call()
 "#;
-        let e = run_expect_error(text);
-        assert_name_error!(e.execution_error, "unknown");
+        let e = eval_expect_error(text);
+        assert_name_error!(e.exception, "unknown");
 
         let call_stack = e.debug_call_stack;
         assert_eq!(call_stack.len(), 3);
@@ -1331,7 +1322,7 @@ middle_call()
     #[test]
     fn stack_trace_from_file() {
         let e = run_path_expect_error("src/fixtures/call_stack/call_stack_one_file.py");
-        assert_name_error!(e.execution_error, "unknown");
+        assert_name_error!(e.exception, "unknown");
 
         let call_stack = e.debug_call_stack;
         assert_eq!(call_stack.len(), 3);
@@ -1361,7 +1352,7 @@ middle_call()
     #[test]
     fn stack_trace_multiple_files() {
         let e = run_path_expect_error("src/fixtures/call_stack/call_stack.py");
-        assert_name_error!(e.execution_error, "unknown");
+        assert_name_error!(e.exception, "unknown");
 
         let call_stack = e.debug_call_stack;
         assert_eq!(call_stack.len(), 3);

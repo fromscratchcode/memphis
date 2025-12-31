@@ -7,12 +7,8 @@ use std::{
 use crate::{
     core::{log, LogLevel},
     domain::{Identifier, Source},
-    errors::LexerError,
+    lexer::{LexerError, LexerResult, MultilineString, Token},
 };
-
-use super::{MultilineString, Token};
-
-type LexerResult<T> = Result<T, LexerError>;
 
 #[derive(Default)]
 pub struct Lexer {

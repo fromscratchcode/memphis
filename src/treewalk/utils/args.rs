@@ -1,11 +1,8 @@
 use std::{collections::HashMap, slice::Iter};
 
-use crate::{
-    domain::{DomainResult, ExecutionError},
-    treewalk::{
-        types::{Dict, Str},
-        SymbolTable, TreewalkInterpreter, TreewalkValue,
-    },
+use crate::treewalk::{
+    types::{Dict, Exception, Str},
+    DomainResult, SymbolTable, TreewalkInterpreter, TreewalkValue,
 };
 
 /// Represents the fully resolved parameter state for all positional and keyword arguments.
@@ -59,10 +56,12 @@ impl Args {
     pub fn get_self(&self) -> DomainResult<TreewalkValue> {
         match &self.bound_val {
             Some(b) => Ok(b.clone()),
-            None => Err(ExecutionError::type_error(
-                "Unbound method needs an argument",
-            )),
+            None => Err(Exception::type_error("Unbound method needs an argument")),
         }
+    }
+
+    pub fn args(&self) -> &[TreewalkValue] {
+        &self.args
     }
 
     /// Access a positional argument by index. Bound arguments are not included in this, use
@@ -150,10 +149,7 @@ where
     F: Fn(usize) -> bool,
 {
     if !condition(args.len()) {
-        Err(ExecutionError::type_error(format!(
-            "Found {} args",
-            args.len()
-        )))
+        Err(Exception::type_error(format!("Found {} args", args.len())))
     } else {
         Ok(())
     }

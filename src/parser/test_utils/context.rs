@@ -1,10 +1,9 @@
 use crate::{
     domain::Source,
-    errors::ParserError,
     lexer::Lexer,
     parser::{
         types::{ast, Ast, ParseNode},
-        Parser,
+        Parser, ParserError,
     },
 };
 

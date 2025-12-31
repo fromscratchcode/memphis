@@ -8,8 +8,7 @@ use crossterm::{
 };
 
 use crate::{
-    core::Voidable,
-    errors::MemphisError,
+    domain::RaisedMemphisError,
     repl::{CrosstermIO, IncrementalContext, TerminalIO},
     Engine,
 };
@@ -58,7 +57,7 @@ pub struct Repl {
     in_block: bool,
 
     /// Track any interpreter errors so that we can properly emit an useful exit code.
-    errors: Vec<MemphisError>,
+    errors: Vec<RaisedMemphisError>,
 
     /// The current line being manipulated by the user.
     line: String,

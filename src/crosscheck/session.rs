@@ -1,6 +1,5 @@
 use crate::{
-    domain::{MemphisValue, Source},
-    errors::{MemphisError, MemphisResult},
+    domain::{MemphisResult, MemphisValue, RaisedMemphisError, Source},
     Engine, MemphisContext,
 };
 
@@ -43,7 +42,7 @@ impl CrosscheckSession {
 
     /// Run both engines, then return the error. We do not test for equality here, but rather leave
     /// that up to any downstream macros, so the source of the error will be clearer to the user.
-    pub fn run_expect_error(mut self) -> (MemphisError, MemphisError) {
+    pub fn run_expect_error(mut self) -> (RaisedMemphisError, RaisedMemphisError) {
         let treewalk_err = self
             .treewalk
             .run()

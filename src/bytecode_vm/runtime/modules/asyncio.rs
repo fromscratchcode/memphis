@@ -3,7 +3,11 @@ use std::time::Duration;
 use crate::{
     bytecode_vm::{
         result::Raise,
-        runtime::{runtime::register_builtin_funcs, types::Module, BuiltinFn, Reference},
+        runtime::{
+            runtime::register_builtin_funcs,
+            types::{Coroutine, Exception, Module},
+            BuiltinFn, Reference,
+        },
         Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::Container,
@@ -12,7 +16,7 @@ use crate::{
 
 fn asyncio_run(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let co_binding = vm.deref(args[0]).raise(vm)?;
-    let coroutine = co_binding.expect_coroutine().raise(vm)?;
+    let coroutine = expect_coroutine_or_raise(vm, &co_binding)?;
 
     // take raw pointer before borrowing anything mutably
     let vm_ptr = vm as *mut VirtualMachine;
@@ -21,7 +25,7 @@ fn asyncio_run(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Refere
 
 fn asyncio_create_task(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let co_binding = vm.deref(args[0]).raise(vm)?;
-    let coroutine = co_binding.expect_coroutine().raise(vm)?;
+    let coroutine = expect_coroutine_or_raise(vm, &co_binding)?;
 
     // enqueue it on the executor, which will start it running
     vm.executor.spawn(coroutine.clone());
@@ -31,13 +35,36 @@ fn asyncio_create_task(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResul
 }
 
 fn asyncio_sleep(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
-    let duration_in_s = vm.deref(args[0]).raise(vm)?.expect_float().raise(vm)?;
+    let duration_in_s = expect_float_or_raise(vm, &vm.deref(args[0]).raise(vm)?)?;
 
     let micros = duration_in_s * 1_000_000.0;
     let duration = Duration::from_micros(micros as u64);
 
     let sleep_future = VmValue::SleepFuture(duration);
     Ok(vm.heapify(sleep_future))
+}
+
+fn expect_float_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<f64> {
+    match value.as_float() {
+        Some(i) => Ok(i),
+        None => {
+            let msg = VmValue::String("Expected a float".to_string());
+            Exception::type_error(vm.heapify(msg)).raise(vm)
+        }
+    }
+}
+
+fn expect_coroutine_or_raise(
+    vm: &mut VirtualMachine,
+    value: &VmValue,
+) -> VmResult<Container<Coroutine>> {
+    match value.as_coroutine() {
+        Some(i) => Ok(i.clone()),
+        None => {
+            let msg = VmValue::String("Expected a coroutine".to_string());
+            Exception::type_error(vm.heapify(msg)).raise(vm)
+        }
+    }
 }
 
 pub fn init_module(runtime: &mut Runtime) {

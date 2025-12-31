@@ -76,6 +76,7 @@ fn builtin_methods() -> HashMap<Type, Vec<Box<dyn CloneableCallable>>> {
     register_methods::<Staticmethod>(&mut methods);
     register_methods::<Property>(&mut methods);
     register_methods::<TypeError>(&mut methods);
+    register_methods::<StopIteration>(&mut methods);
 
     methods
 }

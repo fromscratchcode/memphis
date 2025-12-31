@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use crate::{
     core::{log, LogLevel},
     domain::{FromImportPath, Identifier, ModulePath},
-    errors::ParserError,
     lexer::{Lexer, Token},
     parser::{
         types::{
@@ -13,7 +12,7 @@ use crate::{
             Param, Params, RaiseKind, RegularImport, SliceParams, Statement, StatementKind,
             TypeNode, UnaryOp,
         },
-        TokenBuffer,
+        ParserError, TokenBuffer,
     },
 };
 

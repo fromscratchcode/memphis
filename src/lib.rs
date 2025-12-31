@@ -6,7 +6,6 @@ mod core;
 mod crosscheck;
 mod domain;
 mod engine;
-mod errors;
 mod lexer;
 #[cfg(feature = "llvm_backend")]
 mod llvm_backend;

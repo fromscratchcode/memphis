@@ -12,10 +12,7 @@ macro_rules! crosscheck_expect_error {
             $crate::crosscheck::CrosscheckSession::new($crate::domain::Source::from_text($src))
                 .run_expect_error();
         assert_eq!(tw_err, vm_err, "Engines did not return the same error");
-        match tw_err {
-            $crate::errors::MemphisError::Execution(e) => e,
-            _ => panic!("Expected an execution error."),
-        }
+        tw_err
     }};
 }
 

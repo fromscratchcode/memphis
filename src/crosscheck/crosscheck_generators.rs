@@ -49,7 +49,7 @@ b = next(g)
 "#
     );
 
-    assert_stop_iteration!(e.execution_error);
+    assert_stop_iteration!(e.exception);
 }
 
 #[test]

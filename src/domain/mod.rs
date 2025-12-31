@@ -8,9 +8,10 @@ mod identifier;
 mod import_path;
 mod module_name;
 mod resolver;
-mod result;
 mod source;
 mod stack_frame;
+#[cfg(test)]
+pub mod test_utils;
 mod type_enum;
 mod value;
 
@@ -18,15 +19,12 @@ pub use call_stack::DebugCallStack;
 pub use context::Context;
 pub use dunder::Dunder;
 pub use encoding::Encoding;
-#[cfg(test)]
-pub use error::test_utils;
-pub use error::{ExecutionError, RuntimeError, RuntimeValue};
+pub use error::{ExceptionKind, MemphisException, MemphisResult, RaisedMemphisError};
 pub use function::FunctionType;
 pub use identifier::Identifier;
 pub use import_path::{FromImportPath, ModulePath};
 pub use module_name::ModuleName;
 pub use resolver::{resolve, resolve_absolute_path, resolve_import_path};
-pub use result::DomainResult;
 pub use source::Source;
 pub use stack_frame::{DebugStackFrame, ToDebugStackFrame};
 pub use type_enum::Type;

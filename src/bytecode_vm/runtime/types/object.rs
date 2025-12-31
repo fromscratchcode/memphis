@@ -1,11 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{
-    bytecode_vm::{
-        runtime::{reference::Namespace, Reference},
-        VirtualMachine,
-    },
-    domain::DomainResult,
+use crate::bytecode_vm::{
+    runtime::{reference::Namespace, types::Exception, Reference},
+    DomainResult, VirtualMachine,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,7 +26,8 @@ impl Object {
         }
 
         let class = vm.deref(self.class)?;
-        Ok(class.expect_class()?.read(name))
+        let class = class.as_class().ok_or_else(Exception::runtime_error)?;
+        Ok(class.read(name))
     }
 
     pub fn write(&mut self, name: &str, value: Reference) {

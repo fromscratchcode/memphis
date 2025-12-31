@@ -4,10 +4,9 @@ use wasm_bindgen::prelude::*;
 use crate::{
     bytecode_vm::{
         compiler::{CodeObject, Constant},
-        VmContext,
+        CompilerError, VmContext,
     },
     domain::Source,
-    errors::MemphisResult,
     Engine, MemphisContext,
 };
 
@@ -85,7 +84,7 @@ impl WasmCodeObject {
     }
 }
 
-fn actually_compile(code: String) -> MemphisResult<CodeObject> {
+fn actually_compile(code: String) -> Result<CodeObject, CompilerError> {
     VmContext::new(Source::from_text(&code)).compile()
 }
 

@@ -1,8 +1,7 @@
 use crate::{
     bytecode_vm::VmContext,
     core::Interpreter,
-    domain::{MemphisValue, Source},
-    errors::MemphisResult,
+    domain::{MemphisResult, MemphisValue, Source},
     treewalk::TreewalkContext,
     Engine,
 };

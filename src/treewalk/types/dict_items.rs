@@ -3,15 +3,12 @@ use std::{
     fmt::{Display, Error, Formatter},
 };
 
-use crate::{
-    domain::{DomainResult, ExecutionError},
-    treewalk::{
-        macros::*,
-        type_system::CloneableIterable,
-        types::{Dict, DictKeys, DictValues, Tuple},
-        utils::{format_comma_separated_with, Contextual, ContextualPair},
-        TreewalkInterpreter, TreewalkValue,
-    },
+use crate::treewalk::{
+    macros::*,
+    type_system::CloneableIterable,
+    types::{Dict, DictKeys, DictValues, Exception, Tuple},
+    utils::{format_comma_separated_with, Contextual, ContextualPair},
+    DomainResult, TreewalkInterpreter, TreewalkValue,
 };
 
 impl_iterable!(DictItemsIter);
@@ -34,7 +31,7 @@ impl DictItems {
             // We cannot convert directly from a Vec to a tuple, we must first attempt to convert
             // to an array of a known and fixed length of 2.
             let pair_arr: [TreewalkValue; 2] = pair.clone().try_into().map_err(|_| {
-                ExecutionError::value_error(format!(
+                Exception::value_error(format!(
                     "dictionary update sequence element #{} has length {}; 2 is required",
                     index,
                     pair.len()

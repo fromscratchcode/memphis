@@ -16,7 +16,7 @@ a = 5 - 3
 a = "Hello World"
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::String("Hello World".into()));
+    assert_crosscheck_eq!(session, "a", MemphisValue::Str("Hello World".into()));
 
     let mut session = crosscheck_eval!(
         r#"

@@ -5,7 +5,6 @@ use crate::{
         CompilerError, VmContext,
     },
     domain::{FunctionType, ModuleName, Source},
-    errors::MemphisError,
     parser::{
         test_utils::*,
         types::{ast, Expr, Statement},
@@ -52,8 +51,7 @@ pub fn compile_at_module(text: &str, module_name: ModuleName) -> CodeObject {
 pub fn compile_err(text: &str) -> CompilerError {
     match VmContext::new(Source::from_text(text)).compile() {
         Ok(_) => panic!("Expected an CompilerError!"),
-        Err(MemphisError::Compiler(e)) => e,
-        Err(_) => panic!("Expected a CompilerError!"),
+        Err(e) => e,
     }
 }
 
@@ -62,8 +60,7 @@ pub fn compile_err_at_module(text: &str, module_name: ModuleName) -> CompilerErr
     ctx.set_module_name(module_name);
     match ctx.compile() {
         Ok(_) => panic!("Expected an CompilerError!"),
-        Err(MemphisError::Compiler(e)) => e,
-        Err(_) => panic!("Expected a CompilerError!"),
+        Err(e) => e,
     }
 }
 

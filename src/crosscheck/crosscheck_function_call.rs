@@ -37,7 +37,7 @@ middle_call()
 "#
     );
 
-    assert_name_error!(e.execution_error, "unknown");
+    assert_name_error!(e.exception, "unknown");
     assert_eq!(e.debug_call_stack.len(), 3);
     assert_eq!(e.debug_call_stack.get(0).name(), "<module>");
     assert_eq!(e.debug_call_stack.get(0).file_path_str(), "<stdin>");

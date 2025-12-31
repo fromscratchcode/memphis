@@ -608,7 +608,7 @@ pub enum StatementKind {
 }
 
 #[cfg(test)]
-use crate::{errors::ParserError, parser::Parser};
+use crate::parser::{Parser, ParserError};
 
 #[cfg(test)]
 pub trait ParseNode {
