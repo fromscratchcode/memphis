@@ -1,14 +1,14 @@
 use crate::{
-    domain::Source,
+    domain::{Source, Text},
     treewalk::{RaisedException, TreewalkContext, TreewalkValue},
 };
 
 fn init(text: &str) -> TreewalkContext {
-    TreewalkContext::new(Source::from_text(text))
+    TreewalkContext::from_text(Text::new(text))
 }
 
 fn init_path(path: &str) -> TreewalkContext {
-    TreewalkContext::new(Source::from_path(path).expect("Failed to create Source"))
+    TreewalkContext::from_source(Source::from_path(path).expect("Failed to create Source"))
 }
 
 pub fn eval(text: &str) -> TreewalkValue {

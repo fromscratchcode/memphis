@@ -1,9 +1,9 @@
-use crate::{domain::Source, parser::types::Ast};
+use crate::{domain::Text, parser::types::Ast};
 
 use super::ParseContext;
 
 pub fn init(text: &str) -> ParseContext {
-    ParseContext::new(Source::from_text(text))
+    ParseContext::new(&Text::new(text))
 }
 
 pub fn parse_all(input: &str) -> Ast {

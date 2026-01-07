@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     core::{log, LogLevel},
-    domain::{Identifier, Source},
+    domain::{Identifier, Text},
     lexer::{LexerError, LexerResult, MultilineString, Token},
 };
 
@@ -58,14 +58,14 @@ impl Iterator for Lexer {
 }
 
 impl Lexer {
-    pub fn new(source: &Source) -> Lexer {
+    pub fn new(text: &Text) -> Lexer {
         let mut lexer = Lexer::default();
-        lexer.add_line(source.text());
+        lexer.add_text(text);
         lexer
     }
 
-    pub fn add_line(&mut self, line: &str) {
-        self.source_lines.push_back(line.to_string());
+    pub fn add_text(&mut self, line: &Text) {
+        self.source_lines.push_back(line.as_str().to_string());
     }
 
     /// Since we tokenize one line at a time, we must consider whether we are inside a multiline
@@ -610,7 +610,7 @@ mod tests {
         let trimmed = input.trim_matches('\n');
 
         let mut lexer = Lexer::default();
-        lexer.add_line(trimmed);
+        lexer.add_text(&Text::new(trimmed));
         lexer.collect()
     }
 
@@ -618,7 +618,7 @@ mod tests {
         ( $( $line:expr ),* ) => {{
             let mut lexer = Lexer::default();
             $(
-                lexer.add_line($line);
+                lexer.add_text(&Text::new($line));
             )*
             lexer.collect::<Vec<Token>>()
         }};

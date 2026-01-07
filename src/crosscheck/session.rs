@@ -1,5 +1,5 @@
 use crate::{
-    domain::{MemphisResult, MemphisValue, RaisedMemphisError, Source},
+    domain::{MemphisResult, MemphisValue, RaisedMemphisError, Text},
     Engine, MemphisContext,
 };
 
@@ -10,9 +10,9 @@ pub struct CrosscheckSession {
 
 impl CrosscheckSession {
     /// Create a new session from a `Source`.
-    pub fn new(source: Source) -> Self {
-        let treewalk = MemphisContext::new(Engine::Treewalk, source.clone());
-        let vm = MemphisContext::new(Engine::BytecodeVm, source);
+    pub fn new(text: Text) -> Self {
+        let treewalk = MemphisContext::from_text(Engine::Treewalk, text.clone());
+        let vm = MemphisContext::from_text(Engine::BytecodeVm, text);
         Self { treewalk, vm }
     }
 

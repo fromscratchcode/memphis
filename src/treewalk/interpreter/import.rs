@@ -1,8 +1,10 @@
+use std::path::Path;
+
 #[cfg(feature = "c_stdlib")]
 use crate::treewalk::types::cpython::import_from_cpython;
 use crate::{
     core::Container,
-    domain::{Identifier, ModuleName, Source},
+    domain::{Identifier, ModuleName},
     treewalk::{
         import_utils,
         result::Raise,
@@ -56,12 +58,8 @@ impl TreewalkInterpreter {
         Ok(())
     }
 
-    fn prepare_imported_module(
-        &self,
-        module_name: &ModuleName,
-        source: &Source,
-    ) -> Container<Module> {
-        let module = Container::new(Module::new(module_name.clone(), source.clone()));
+    fn prepare_imported_module(&self, module_name: &ModuleName, path: &Path) -> Container<Module> {
+        let module = Container::new(Module::new_file_backed(module_name.clone(), path));
 
         // Before we parse and evaluate this module, store an empty module as a placeholder. This
         // is necessary to indicate to downstream modules that the upstream module which called
@@ -95,10 +93,10 @@ impl TreewalkInterpreter {
             .map_err(|err| Exception::import_error(err.message))
             .raise(self)?;
 
-        let module = self.prepare_imported_module(module_name, &source);
+        let module = self.prepare_imported_module(module_name, source.path());
         self.enter_imported_module(module);
 
-        TreewalkContext::from_state(source, self.state.clone())
+        TreewalkContext::from_state(source.text().clone(), self.state.clone())
             .run_inner()
             .map_err(TreewalkDisruption::Error)?;
 

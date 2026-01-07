@@ -1,6 +1,8 @@
+#[cfg(test)]
+use crate::domain::Source;
 use crate::{
     core::{Container, Interpreter},
-    domain::{MemphisResult, MemphisValue, ModuleName, Source},
+    domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     lexer::Lexer,
     parser::Parser,
     runtime::MemphisState,
@@ -13,15 +15,14 @@ pub struct TreewalkContext {
 }
 
 impl TreewalkContext {
-    pub fn new(source: Source) -> Self {
-        let state = Self::init_state(source.clone());
-        Self::from_state(source, state)
+    pub fn new(text: Text, origin: ModuleOrigin) -> Self {
+        let state = Self::init_state(origin);
+        Self::from_state(text, state)
     }
 
-    /// Initialize a context from a [`Source`] and existing treewalk state.
-    pub fn from_state(source: Source, treewalk_state: Container<TreewalkState>) -> Self {
+    pub fn from_state(text: Text, treewalk_state: Container<TreewalkState>) -> Self {
         Self {
-            lexer: Lexer::new(&source),
+            lexer: Lexer::new(&text),
             interpreter: TreewalkInterpreter::new(treewalk_state),
         }
     }
@@ -40,16 +41,15 @@ impl TreewalkContext {
         self.interpreter.load_var(name).ok()
     }
 
-    pub fn add_line_inner(&mut self, line: &str) {
-        self.lexer.add_line(line);
+    pub fn add_text_inner(&mut self, line: Text) {
+        self.lexer.add_text(&line);
     }
 
-    fn init_state(source: Source) -> Container<TreewalkState> {
-        let state = Container::new(MemphisState::new());
-        state.register_root(source.path());
-
+    fn init_state(origin: ModuleOrigin) -> Container<TreewalkState> {
+        let state = Container::new(MemphisState::init(origin.clone()));
         let treewalk_state = Container::new(TreewalkState::new(state));
-        let module = Container::new(Module::new(ModuleName::main(), source.clone()));
+
+        let module = Container::new(Module::new(ModuleName::main(), origin));
         treewalk_state.push_module_context(module);
 
         treewalk_state
@@ -58,6 +58,19 @@ impl TreewalkContext {
     #[cfg(test)]
     pub fn interpreter(&self) -> &TreewalkInterpreter {
         &self.interpreter
+    }
+
+    #[cfg(test)]
+    pub fn from_text(text: Text) -> Self {
+        Self::new(text, ModuleOrigin::Stdin)
+    }
+
+    #[cfg(test)]
+    pub fn from_source(source: Source) -> Self {
+        Self::new(
+            source.text().clone(),
+            ModuleOrigin::File(source.path().to_path_buf()),
+        )
     }
 }
 
@@ -70,7 +83,7 @@ impl Interpreter for TreewalkContext {
         self.read_inner(name).map(Into::into)
     }
 
-    fn add_line(&mut self, line: &str) {
-        self.add_line_inner(line);
+    fn add_text(&mut self, line: Text) {
+        self.add_text_inner(line);
     }
 }

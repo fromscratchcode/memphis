@@ -17,7 +17,7 @@ use crate::{
         DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
     },
     core::{log, log_impure, Container, LogLevel},
-    domain::{Dunder, FunctionType, MemphisValue, ModuleName},
+    domain::{Dunder, FunctionType, MemphisValue, ModuleName, ModuleOrigin},
     runtime::MemphisState,
 };
 
@@ -126,7 +126,8 @@ impl VirtualMachine {
 
         let mut context = VmContext::from_state(
             module_name.clone(),
-            source,
+            source.text().clone(),
+            ModuleOrigin::File(source.path().to_path_buf()),
             self.state.clone(),
             self.runtime.clone(),
         );

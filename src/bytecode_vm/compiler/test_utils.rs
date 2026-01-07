@@ -4,7 +4,7 @@ use crate::{
         indices::Index,
         CompilerError, VmContext,
     },
-    domain::{FunctionType, ModuleName, Source},
+    domain::{FunctionType, ModuleName, Text},
     parser::{
         test_utils::*,
         types::{ast, Expr, Statement},
@@ -13,6 +13,10 @@ use crate::{
 
 fn init() -> Compiler {
     Compiler::new(ModuleName::main(), "compiler_unit_test")
+}
+
+fn init_ctx(text: &str) -> VmContext {
+    VmContext::from_text(Text::new(text))
 }
 
 pub fn compile_expr(expr: Expr) -> Bytecode {
@@ -37,26 +41,26 @@ pub fn compile_stmt(stmt: Statement) -> Bytecode {
 }
 
 pub fn compile(text: &str) -> CodeObject {
-    VmContext::new(Source::from_text(text))
+    init_ctx(text)
         .compile()
         .expect("Failed to compile test program!")
 }
 
 pub fn compile_at_module(text: &str, module_name: ModuleName) -> CodeObject {
-    let mut ctx = VmContext::new(Source::from_text(text));
+    let mut ctx = init_ctx(text);
     ctx.set_module_name(module_name);
     ctx.compile().expect("Failed to compile test program!")
 }
 
 pub fn compile_err(text: &str) -> CompilerError {
-    match VmContext::new(Source::from_text(text)).compile() {
+    match init_ctx(text).compile() {
         Ok(_) => panic!("Expected an CompilerError!"),
         Err(e) => e,
     }
 }
 
 pub fn compile_err_at_module(text: &str, module_name: ModuleName) -> CompilerError {
-    let mut ctx = VmContext::new(Source::from_text(text));
+    let mut ctx = init_ctx(text);
     ctx.set_module_name(module_name);
     match ctx.compile() {
         Ok(_) => panic!("Expected an CompilerError!"),
@@ -115,9 +119,9 @@ macro_rules! assert_code_eq {
 
 macro_rules! compile_incremental {
         ( $( $line:expr ),* ) => {{
-            let mut context = $crate::bytecode_vm::VmContext::default();
+            let mut context = $crate::bytecode_vm::VmContext::from_text($crate::domain::Text::default());
             $(
-                context.add_line_inner($line);
+                context.add_text_inner($crate::domain::Text::new($line));
             )*
             context.compile().expect("Failed to compile")
         }};

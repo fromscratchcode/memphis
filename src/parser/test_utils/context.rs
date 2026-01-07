@@ -1,5 +1,5 @@
 use crate::{
-    domain::Source,
+    domain::Text,
     lexer::Lexer,
     parser::{
         types::{ast, Ast, ParseNode},
@@ -12,9 +12,9 @@ pub struct ParseContext {
 }
 
 impl ParseContext {
-    pub fn new(source: Source) -> Self {
+    pub fn new(text: &Text) -> Self {
         Self {
-            lexer: Lexer::new(&source),
+            lexer: Lexer::new(&text),
         }
     }
 

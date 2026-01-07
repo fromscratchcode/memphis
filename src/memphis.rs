@@ -19,7 +19,7 @@ impl Memphis {
                         process::exit(1);
                     })
                     .unwrap();
-                let _ = MemphisContext::new(engine, source)
+                let _ = MemphisContext::from_source(engine, source)
                     .run()
                     .map_err(|err| memphis_utils::exit(err));
             }

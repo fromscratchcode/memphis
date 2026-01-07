@@ -1,10 +1,12 @@
+#[cfg(test)]
+use crate::domain::Source;
 use crate::{
     bytecode_vm::{
         compiler::CodeObject, runtime::types::Exception, Compiler, CompilerError, Runtime,
         VirtualMachine, VmResult, VmValue,
     },
     core::{Container, Interpreter},
-    domain::{MemphisResult, MemphisValue, ModuleName, Source},
+    domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     lexer::Lexer,
     parser::Parser,
     runtime::MemphisState,
@@ -16,32 +18,24 @@ pub struct VmContext {
     vm: VirtualMachine,
 }
 
-impl Default for VmContext {
-    fn default() -> Self {
-        Self::new(Source::from_text(""))
-    }
-}
-
 impl VmContext {
-    pub fn new(source: Source) -> Self {
-        let state = Self::init_state(source.clone());
+    pub fn new(text: Text, origin: ModuleOrigin) -> Self {
+        let state = Container::new(MemphisState::init(origin.clone()));
         let runtime = Container::new(Runtime::new());
-        Self::from_state(ModuleName::main(), source, state, runtime)
+        Self::from_state(ModuleName::main(), text, origin, state, runtime)
     }
 
     /// Initialize a context from a [`Source`] and existing treewalk state.
     pub fn from_state(
         module_name: ModuleName,
-        source: Source,
+        text: Text,
+        origin: ModuleOrigin,
         state: Container<MemphisState>,
         runtime: Container<Runtime>,
     ) -> Self {
         Self {
-            lexer: Lexer::new(&source),
-            compiler: Compiler::new(
-                module_name,
-                source.path().to_str().expect("Failed to convert path."),
-            ),
+            lexer: Lexer::new(&text),
+            compiler: Compiler::new(module_name, &origin.path_str()),
             vm: VirtualMachine::new(state, runtime),
         }
     }
@@ -67,14 +61,8 @@ impl VmContext {
         self.vm.read_global(name).ok()
     }
 
-    pub fn add_line_inner(&mut self, line: &str) {
-        self.lexer.add_line(line);
-    }
-
-    fn init_state(source: Source) -> Container<MemphisState> {
-        let state = Container::new(MemphisState::new());
-        state.register_root(source.path());
-        state
+    pub fn add_text_inner(&mut self, line: Text) {
+        self.lexer.add_text(&line);
     }
 
     #[cfg(test)]
@@ -85,6 +73,19 @@ impl VmContext {
     #[cfg(test)]
     pub fn set_module_name(&mut self, name: ModuleName) {
         self.compiler.set_module_name(name);
+    }
+
+    #[cfg(any(test, feature = "wasm"))]
+    pub fn from_text(text: Text) -> Self {
+        Self::new(text, ModuleOrigin::Stdin)
+    }
+
+    #[cfg(test)]
+    pub fn from_source(source: Source) -> Self {
+        Self::new(
+            source.text().clone(),
+            ModuleOrigin::File(source.path().to_path_buf()),
+        )
     }
 }
 
@@ -99,7 +100,7 @@ impl Interpreter for VmContext {
         self.read_inner(name).map(Into::into)
     }
 
-    fn add_line(&mut self, line: &str) {
-        self.add_line_inner(line);
+    fn add_text(&mut self, line: Text) {
+        self.add_text_inner(line);
     }
 }

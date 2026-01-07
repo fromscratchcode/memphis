@@ -7,11 +7,13 @@ mod function;
 mod identifier;
 mod import_path;
 mod module_name;
+mod origin;
 mod resolver;
 mod source;
 mod stack_frame;
 #[cfg(test)]
 pub mod test_utils;
+mod text;
 mod type_enum;
 mod value;
 
@@ -24,8 +26,10 @@ pub use function::FunctionType;
 pub use identifier::Identifier;
 pub use import_path::{FromImportPath, ModulePath};
 pub use module_name::ModuleName;
+pub use origin::ModuleOrigin;
 pub use resolver::{resolve, resolve_absolute_path, resolve_import_path};
 pub use source::Source;
 pub use stack_frame::{DebugStackFrame, ToDebugStackFrame};
+pub use text::Text;
 pub use type_enum::Type;
 pub use value::MemphisValue;

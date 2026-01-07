@@ -8,7 +8,7 @@ use crossterm::{
 };
 
 use crate::{
-    domain::RaisedMemphisError,
+    domain::{RaisedMemphisError, Text},
     repl::{CrosstermIO, IncrementalContext, TerminalIO},
     Engine,
 };
@@ -284,7 +284,10 @@ impl Repl {
         self.input.push_str(line);
 
         if self.end_of_statement(line) {
-            context.add_line(&self.input);
+            let text = Text::new(&self.input);
+            context.add_text(text);
+            self.input.clear();
+
             match context.run() {
                 Ok(result) => {
                     if !result.is_none() {
@@ -297,7 +300,6 @@ impl Repl {
                 }
             }
 
-            self.input.clear();
             self.in_block = false;
         } else {
             // This wasn't the end of a statement, so add a newline. We could do this in the

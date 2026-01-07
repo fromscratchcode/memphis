@@ -1,14 +1,14 @@
 use crate::{
     bytecode_vm::{VmContext, VmValue},
-    domain::{RaisedMemphisError, Source},
+    domain::{RaisedMemphisError, Source, Text},
 };
 
 fn init(text: &str) -> VmContext {
-    VmContext::new(Source::from_text(text.trim()))
+    VmContext::from_text(Text::new(text.trim()))
 }
 
 fn init_path(path: &str) -> VmContext {
-    VmContext::new(Source::from_path(path).expect("Failed to create Source"))
+    VmContext::from_source(Source::from_path(path).expect("Failed to create Source"))
 }
 
 pub fn eval(text: &str) -> VmValue {

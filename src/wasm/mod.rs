@@ -6,7 +6,7 @@ use crate::{
         compiler::{CodeObject, Constant},
         CompilerError, VmContext,
     },
-    domain::Source,
+    domain::Text,
     Engine, MemphisContext,
 };
 
@@ -21,7 +21,7 @@ pub fn evaluate(code: String) -> String {
     // Set the panic hook for better error messages in the browser console
     set_once();
 
-    let mut context = MemphisContext::new(Engine::Treewalk, Source::from_text(&code));
+    let mut context = MemphisContext::from_text(Engine::Treewalk, Text::new(&code));
     let result = context.run().expect("Failed to evaluate.");
     format!("{result}")
 }
@@ -84,15 +84,15 @@ impl WasmCodeObject {
     }
 }
 
-fn actually_compile(code: String) -> Result<CodeObject, CompilerError> {
-    VmContext::new(Source::from_text(&code)).compile()
+fn actually_compile(code: &str) -> Result<CodeObject, CompilerError> {
+    VmContext::from_text(Text::new(code)).compile()
 }
 
 #[wasm_bindgen]
 pub fn compile(text: String) -> Result<JsValue, JsValue> {
     set_once();
 
-    let code = actually_compile(text).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let code = actually_compile(&text).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let wasm_code = WasmCodeObject::from(code);
     serde_wasm_bindgen::to_value(&wasm_code).map_err(|e| e.into())
 }

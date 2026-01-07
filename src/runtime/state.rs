@@ -2,7 +2,10 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     core::Container,
-    domain::{resolve, DebugCallStack, DebugStackFrame, ModuleName, Source, ToDebugStackFrame},
+    domain::{
+        resolve, DebugCallStack, DebugStackFrame, ModuleName, ModuleOrigin, Source,
+        ToDebugStackFrame,
+    },
 };
 
 use super::ImportResolver;
@@ -40,6 +43,18 @@ impl MemphisState {
             line_number: 1,
         }
     }
+
+    pub fn init(origin: ModuleOrigin) -> Self {
+        let mut state = MemphisState::new();
+        if let ModuleOrigin::File(ref p) = origin {
+            state.register_root(p);
+        }
+        state
+    }
+
+    fn register_root(&mut self, path: &Path) {
+        self.import_resolver.register_root(path);
+    }
 }
 
 impl Container<MemphisState> {
@@ -70,14 +85,6 @@ impl Container<MemphisState> {
         self.borrow_mut().debug_call_stack.pop_stack_frame()
     }
 
-    pub fn register_root(&self, path: &Path) {
-        self.borrow_mut().import_resolver.register_root(path);
-    }
-
-    fn search_paths(&self) -> Vec<PathBuf> {
-        self.borrow().import_resolver.search_paths().to_vec()
-    }
-
     pub fn load_source(&self, module_name: &ModuleName) -> Result<Source, ImportError> {
         let path = self.resolve_module_path(module_name)?;
         Source::from_path(path)
@@ -88,5 +95,9 @@ impl Container<MemphisState> {
         let search_paths = self.search_paths();
         resolve(module_name, &search_paths)
             .ok_or_else(|| ImportError::new(&format!("No module named {}", module_name)))
+    }
+
+    fn search_paths(&self) -> Vec<PathBuf> {
+        self.borrow().import_resolver.search_paths().to_vec()
     }
 }

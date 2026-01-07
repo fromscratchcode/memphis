@@ -1,5 +1,5 @@
 use crate::{
-    domain::{MemphisResult, MemphisValue, Source},
+    domain::{MemphisResult, MemphisValue, Text},
     Engine, MemphisContext,
 };
 
@@ -10,12 +10,12 @@ pub struct IncrementalContext {
 impl IncrementalContext {
     pub fn new(engine: Engine) -> Self {
         Self {
-            context: MemphisContext::new(engine, Source::from_text("")),
+            context: MemphisContext::from_text(engine, Text::default()),
         }
     }
 
-    pub fn add_line(&mut self, line: &str) {
-        self.context.add_line(line);
+    pub fn add_text(&mut self, line: Text) {
+        self.context.add_text(line);
     }
 
     pub fn run(&mut self) -> MemphisResult<MemphisValue> {

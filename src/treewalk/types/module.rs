@@ -2,25 +2,18 @@
 use std::collections::hash_map::Iter;
 use std::{
     fmt::{Display, Error, Formatter},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use crate::{
     core::Container,
-    domain::{DebugStackFrame, Dunder, ModuleName, Source, ToDebugStackFrame},
+    domain::{DebugStackFrame, Dunder, ModuleName, ModuleOrigin, ToDebugStackFrame},
     treewalk::{
         protocols::MemberRead,
         types::{Dict, Str},
         Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
-
-#[derive(Debug, PartialEq, Clone)]
-enum ModuleOrigin {
-    File(Source),
-    Builtin,
-    Synthetic,
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Module {
@@ -30,11 +23,7 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn new(name: ModuleName, source: Source) -> Self {
-        Self::_new(name, ModuleOrigin::File(source))
-    }
-
-    fn _new(name: ModuleName, origin: ModuleOrigin) -> Self {
+    pub fn new(name: ModuleName, origin: ModuleOrigin) -> Self {
         let mut scope = Scope::default();
         scope.insert(&Dunder::Name, TreewalkValue::Str(Str::new(&name.as_str())));
         Self {
@@ -44,20 +33,20 @@ impl Module {
         }
     }
 
+    pub fn new_file_backed(name: ModuleName, path: &Path) -> Self {
+        Self::new(name, ModuleOrigin::File(path.to_path_buf()))
+    }
+
     pub fn new_builtin(name: ModuleName) -> Self {
-        Self::_new(name, ModuleOrigin::Builtin)
+        Self::new(name, ModuleOrigin::Builtin)
     }
 
     pub fn new_empty(name: ModuleName) -> Self {
-        Self::_new(name, ModuleOrigin::Synthetic)
+        Self::new(name, ModuleOrigin::Synthetic)
     }
 
     pub fn path(&self) -> PathBuf {
-        match &self.origin {
-            ModuleOrigin::File(s) => s.path().to_path_buf(),
-            ModuleOrigin::Builtin => PathBuf::from("builtin"),
-            ModuleOrigin::Synthetic => PathBuf::from("synthetic"),
-        }
+        self.origin.path()
     }
 
     pub fn name(&self) -> &ModuleName {

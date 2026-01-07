@@ -7,12 +7,12 @@ pub use container::Container;
 pub use log::{log, log_impure, LogLevel};
 pub use utils::floats_equal;
 
-use crate::domain::{MemphisResult, MemphisValue};
+use crate::domain::{MemphisResult, MemphisValue, Text};
 
 pub trait Interpreter {
     fn run(&mut self) -> MemphisResult<MemphisValue>;
     fn read(&mut self, name: &str) -> Option<MemphisValue>;
-    fn add_line(&mut self, line: &str);
+    fn add_text(&mut self, line: Text);
 }
 
 pub mod memphis_utils {
