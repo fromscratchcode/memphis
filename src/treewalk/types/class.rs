@@ -279,7 +279,7 @@ impl Display for Container<Class> {
 
 impl Callable for Container<Class> {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        TreewalkValue::new(interpreter, self.clone(), args)
+        interpreter.create_object(self.clone(), args)
     }
 
     fn name(&self) -> String {

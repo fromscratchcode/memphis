@@ -20,6 +20,7 @@ mod expr;
 mod function;
 mod import;
 mod load;
+mod object;
 mod stmt;
 
 #[derive(Clone)]
