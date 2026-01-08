@@ -7,7 +7,7 @@ use crate::{
     domain::{FunctionType, ModuleName, Text},
     parser::{
         test_utils::*,
-        types::{ast, Expr, Statement},
+        types::{ast, Statement},
     },
 };
 
@@ -17,18 +17,6 @@ fn init() -> Compiler {
 
 fn init_ctx(text: &str) -> VmContext {
     VmContext::from_text(Text::new(text))
-}
-
-pub fn compile_expr(expr: Expr) -> Bytecode {
-    let mut bytecode = compile_stmt(stmt_expr!(expr));
-
-    // Some expressions end with a PopTop since we are not saving their value here, we are safe to
-    // strip that away for tests.
-    if let Some(&Opcode::PopTop) = bytecode.last() {
-        bytecode.pop();
-    }
-
-    bytecode
 }
 
 pub fn compile_stmt(stmt: Statement) -> Bytecode {
