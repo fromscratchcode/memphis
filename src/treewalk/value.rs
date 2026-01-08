@@ -359,19 +359,6 @@ impl TreewalkValue {
         }
     }
 
-    pub fn get_class(&self, interpreter: &TreewalkInterpreter) -> Container<Class> {
-        match self {
-            TreewalkValue::Object(o) => o.borrow().class(),
-            TreewalkValue::Class(o) => o.clone(),
-            TreewalkValue::Super(s) => s.receiver().get_class(interpreter),
-            _ => interpreter.state.class_of_type(&self.get_type()).clone(),
-        }
-    }
-
-    pub fn class_name(&self, interpreter: &TreewalkInterpreter) -> String {
-        self.get_class(interpreter).borrow().name().to_string()
-    }
-
     pub fn resolve_descriptor(
         self,
         interpreter: &TreewalkInterpreter,

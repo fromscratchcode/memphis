@@ -16,7 +16,7 @@ impl TreewalkInterpreter {
         // here on `Type::Type` would also create unintended behaviors.
         if class.borrow().is_type(&Type::Type) {
             assert_eq!(args.len(), 1);
-            return Ok(self.state.class_of_value(&args.get_arg(0)));
+            return Ok(self.state.type_of_value(&args.get_arg(0)));
         };
 
         // The [`Class`] must be explicitly passed to the [`Dunder::New`] method as this method is
