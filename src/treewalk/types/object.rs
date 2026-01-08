@@ -172,8 +172,8 @@ impl MemberRead for Container<Object> {
             });
             let instance = TreewalkValue::Object(self.clone());
             let owner = interpreter.state.class_of_value(&instance);
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(instance),
                 owner,
             )?));

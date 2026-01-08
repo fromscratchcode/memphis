@@ -197,8 +197,8 @@ impl MemberRead for Container<Function> {
             log(LogLevel::Debug, || format!("Found: {class}::{name}"));
             let instance = TreewalkValue::Function(self.clone());
             let owner = interpreter.state.class_of_value(&instance);
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(instance),
                 owner,
             )?));

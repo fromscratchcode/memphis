@@ -10,7 +10,7 @@ use std::{
 use crate::treewalk::types::cpython::{CPythonClass, CPythonModule, CPythonObject};
 use crate::{
     core::{floats_equal, Container},
-    domain::{Dunder, MemphisValue, Type},
+    domain::{MemphisValue, Type},
     treewalk::{
         protocols::MemberRead,
         type_system::{
@@ -28,7 +28,7 @@ use crate::{
             Traceback, Tuple,
         },
         typing::TypeExpr,
-        DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult,
+        DomainResult, SymbolTable,
     },
 };
 
@@ -356,42 +356,6 @@ impl TreewalkValue {
             TreewalkValue::CPythonObject(_) => Type::Object,
             #[cfg(feature = "c_stdlib")]
             TreewalkValue::CPythonClass(_) => unimplemented!(),
-        }
-    }
-
-    pub fn resolve_descriptor(
-        self,
-        interpreter: &TreewalkInterpreter,
-        instance: Option<TreewalkValue>,
-        owner: Container<Class>,
-    ) -> TreewalkResult<TreewalkValue> {
-        // Similar to callable below, ideally we'd be able to handle this inside
-        // `Result::as_nondata_descriptor` but we don't yet have a way to downcast in this way
-        // (i.e. treat `S` as a different `dyn T` when `S : T`)
-        if let Some(descriptor) = self.clone().into_data_descriptor(interpreter)? {
-            return descriptor.get_attr(interpreter, instance, owner);
-        }
-
-        // I'd love to find a way to combine this into [`Result::as_nondata_descriptor`] and move
-        // this functionality onto the [`Callable`] trait somehow.
-        if let Ok(callable) = self.clone().as_callable() {
-            // The new method is never bound. When called explicitly inside other metaclasses, the
-            // class must be passed in by the calling metaclass.
-            if callable.name() == String::from(Dunder::New) {
-                return Ok(self.clone());
-            }
-
-            return Ok(match instance {
-                Some(instance) => {
-                    TreewalkValue::Method(Container::new(Method::new(instance, callable)))
-                }
-                None => self.clone(),
-            });
-        }
-
-        match self.clone().into_nondata_descriptor(interpreter)? {
-            Some(descriptor) => descriptor.get_attr(interpreter, instance, owner),
-            None => Ok(self.clone()),
         }
     }
 

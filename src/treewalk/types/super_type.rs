@@ -47,8 +47,8 @@ impl MemberRead for Super {
             log(LogLevel::Debug, || {
                 format!("Found: {parent_class}::{name} on class via super()")
             });
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(instance),
                 class,
             )?));
