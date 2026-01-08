@@ -231,8 +231,7 @@ impl Container<TreewalkState> {
     pub fn resolve_import_path(&self, import_path: &FromImportPath) -> DomainResult<ModuleName> {
         let current_module = self.current_module();
         let current_module = current_module.borrow();
-        let current_module = current_module.name();
-        resolve_import_path(import_path, current_module)
+        resolve_import_path(import_path, current_module.package())
             .map_err(|e| Exception::import_error(e.message()))
     }
 

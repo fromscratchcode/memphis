@@ -5,7 +5,7 @@ use crate::domain::Dunder;
 /// A resolved, absolute module name used at runtime.
 /// Always valid, never relative. Built by the resolver
 /// or by the runtime for builtin modules.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleName(Vec<String>);
 
 impl ModuleName {
@@ -22,12 +22,16 @@ impl ModuleName {
         ModuleName::new(segments)
     }
 
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+
     pub fn main() -> Self {
         Self::from_segments(&[Dunder::Main])
     }
 
-    pub fn is_main(&self) -> bool {
-        self.0.len() == 1 && self.0[0] == *Dunder::Main
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn as_str(&self) -> String {
@@ -46,12 +50,26 @@ impl ModuleName {
         self.0.last().map(|s| s.as_str())
     }
 
-    /// Removes `n` segments from the end.
-    /// Returns None if it would underflow the module name (Illegal relative import).
+    pub fn parent(&self) -> Option<ModuleName> {
+        self.strip_last(1)
+    }
+
+    /// Removes `n` segments from the end of the module name.
+    ///
+    /// This operation is structural, not semantic: it represents walking upward in the module
+    /// hierarchy.
+    ///
+    /// Returns `None` if removing `n` segments would underflow or erase the module name entirely.
+    /// The empty module name (`ModuleName([])`) is a valid state, but it should only be
+    /// constructed explicitly (not reached by stripping).
+    ///
+    /// Python-specific relative import semantics (e.g. dot handling) are layered on top of this
+    /// operation in the resolver.
     pub fn strip_last(&self, n: usize) -> Option<ModuleName> {
-        if n > self.0.len() {
+        if n >= self.0.len() {
             return None;
         }
+
         let new_len = self.0.len() - n;
         Some(ModuleName(self.0[..new_len].to_vec()))
     }
@@ -127,7 +145,6 @@ mod tests {
 
     #[test]
     fn parents_is_double_ended_iterator() {
-        // Verify that next_back works
         let m = ModuleName::from_segments(&["x", "y", "z"]);
         let mut it = m.parents();
 
@@ -140,5 +157,23 @@ mod tests {
     fn from_dotted() {
         let m = ModuleName::from_dotted("pkg.mod");
         assert_eq!(m, ModuleName::from_segments(&["pkg", "mod"]));
+    }
+
+    #[test]
+    fn parent_of_three_segments() {
+        let m = ModuleName::from_segments(&["a", "b", "c"]);
+        assert_eq!(m.parent(), Some(ModuleName::from_segments(&["a", "b"])));
+    }
+
+    #[test]
+    fn parent_of_one_segment_is_none() {
+        let m = ModuleName::from_segments(&["a"]);
+        assert_eq!(m.parent(), None);
+    }
+
+    #[test]
+    fn parent_of_empty_is_none() {
+        let m = ModuleName::empty();
+        assert_eq!(m.parent(), None);
     }
 }

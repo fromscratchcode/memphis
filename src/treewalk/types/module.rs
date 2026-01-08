@@ -18,31 +18,33 @@ use crate::{
 #[derive(Debug, PartialEq, Clone)]
 pub struct Module {
     name: ModuleName,
-    scope: Scope,
+    package: ModuleName,
     origin: ModuleOrigin,
+    scope: Scope,
 }
 
 impl Module {
-    pub fn new(name: ModuleName, origin: ModuleOrigin) -> Self {
-        let mut scope = Scope::default();
-        scope.insert(&Dunder::Name, TreewalkValue::Str(Str::new(&name.as_str())));
+    pub fn new(name: ModuleName, package: ModuleName, origin: ModuleOrigin) -> Self {
+        let scope = init_scope(&name, &package);
+
         Self {
             name,
-            scope,
+            package,
             origin,
+            scope,
         }
     }
 
-    pub fn new_file_backed(name: ModuleName, path: &Path) -> Self {
-        Self::new(name, ModuleOrigin::File(path.to_path_buf()))
+    pub fn new_file_backed(name: ModuleName, package: ModuleName, path: &Path) -> Self {
+        Self::new(name, package, ModuleOrigin::File(path.to_path_buf()))
     }
 
     pub fn new_builtin(name: ModuleName) -> Self {
-        Self::new(name, ModuleOrigin::Builtin)
+        Self::new(name, ModuleName::empty(), ModuleOrigin::Builtin)
     }
 
     pub fn new_empty(name: ModuleName) -> Self {
-        Self::new(name, ModuleOrigin::Synthetic)
+        Self::new(name, ModuleName::empty(), ModuleOrigin::Synthetic)
     }
 
     pub fn path(&self) -> PathBuf {
@@ -51,6 +53,10 @@ impl Module {
 
     pub fn name(&self) -> &ModuleName {
         &self.name
+    }
+
+    pub fn package(&self) -> &ModuleName {
+        &self.package
     }
 
     pub fn get(&self, name: &str) -> Option<TreewalkValue> {
@@ -75,6 +81,23 @@ impl Module {
     pub fn as_dict(&self, interpreter: &TreewalkInterpreter) -> Container<Dict> {
         self.scope.as_dict(interpreter)
     }
+}
+
+fn init_scope(module: &ModuleName, package: &ModuleName) -> Scope {
+    let mut scope = Scope::default();
+    scope.insert(
+        &Dunder::Name,
+        TreewalkValue::Str(Str::new(&module.as_str())),
+    );
+
+    let package_value = if package.is_empty() {
+        TreewalkValue::None
+    } else {
+        TreewalkValue::Str(Str::new(&package.as_str()))
+    };
+    scope.insert(&Dunder::Package, package_value);
+
+    scope
 }
 
 impl MemberRead for Module {

@@ -860,7 +860,6 @@ foo.bar()
     }
 
     #[test]
-    #[ignore]
     fn relative_import_from_package() {
         let ctx = run_path("src/fixtures/imports/pkg_test/test_app.py");
         assert_read_eq!(ctx, "a", int!(111));
@@ -4945,14 +4944,42 @@ except Exception as e:
     }
 
     #[test]
-    fn name_dunder() {
+    fn name_dunder_global() {
         let input = r#"__name__"#;
         assert_eval_eq!(input, str!("__main__"));
+    }
 
+    #[test]
+    fn name_dunder_script() {
         let ctx = run_path("src/fixtures/name_dunder/main.py");
         assert_read_eq!(ctx, "__name__", str!("__main__"));
         assert_read_eq!(ctx, "a", str!("second"));
         assert_read_eq!(ctx, "b", str!("inner.third"));
+    }
+
+    #[test]
+    fn package_dunder_global() {
+        let input = r#"__package__"#;
+        assert_eval_eq!(input, none!());
+    }
+
+    #[test]
+    fn package_dunder_namespace() {
+        // This example does NOT have an __init__.py file
+        let ctx = run_path("src/fixtures/package_dunder/namespace/main.py");
+        assert_read_eq!(ctx, "__package__", none!());
+        assert_read_eq!(ctx, "second_pkg", none!());
+        assert_read_eq!(ctx, "third_pkg", str!("inner"));
+    }
+
+    #[test]
+    fn package_dunder_regular() {
+        // This example does have an __init__.py file
+        let ctx = run_path("src/fixtures/package_dunder/regular/main.py");
+        assert_read_eq!(ctx, "__package__", none!());
+        assert_read_eq!(ctx, "second_pkg", none!());
+        assert_read_eq!(ctx, "third_pkg", str!("inner"));
+        assert_read_eq!(ctx, "inner_pkg", str!("inner"));
     }
 
     #[test]

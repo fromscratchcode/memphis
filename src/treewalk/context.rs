@@ -49,7 +49,7 @@ impl TreewalkContext {
         let state = Container::new(MemphisState::init(origin.clone()));
         let treewalk_state = Container::new(TreewalkState::new(state));
 
-        let module = Container::new(Module::new(ModuleName::main(), origin));
+        let module = Container::new(Module::new(ModuleName::main(), ModuleName::empty(), origin));
         treewalk_state.push_module_context(module);
 
         treewalk_state

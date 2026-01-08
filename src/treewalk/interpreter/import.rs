@@ -1,10 +1,8 @@
-use std::path::Path;
-
 #[cfg(feature = "c_stdlib")]
 use crate::treewalk::types::cpython::import_from_cpython;
 use crate::{
     core::Container,
-    domain::{Identifier, ModuleName},
+    domain::{Identifier, ModuleName, ResolvedModule},
     treewalk::{
         import_utils,
         result::Raise,
@@ -58,8 +56,12 @@ impl TreewalkInterpreter {
         Ok(())
     }
 
-    fn prepare_imported_module(&self, module_name: &ModuleName, path: &Path) -> Container<Module> {
-        let module = Container::new(Module::new_file_backed(module_name.clone(), path));
+    fn prepare_imported_module(&self, resolved: &ResolvedModule) -> Container<Module> {
+        let module = Container::new(Module::new_file_backed(
+            resolved.name.clone(),
+            resolved.package.clone(),
+            &resolved.path,
+        ));
 
         // Before we parse and evaluate this module, store an empty module as a placeholder. This
         // is necessary to indicate to downstream modules that the upstream module which called
@@ -86,14 +88,14 @@ impl TreewalkInterpreter {
     }
 
     fn import_module(&self, module_name: &ModuleName) -> TreewalkResult<Container<Module>> {
-        let source = self
+        let (resolved, source) = self
             .state
             .memphis_state()
             .load_source(module_name)
             .map_err(|err| Exception::import_error(err.message))
             .raise(self)?;
 
-        let module = self.prepare_imported_module(module_name, source.path());
+        let module = self.prepare_imported_module(&resolved);
         self.enter_imported_module(module);
 
         TreewalkContext::from_state(source.text().clone(), self.state.clone())

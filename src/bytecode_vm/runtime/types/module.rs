@@ -5,7 +5,7 @@ use std::{
 
 use crate::{bytecode_vm::runtime::Reference, domain::ModuleName};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Module {
     name: ModuleName,
 

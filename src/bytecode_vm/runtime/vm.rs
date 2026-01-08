@@ -113,7 +113,7 @@ impl VirtualMachine {
     }
 
     fn import_from_source(&mut self, module_name: &ModuleName) -> VmResult<Container<Module>> {
-        let source = self
+        let (_resolved, source) = self
             .state
             .load_source(module_name)
             .map_err(|err| {

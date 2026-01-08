@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::{
     core::Container,
     domain::{
-        resolve, DebugCallStack, DebugStackFrame, ModuleName, ModuleOrigin, Source,
+        resolve, DebugCallStack, DebugStackFrame, ModuleName, ModuleOrigin, ResolvedModule, Source,
         ToDebugStackFrame,
     },
 };
@@ -85,13 +85,18 @@ impl Container<MemphisState> {
         self.borrow_mut().debug_call_stack.pop_stack_frame()
     }
 
-    pub fn load_source(&self, module_name: &ModuleName) -> Result<Source, ImportError> {
-        let path = self.resolve_module_path(module_name)?;
-        Source::from_path(path)
-            .map_err(|_| ImportError::new(&format!("No module named {}", module_name)))
+    pub fn load_source(
+        &self,
+        module_name: &ModuleName,
+    ) -> Result<(ResolvedModule, Source), ImportError> {
+        let resolved = self.resolve_module(module_name)?;
+        let source = Source::from_path(&resolved.path)
+            .map_err(|_| ImportError::new(&format!("No module named {}", module_name)))?;
+
+        Ok((resolved, source))
     }
 
-    fn resolve_module_path(&self, module_name: &ModuleName) -> Result<PathBuf, ImportError> {
+    fn resolve_module(&self, module_name: &ModuleName) -> Result<ResolvedModule, ImportError> {
         let search_paths = self.search_paths();
         resolve(module_name, &search_paths)
             .ok_or_else(|| ImportError::new(&format!("No module named {}", module_name)))

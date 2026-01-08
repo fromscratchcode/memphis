@@ -1,13 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use crate::domain::{Dunder, FromImportPath, ModuleName, ModulePath};
+use crate::domain::{Dunder, FromImportPath, ModuleName, ModulePath, ResolvedModule};
 
 pub enum ImportResolutionError {
     NoParentPackage,
     BeyondTopLevel,
 }
-
-pub type ImportResult<T> = Result<T, ImportResolutionError>;
 
 impl ImportResolutionError {
     pub fn message(&self) -> &'static str {
@@ -20,22 +18,22 @@ impl ImportResolutionError {
 
 pub fn resolve_import_path(
     import_path: &FromImportPath,
-    current_module: &ModuleName,
-) -> ImportResult<ModuleName> {
+    current_package: &ModuleName,
+) -> Result<ModuleName, ImportResolutionError> {
     match import_path {
         FromImportPath::Absolute(mp) => Ok(resolve_absolute_path(mp)),
         FromImportPath::Relative(levels, tail) => {
-            if current_module.is_main() {
+            if current_package.is_empty() {
                 return Err(ImportResolutionError::NoParentPackage);
             }
 
-            let depth = current_module.segments().len();
-            if *levels >= depth {
-                return Err(ImportResolutionError::BeyondTopLevel);
-            }
-
-            let base = current_module
-                .strip_last(*levels)
+            // - One leading dot (`.`) refers to the current package
+            // - Additional dots (`..`, `...`) walk upward in the package hierarchy
+            //
+            // Since `current_package` already names the containing package,
+            // we strip `levels - 1` segments to compute the base.
+            let base = current_package
+                .strip_last(*levels - 1)
                 .ok_or(ImportResolutionError::BeyondTopLevel)?;
             Ok(base.join(tail.segments_as_str()))
         }
@@ -49,13 +47,32 @@ pub fn resolve_absolute_path(module_path: &ModulePath) -> ModuleName {
 }
 
 /// Finds a module but does not read it (returns absolute path).
-pub fn resolve(module_name: &ModuleName, search_paths: &[PathBuf]) -> Option<PathBuf> {
-    let path = search_paths
-        .iter()
-        .flat_map(|filepath| expand_path(filepath, module_name.segments()))
-        .find(|filepath| filepath.exists())?;
+pub fn resolve(requested: &ModuleName, search_paths: &[PathBuf]) -> Option<ResolvedModule> {
+    for root in search_paths {
+        let candidates = expand_path(root, requested.segments());
 
-    path.canonicalize().ok()
+        for path in candidates {
+            if path.exists() {
+                let path = path.canonicalize().ok()?;
+
+                let package = if path.ends_with(Dunder::Init.py_file()) {
+                    // package
+                    requested.clone()
+                } else {
+                    // regular module
+                    requested.parent().unwrap_or(ModuleName::empty())
+                };
+
+                return Some(ResolvedModule {
+                    name: requested.clone(),
+                    package,
+                    path,
+                });
+            }
+        }
+    }
+
+    None
 }
 
 /// For a given path and segments, this returns both the `../base.py` and `../base/__init__.py`
@@ -82,7 +99,7 @@ fn expand_path(path: &Path, segments: &[String]) -> [PathBuf; 2] {
     let init_path = segments
         .iter()
         .fold(path.to_path_buf(), append_segment)
-        .join(format!("{}.py", Dunder::Init));
+        .join(Dunder::Init.py_file());
 
     [base_path, init_path]
 }

@@ -48,6 +48,7 @@ pub enum Dunder {
     Module,
     Doc,
     Name,
+    Package,
     Qualname,
     Annotations,
     TypeParams,
@@ -100,6 +101,7 @@ impl Dunder {
             Dunder::Module => "__module__",
             Dunder::Doc => "__doc__",
             Dunder::Name => "__name__",
+            Dunder::Package => "__package__",
             Dunder::Qualname => "__qualname__",
             Dunder::Annotations => "__annotations__",
             Dunder::TypeParams => "__type_params__",
@@ -110,6 +112,10 @@ impl Dunder {
             Dunder::Class => "__class__",
             Dunder::Builtins => "__builtins__",
         }
+    }
+
+    pub fn py_file(&self) -> String {
+        format!("{}.py", self)
     }
 }
 
