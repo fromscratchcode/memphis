@@ -646,6 +646,16 @@ impl VirtualMachine {
         log_impure(LogLevel::Debug, || self.dump_frame());
         log(LogLevel::Debug, || frame.current_inst_annotated());
 
+        let result = self.execute_opcode(opcode)?;
+
+        if matches!(result, StepResult::Continue) {
+            self.call_stack.advance_pc().raise(self)?;
+        }
+
+        Ok(result)
+    }
+
+    fn execute_opcode(&mut self, opcode: Opcode) -> VmResult<StepResult> {
         match opcode {
             Opcode::Add => {
                 self.binary_op(opcode, |a, b| a + b, false)
@@ -1082,8 +1092,6 @@ impl VirtualMachine {
             Opcode::Placeholder => return Exception::runtime_error().raise(self),
         }
 
-        // Increment PC for all instructions.
-        self.call_stack.advance_pc().raise(self)?;
         Ok(StepResult::Continue)
     }
 
