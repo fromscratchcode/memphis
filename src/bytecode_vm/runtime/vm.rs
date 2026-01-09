@@ -1099,15 +1099,6 @@ impl VirtualMachine {
     }
 }
 
-impl Default for VirtualMachine {
-    fn default() -> Self {
-        Self::new(
-            Container::new(MemphisState::default()),
-            Container::new(Runtime::default()),
-        )
-    }
-}
-
 /// Expects the frame to return a value. Panics if the result was not `StepResult::Return`.
 fn unwrap_return_value(step_result: StepResult) -> Reference {
     match step_result {
