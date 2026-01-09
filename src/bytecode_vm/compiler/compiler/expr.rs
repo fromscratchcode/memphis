@@ -54,12 +54,6 @@ impl Compiler {
         self.compile_constant(Constant::String(value.to_string()))
     }
 
-    // TODO should this actually be public?
-    pub fn compile_load(&mut self, name: &Identifier) -> CompilerResult<()> {
-        let load = self.generate_load(name)?;
-        self.emit(load)
-    }
-
     fn compile_list(&mut self, items: &[Expr]) -> CompilerResult<()> {
         self.compile_expr_slice(items)?;
         self.emit(Opcode::BuildList(items.len()))?;
@@ -243,6 +237,13 @@ impl Compiler {
     fn compile_await(&mut self, expr: &Expr) -> CompilerResult<()> {
         self.compile_expr(expr)?;
         self.emit(Opcode::Await)?;
+        Ok(())
+    }
+
+    fn compile_expr_slice(&mut self, items: &[Expr]) -> CompilerResult<()> {
+        for item in items {
+            self.compile_expr(item)?;
+        }
         Ok(())
     }
 }

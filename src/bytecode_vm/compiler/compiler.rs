@@ -7,7 +7,7 @@ use crate::{
     },
     core::{log, LogLevel},
     domain::{Context, Identifier, ModuleName},
-    parser::types::{Ast, ConditionalAst, Expr},
+    parser::types::Ast,
 };
 
 use super::opcode::{SignedOffset, UnsignedOffset};
@@ -144,57 +144,20 @@ impl Compiler {
         Ok(opcode)
     }
 
-    /// Compiles a condition and block, returning the offset of the placeholder
-    /// that should later be patched with a `JumpIfFalse`.
-    fn compile_conditional_branch(
-        &mut self,
-        ast: &ConditionalAst,
-    ) -> CompilerResult<UnsignedOffset> {
-        self.compile_expr(&ast.condition)?;
-        let placeholder = self.emit_placeholder()?;
-        self.compile_ast(&ast.ast)?;
-        Ok(placeholder)
-    }
-
-    /// Load a CodeObject and turn it into a function or closure.
-    fn make_function(&mut self, code: CodeObject) -> CompilerResult<()> {
-        let free_vars = code.freevars.clone();
-        self.compile_code(code)?;
-
-        if free_vars.is_empty() {
-            self.emit(Opcode::MakeFunction)?;
-        } else {
-            // We push the free vars onto the stack in reverse order so that we will pop
-            // them off in order.
-            for free_var in free_vars.iter().rev() {
-                // TODO this is a hack, we should either treat these as identifiers or not!
-                self.compile_load(&Identifier::new(free_var).unwrap())?;
-            }
-            self.emit(Opcode::MakeClosure(free_vars.len()))?;
-        }
-        Ok(())
-    }
-
-    fn compile_code(&mut self, code: CodeObject) -> CompilerResult<()> {
-        self.compile_constant(Constant::Code(code))
-    }
-
     fn compile_constant(&mut self, constant: Constant) -> CompilerResult<()> {
         let index = self.get_or_set_constant_index(constant)?;
         self.emit(Opcode::LoadConst(index))?;
         Ok(())
     }
 
+    fn compile_load(&mut self, name: &Identifier) -> CompilerResult<()> {
+        let load = self.generate_load(name)?;
+        self.emit(load)
+    }
+
     fn compile_store(&mut self, name: &Identifier) -> CompilerResult<()> {
         let store = self.generate_store(name)?;
         self.emit(store)
-    }
-
-    fn compile_expr_slice(&mut self, items: &[Expr]) -> CompilerResult<()> {
-        for item in items {
-            self.compile_expr(item)?;
-        }
-        Ok(())
     }
 
     fn get_or_set_local_index(&mut self, name: &Identifier) -> CompilerResult<LocalIndex> {

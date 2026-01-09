@@ -1,6 +1,6 @@
 use crate::{
     bytecode_vm::{
-        compiler::{CodeObject, Opcode},
+        compiler::{opcode::UnsignedOffset, CodeObject, Constant, Opcode},
         Compiler, CompilerError, CompilerResult,
     },
     domain::{resolve_import_path, FromImportPath, FunctionType, Identifier, ModuleName},
@@ -255,7 +255,7 @@ impl Compiler {
         }
 
         // Make the function/closure itself out of the compiled code
-        self.make_function(code)?;
+        self.compile_function(code)?;
 
         // Apply the decorators - innermost outward
         for _ in decorators {
@@ -356,6 +356,41 @@ impl Compiler {
         }
 
         Ok(())
+    }
+
+    /// Compiles a condition and block, returning the offset of the placeholder
+    /// that should later be patched with a `JumpIfFalse`.
+    fn compile_conditional_branch(
+        &mut self,
+        ast: &ConditionalAst,
+    ) -> CompilerResult<UnsignedOffset> {
+        self.compile_expr(&ast.condition)?;
+        let placeholder = self.emit_placeholder()?;
+        self.compile_ast(&ast.ast)?;
+        Ok(placeholder)
+    }
+
+    /// Load a CodeObject and turn it into a function or closure.
+    fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
+        let free_vars = code.freevars.clone();
+        self.compile_code(code)?;
+
+        if free_vars.is_empty() {
+            self.emit(Opcode::MakeFunction)?;
+        } else {
+            // We push the free vars onto the stack in reverse order so that we will pop
+            // them off in order.
+            for free_var in free_vars.iter().rev() {
+                // TODO this is a hack, we should either treat these as identifiers or not!
+                self.compile_load(&Identifier::new(free_var).unwrap())?;
+            }
+            self.emit(Opcode::MakeClosure(free_vars.len()))?;
+        }
+        Ok(())
+    }
+
+    fn compile_code(&mut self, code: CodeObject) -> CompilerResult<()> {
+        self.compile_constant(Constant::Code(code))
     }
 }
 
