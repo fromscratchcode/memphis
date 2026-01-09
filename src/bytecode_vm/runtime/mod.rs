@@ -8,6 +8,7 @@ pub mod modules;
 mod reference;
 #[allow(clippy::module_inception)]
 mod runtime;
+mod step_result;
 pub mod types;
 mod vm;
 
@@ -18,4 +19,5 @@ pub use frame::Frame;
 pub use heap::Heap;
 pub use reference::Reference;
 pub use runtime::Runtime;
+pub use step_result::StepResult;
 pub use vm::VirtualMachine;
