@@ -34,7 +34,7 @@ impl MemberRead for Super {
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
         let instance = self.receiver();
-        let class = instance.get_class(interpreter);
+        let class = interpreter.state.class_of_value(&instance);
 
         // Retrieve the MRO for the class, excluding the class itself
         let super_mro = class.super_mro();
@@ -47,8 +47,8 @@ impl MemberRead for Super {
             log(LogLevel::Debug, || {
                 format!("Found: {parent_class}::{name} on class via super()")
             });
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(instance),
                 class,
             )?));

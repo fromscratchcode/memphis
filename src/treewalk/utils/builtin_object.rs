@@ -36,8 +36,8 @@ impl MemberRead for BuiltinObject {
             log(LogLevel::Debug, || {
                 format!("Found: {}::{} on builtin class", self.class, name)
             });
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(self.instance.clone()),
                 self.class.clone(),
             )?));

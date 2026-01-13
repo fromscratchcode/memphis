@@ -4,8 +4,7 @@ use crate::{
     bytecode_vm::{
         runtime::{
             types::{Coroutine, CoroutineState},
-            vm::StepResult,
-            Reference,
+            Reference, StepResult,
         },
         VirtualMachine, VmResult,
     },

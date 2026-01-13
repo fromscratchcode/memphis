@@ -220,8 +220,8 @@ impl MemberRead for Container<Class> {
             log(LogLevel::Debug, || {
                 format!("Found: {self}::{name} on class [from class]")
             });
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 None,
                 self.clone(),
             )?));
@@ -231,8 +231,8 @@ impl MemberRead for Container<Class> {
             log(LogLevel::Debug, || {
                 format!("Found: {self}::{name} on metaclass")
             });
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(TreewalkValue::Class(self.clone())),
                 self.borrow().metaclass(),
             )?));
@@ -279,7 +279,7 @@ impl Display for Container<Class> {
 
 impl Callable for Container<Class> {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        TreewalkValue::new(interpreter, self.clone(), args)
+        interpreter.create_object(self.clone(), args)
     }
 
     fn name(&self) -> String {

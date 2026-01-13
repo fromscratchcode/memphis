@@ -10,7 +10,7 @@ use std::{
 use crate::treewalk::types::cpython::{CPythonClass, CPythonModule, CPythonObject};
 use crate::{
     core::{floats_equal, Container},
-    domain::{Dunder, MemphisValue, Type},
+    domain::{MemphisValue, Type},
     treewalk::{
         protocols::MemberRead,
         type_system::{
@@ -28,8 +28,7 @@ use crate::{
             Traceback, Tuple,
         },
         typing::TypeExpr,
-        utils::Args,
-        DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult,
+        DomainResult, SymbolTable,
     },
 };
 
@@ -177,35 +176,6 @@ impl PartialOrd for TreewalkValue {
 }
 
 impl TreewalkValue {
-    pub fn new(
-        interpreter: &TreewalkInterpreter,
-        class: Container<Class>,
-        args: Args,
-    ) -> TreewalkResult<Self> {
-        // We have to handle calls to `type()` with only one parameter as a special case because
-        // this doesn't actually call the `Type::Type` `Dunder::New` method, which expects more
-        // arguments and would return a new class. Overloading the `Dunder::Init` method
-        // here on `Type::Type` would also create unintended behaviors.
-        if class.borrow().is_type(&Type::Type) {
-            assert_eq!(args.len(), 1);
-            return Ok(interpreter.state.class_of_value(&args.get_arg(0)));
-        };
-
-        // The [`Class`] must be explicitly passed to the [`Dunder::New`] method as this method is
-        // never bound.
-        // We clone here because these args will be consumed by the `Dunder::New` method call and
-        // we still need a version of these for method call to `Dunder::Init`.
-        let new_args = args
-            .clone()
-            .with_bound_new(TreewalkValue::Class(class.clone()));
-        let object =
-            interpreter.call_method(&TreewalkValue::Class(class), Dunder::New, new_args)?;
-
-        interpreter.call_method(&object, Dunder::Init, args)?;
-
-        Ok(object)
-    }
-
     pub fn hash(&self) -> usize {
         match self {
             TreewalkValue::Object(o) => o.address(),
@@ -215,103 +185,101 @@ impl TreewalkValue {
         }
     }
 
-    fn minimized_display(&self, f: &mut Formatter) -> Result<(), Error> {
+    fn repr(&self) -> String {
         match self {
-            TreewalkValue::None => write!(f, "None"),
-            TreewalkValue::Ellipsis => write!(f, "Ellipsis"),
-            TreewalkValue::NotImplemented => write!(f, "NotImplemented"),
-            TreewalkValue::Super(_) => write!(f, "<super>"),
-            TreewalkValue::Classmethod(_) => write!(f, "<classmethod>"),
-            TreewalkValue::Staticmethod(_) => write!(f, "<staticmethod>"),
-            TreewalkValue::Property(_) => write!(f, "<property>"),
-            TreewalkValue::DataDescriptor(_) => write!(f, "<attribute <> of <> objects>"),
-            TreewalkValue::NonDataDescriptor(_) => {
-                write!(f, "<non-data attribute <> of <> objects>")
-            }
-            TreewalkValue::Class(c) => write!(f, "{c}"),
-            TreewalkValue::Object(o) => write!(f, "{o}"),
-            TreewalkValue::Method(m) => write!(f, "{m}"),
-            TreewalkValue::Function(func) => write!(f, "{func}"),
-            TreewalkValue::Generator(_) => write!(f, "<generator object>"),
-            TreewalkValue::Coroutine(_) => write!(f, "<coroutine object>"),
+            TreewalkValue::None => "None".into(),
+            TreewalkValue::Ellipsis => "Ellipsis".into(),
+            TreewalkValue::NotImplemented => "NotImplemented".into(),
+            TreewalkValue::Super(_) => "<super>".into(),
+            TreewalkValue::Classmethod(_) => "<classmethod>".into(),
+            TreewalkValue::Staticmethod(_) => "<staticmethod>".into(),
+            TreewalkValue::Property(_) => "<property>".into(),
+            TreewalkValue::DataDescriptor(_) => "<attribute <> of <> objects>".into(),
+            TreewalkValue::NonDataDescriptor(_) => "<non-data attribute <> of <> objects>".into(),
+            TreewalkValue::Class(c) => c.to_string(),
+            TreewalkValue::Object(o) => o.to_string(),
+            TreewalkValue::Method(m) => m.to_string(),
+            TreewalkValue::Function(func) => func.to_string(),
+            TreewalkValue::Generator(_) => "<generator object>".into(),
+            TreewalkValue::Coroutine(_) => "<coroutine object>".into(),
             TreewalkValue::BuiltinFunction(func) => {
-                write!(f, "<built-in function {}>", func.name())
+                format!("<built-in function {}>", func.name())
             }
-            TreewalkValue::BuiltinMethod(_) => write!(f, "<built-in method>"),
-            TreewalkValue::Int(i) => write!(f, "{i}"),
+            TreewalkValue::BuiltinMethod(_) => "<built-in method>".into(),
+            TreewalkValue::Int(i) => i.to_string(),
             TreewalkValue::Float(i) => {
                 // We should probably move this onto Float eventually
                 if i.fract() == 0.0 {
                     // integer-like float, force ".0"
-                    write!(f, "{}.0", i.trunc())
+                    format!("{}.0", i.trunc())
                 } else {
-                    write!(f, "{}", i)
+                    format!("{}", i)
                 }
             }
-            TreewalkValue::Str(s) => write!(f, "{s}"),
+            TreewalkValue::Str(s) => format!("{s}"),
             TreewalkValue::Bytes(b) => {
                 // Similar to Float, we should probably move this onto Bytes
-                write!(f, "b'")?;
+                let mut s = String::from("b'");
                 for &byte in b {
                     match byte {
-                        b'\n' => write!(f, "\\n")?,
-                        b'\r' => write!(f, "\\r")?,
-                        b'\t' => write!(f, "\\t")?,
-                        b'\'' => write!(f, "\\'")?,
-                        b'\\' => write!(f, "\\\\")?,
-                        32..=126 => write!(f, "{}", byte as char)?, // printable ASCII
-                        _ => write!(f, "\\x{:02x}", byte)?,         // hex escape
+                        b'\n' => s.push_str("\\n"),
+                        b'\r' => s.push_str("\\r"),
+                        b'\t' => s.push_str("\\t"),
+                        b'\'' => s.push_str("\\'"),
+                        b'\\' => s.push_str("\\\\"),
+                        32..=126 => s.push(byte as char), // printable ASCII
+                        _ => s.push_str(&format!("\\x{:02x}", byte)), // hex escape
                     }
                 }
-                write!(f, "'")
+                s.push('\'');
+                s
             }
             TreewalkValue::ByteArray(b) => {
-                write!(f, "bytearray(")?;
-                Display::fmt(&TreewalkValue::Bytes(b.borrow().raw().to_vec()), f)?;
-                write!(f, ")")
+                let bytes = TreewalkValue::Bytes(b.borrow().raw().to_vec());
+                format!("bytearray({})", bytes.repr())
             }
             TreewalkValue::Bool(b) => match b {
-                true => write!(f, "True"),
-                false => write!(f, "False"),
+                true => "True".into(),
+                false => "False".into(),
             },
-            TreewalkValue::List(l) => write!(f, "{l}"),
-            TreewalkValue::Set(s) => write!(f, "{s}"),
-            TreewalkValue::FrozenSet(s) => write!(f, "{s}"),
-            TreewalkValue::Range(r) => write!(f, "{r}"),
-            TreewalkValue::Tuple(t) => write!(f, "{t}"),
-            TreewalkValue::Zip(_) => write!(f, "<zip>"),
-            TreewalkValue::Slice(s) => write!(f, "{s}"),
-            TreewalkValue::Complex(c) => write!(f, "{c}"),
-            TreewalkValue::Dict(d) => write!(f, "{d}"),
-            TreewalkValue::MappingProxy(d) => write!(f, "{d}"),
-            TreewalkValue::DictItems(d) => write!(f, "dict_items({d})"),
-            TreewalkValue::DictKeys(d) => write!(f, "dict_keys({d})"),
-            TreewalkValue::DictValues(d) => write!(f, "dict_values({d})"),
-            TreewalkValue::StrIter(_) => write!(f, "<str_ascii_iterator>"),
-            TreewalkValue::BytesIter(_) => write!(f, "<bytes_iterator>"),
-            TreewalkValue::ByteArrayIter(_) => write!(f, "<byte_array_iterator>"),
-            TreewalkValue::ListIter(_) => write!(f, "<list_iterator>"),
-            TreewalkValue::ReversedIter(_) => write!(f, "<list_reverseiterator>"),
-            TreewalkValue::SetIter(_) => write!(f, "<set_iterator>"),
-            TreewalkValue::DictItemsIter(_) => write!(f, "<dict_itemiterator>"),
-            TreewalkValue::DictKeysIter(_) => write!(f, "<dict_keyiterator>"),
-            TreewalkValue::DictValuesIter(_) => write!(f, "<dict_valueiterator>"),
-            TreewalkValue::RangeIter(_) => write!(f, "<range_iterator>"),
-            TreewalkValue::TupleIter(_) => write!(f, "<tuple_iterator>"),
-            TreewalkValue::Code(_) => write!(f, "<code object>"),
-            TreewalkValue::Cell(_) => write!(f, "<cell>"),
-            TreewalkValue::Module(m) => write!(f, "{m}"),
-            TreewalkValue::Exception(_) => write!(f, "<exception>"),
-            TreewalkValue::StopIteration(_) => write!(f, "<stop_iteration>"),
-            TreewalkValue::Traceback(_) => write!(f, "<traceback>"),
-            TreewalkValue::Frame => write!(f, "<frame>"),
-            TreewalkValue::TypeNode(t) => write!(f, "<type {t:?}>"),
+            TreewalkValue::List(l) => l.to_string(),
+            TreewalkValue::Set(s) => s.to_string(),
+            TreewalkValue::FrozenSet(s) => s.to_string(),
+            TreewalkValue::Range(r) => r.to_string(),
+            TreewalkValue::Tuple(t) => t.to_string(),
+            TreewalkValue::Zip(_) => "<zip>".into(),
+            TreewalkValue::Slice(s) => s.to_string(),
+            TreewalkValue::Complex(c) => c.to_string(),
+            TreewalkValue::Dict(d) => d.to_string(),
+            TreewalkValue::MappingProxy(d) => d.to_string(),
+            TreewalkValue::DictItems(d) => format!("dict_items({d})"),
+            TreewalkValue::DictKeys(d) => format!("dict_keys({d})"),
+            TreewalkValue::DictValues(d) => format!("dict_values({d})"),
+            TreewalkValue::StrIter(_) => "<str_ascii_iterator>".to_string(),
+            TreewalkValue::BytesIter(_) => "<bytes_iterator>".to_string(),
+            TreewalkValue::ByteArrayIter(_) => "<byte_array_iterator>".to_string(),
+            TreewalkValue::ListIter(_) => "<list_iterator>".to_string(),
+            TreewalkValue::ReversedIter(_) => "<list_reverseiterator>".to_string(),
+            TreewalkValue::SetIter(_) => "<set_iterator>".to_string(),
+            TreewalkValue::DictItemsIter(_) => "<dict_itemiterator>".to_string(),
+            TreewalkValue::DictKeysIter(_) => "<dict_keyiterator>".to_string(),
+            TreewalkValue::DictValuesIter(_) => "<dict_valueiterator>".to_string(),
+            TreewalkValue::RangeIter(_) => "<range_iterator>".to_string(),
+            TreewalkValue::TupleIter(_) => "<tuple_iterator>".to_string(),
+            TreewalkValue::Code(_) => "<code object>".to_string(),
+            TreewalkValue::Cell(_) => "<cell>".to_string(),
+            TreewalkValue::Module(m) => m.to_string(),
+            TreewalkValue::Exception(_) => "<exception>".to_string(),
+            TreewalkValue::StopIteration(_) => "<stop_iteration>".to_string(),
+            TreewalkValue::Traceback(_) => "<traceback>".to_string(),
+            TreewalkValue::Frame => "<frame>".to_string(),
+            TreewalkValue::TypeNode(t) => format!("<type {t:?}>"),
             #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(m) => write!(f, "{m}"),
+            TreewalkValue::CPythonModule(m) => m.to_string(),
             #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(o) => write!(f, "{o}"),
+            TreewalkValue::CPythonObject(o) => o.to_string(),
             #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonClass(_) => write!(f, "<class>"),
+            TreewalkValue::CPythonClass(_) => "<class>".into(),
         }
     }
 
@@ -388,55 +356,6 @@ impl TreewalkValue {
             TreewalkValue::CPythonObject(_) => Type::Object,
             #[cfg(feature = "c_stdlib")]
             TreewalkValue::CPythonClass(_) => unimplemented!(),
-        }
-    }
-
-    pub fn get_class(&self, interpreter: &TreewalkInterpreter) -> Container<Class> {
-        match self {
-            TreewalkValue::Object(o) => o.borrow().class(),
-            TreewalkValue::Class(o) => o.clone(),
-            TreewalkValue::Super(s) => s.receiver().get_class(interpreter),
-            _ => interpreter.state.class_of_type(&self.get_type()).clone(),
-        }
-    }
-
-    pub fn class_name(&self, interpreter: &TreewalkInterpreter) -> String {
-        self.get_class(interpreter).borrow().name().to_string()
-    }
-
-    pub fn resolve_descriptor(
-        self,
-        interpreter: &TreewalkInterpreter,
-        instance: Option<TreewalkValue>,
-        owner: Container<Class>,
-    ) -> TreewalkResult<TreewalkValue> {
-        // Similar to callable below, ideally we'd be able to handle this inside
-        // `Result::as_nondata_descriptor` but we don't yet have a way to downcast in this way
-        // (i.e. treat `S` as a different `dyn T` when `S : T`)
-        if let Some(descriptor) = self.clone().into_data_descriptor(interpreter)? {
-            return descriptor.get_attr(interpreter, instance, owner);
-        }
-
-        // I'd love to find a way to combine this into [`Result::as_nondata_descriptor`] and move
-        // this functionality onto the [`Callable`] trait somehow.
-        if let Ok(callable) = self.clone().as_callable() {
-            // The new method is never bound. When called explicitly inside other metaclasses, the
-            // class must be passed in by the calling metaclass.
-            if callable.name() == String::from(Dunder::New) {
-                return Ok(self.clone());
-            }
-
-            return Ok(match instance {
-                Some(instance) => {
-                    TreewalkValue::Method(Container::new(Method::new(instance, callable)))
-                }
-                None => self.clone(),
-            });
-        }
-
-        match self.clone().into_nondata_descriptor(interpreter)? {
-            Some(descriptor) => descriptor.get_attr(interpreter, instance, owner),
-            None => Ok(self.clone()),
         }
     }
 
@@ -690,13 +609,13 @@ impl From<&TreewalkValue> for String {
 
 impl Display for TreewalkValue {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        self.minimized_display(f)
+        write!(f, "{}", self.repr())
     }
 }
 
 impl Debug for TreewalkValue {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        self.minimized_display(f)
+        write!(f, "{}", self.repr())
     }
 }
 

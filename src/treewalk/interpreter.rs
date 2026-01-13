@@ -20,6 +20,7 @@ mod expr;
 mod function;
 mod import;
 mod load;
+mod object;
 mod stmt;
 
 #[derive(Clone)]
@@ -4819,7 +4820,9 @@ f = obj.my_attr
         assert_read_eq!(ctx, "b", str!("new value"));
         assert_read_eq!(ctx, "c", str!("default value"));
         assert_eq!(
-            read(&ctx, "d").get_class(ctx.interpreter()).borrow().name(),
+            ctx.interpreter()
+                .state
+                .class_name_of_value(&read(&ctx, "d")),
             "Descriptor"
         );
         assert_read_eq!(ctx, "e", str!("custom value"));

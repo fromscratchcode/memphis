@@ -171,9 +171,9 @@ impl MemberRead for Container<Object> {
                 )
             });
             let instance = TreewalkValue::Object(self.clone());
-            let owner = instance.get_class(interpreter);
-            return Ok(Some(attr.resolve_descriptor(
-                interpreter,
+            let owner = interpreter.state.class_of_value(&instance);
+            return Ok(Some(interpreter.resolve_descriptor(
+                &attr,
                 Some(instance),
                 owner,
             )?));
@@ -245,7 +245,10 @@ impl MemberWrite for Container<Object> {
             .into_member_reader(interpreter)
             .get_member(interpreter, &Dunder::Dict)?
             .ok_or_else(|| {
-                Exception::attribute_error(result.class_name(interpreter), Dunder::Dict.as_ref())
+                Exception::attribute_error(
+                    interpreter.state.class_name_of_value(&result),
+                    Dunder::Dict.as_ref(),
+                )
             })
             .raise(interpreter)?
             .as_dict()
@@ -253,8 +256,11 @@ impl MemberWrite for Container<Object> {
             .borrow()
             .has(interpreter.clone(), &TreewalkValue::Str(Str::new(name)))
         {
-            return Exception::attribute_error(result.class_name(interpreter), name)
-                .raise(interpreter);
+            return Exception::attribute_error(
+                interpreter.state.class_name_of_value(&result),
+                name,
+            )
+            .raise(interpreter);
         }
 
         log(LogLevel::Debug, || {

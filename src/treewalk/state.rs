@@ -207,15 +207,6 @@ impl Container<TreewalkState> {
         self.borrow_mut().scope_manager.mark_global(name);
     }
 
-    pub fn class_of_value(&self, result: &TreewalkValue) -> TreewalkValue {
-        match result {
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(o) => o.get_type(),
-            TreewalkValue::Object(o) => TreewalkValue::Class(o.borrow().class()),
-            _ => TreewalkValue::Class(self.class_of_type(&result.get_type())),
-        }
-    }
-
     /// Return a singleton `Class` for builtin types such as list, set, tuple, dict, etc.
     pub fn class_of_type(&self, type_: &Type) -> Container<Class> {
         self.borrow().type_registry.get_type_class(type_)
@@ -254,5 +245,29 @@ impl Container<TreewalkState> {
         let module = self.fetch_module(module)?;
         let binding = module.borrow();
         binding.get(class)?.as_class().ok()
+    }
+
+    // TODO we should clarify the difference between this and class_of_value below.
+    // They behave differently for TreewalkValue::Class, which has a Type of Type.
+    pub fn type_of_value(&self, value: &TreewalkValue) -> TreewalkValue {
+        match value {
+            TreewalkValue::Object(o) => TreewalkValue::Class(o.borrow().class()),
+            #[cfg(feature = "c_stdlib")]
+            TreewalkValue::CPythonObject(o) => o.get_type(),
+            _ => TreewalkValue::Class(self.class_of_type(&value.get_type())),
+        }
+    }
+
+    pub fn class_of_value(&self, value: &TreewalkValue) -> Container<Class> {
+        match value {
+            TreewalkValue::Object(o) => o.borrow().class(),
+            TreewalkValue::Class(o) => o.clone(),
+            TreewalkValue::Super(s) => self.class_of_value(&s.receiver()),
+            _ => self.class_of_type(&value.get_type()).clone(),
+        }
+    }
+
+    pub fn class_name_of_value(&self, value: &TreewalkValue) -> String {
+        self.class_of_value(value).borrow().name().to_string()
     }
 }
