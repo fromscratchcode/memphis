@@ -47,6 +47,7 @@ impl Heap {
         }
     }
 
+    #[cfg(test)]
     pub fn iter(&self) -> impl Iterator<Item = &VmValue> {
         self.storage.iter()
     }

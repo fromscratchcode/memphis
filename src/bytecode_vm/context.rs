@@ -91,13 +91,13 @@ impl VmContext {
 
 impl Interpreter for VmContext {
     fn run(&mut self) -> MemphisResult<MemphisValue> {
-        self.run_inner()
-            .map(Into::into)
-            .map_err(|e| e.normalize(&self.vm))
+        let value = self.run_inner().map_err(|e| e.normalize(&self.vm))?;
+        Ok(self.vm.normalize_vm_value(value).unwrap())
     }
 
-    fn read(&mut self, name: &str) -> Option<MemphisValue> {
-        self.read_inner(name).map(Into::into)
+    fn read(&self, name: &str) -> Option<MemphisValue> {
+        let value = self.read_inner(name)?;
+        Some(self.vm.normalize_vm_value(value).unwrap())
     }
 
     fn add_text(&mut self, line: Text) {

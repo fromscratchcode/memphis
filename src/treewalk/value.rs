@@ -1,7 +1,7 @@
 use std::{
     cell::{Ref, RefMut},
     cmp::Ordering,
-    fmt::{Debug, Display, Error, Formatter},
+    fmt::{Debug, Error, Formatter},
     hash::{Hash, Hasher},
     ptr,
 };
@@ -24,8 +24,8 @@ use crate::{
             },
             ByteArray, Cell, Class, Classmethod, Code, Complex, Coroutine, Dict, DictItems,
             DictKeys, DictValues, Exception, FrozenSet, Function, List, MappingProxy, Method,
-            Module, Object, Property, Range, Set, Slice, Staticmethod, StopIteration, Str, Super,
-            Traceback, Tuple,
+            Module, Object, Property, Range, Set, Slice, Staticmethod, Str, Super, Traceback,
+            Tuple,
         },
         typing::TypeExpr,
         DomainResult, SymbolTable,
@@ -74,9 +74,6 @@ pub enum TreewalkValue {
     Range(Range),
     Tuple(Tuple),
     Exception(Exception),
-    /// Only constructed when a `StopIteration` exception is caught and aliased,
-    /// e.g., `except StopIteration as e:`. Mirrors CPython behavior to expose `.value`.
-    StopIteration(Box<StopIteration>),
     Traceback(Traceback),
     Frame,
     ListIter(ListIter),
@@ -185,104 +182,6 @@ impl TreewalkValue {
         }
     }
 
-    fn repr(&self) -> String {
-        match self {
-            TreewalkValue::None => "None".into(),
-            TreewalkValue::Ellipsis => "Ellipsis".into(),
-            TreewalkValue::NotImplemented => "NotImplemented".into(),
-            TreewalkValue::Super(_) => "<super>".into(),
-            TreewalkValue::Classmethod(_) => "<classmethod>".into(),
-            TreewalkValue::Staticmethod(_) => "<staticmethod>".into(),
-            TreewalkValue::Property(_) => "<property>".into(),
-            TreewalkValue::DataDescriptor(_) => "<attribute <> of <> objects>".into(),
-            TreewalkValue::NonDataDescriptor(_) => "<non-data attribute <> of <> objects>".into(),
-            TreewalkValue::Class(c) => c.to_string(),
-            TreewalkValue::Object(o) => o.to_string(),
-            TreewalkValue::Method(m) => m.to_string(),
-            TreewalkValue::Function(func) => func.to_string(),
-            TreewalkValue::Generator(_) => "<generator object>".into(),
-            TreewalkValue::Coroutine(_) => "<coroutine object>".into(),
-            TreewalkValue::BuiltinFunction(func) => {
-                format!("<built-in function {}>", func.name())
-            }
-            TreewalkValue::BuiltinMethod(_) => "<built-in method>".into(),
-            TreewalkValue::Int(i) => i.to_string(),
-            TreewalkValue::Float(i) => {
-                // We should probably move this onto Float eventually
-                if i.fract() == 0.0 {
-                    // integer-like float, force ".0"
-                    format!("{}.0", i.trunc())
-                } else {
-                    format!("{}", i)
-                }
-            }
-            TreewalkValue::Str(s) => format!("{s}"),
-            TreewalkValue::Bytes(b) => {
-                // Similar to Float, we should probably move this onto Bytes
-                let mut s = String::from("b'");
-                for &byte in b {
-                    match byte {
-                        b'\n' => s.push_str("\\n"),
-                        b'\r' => s.push_str("\\r"),
-                        b'\t' => s.push_str("\\t"),
-                        b'\'' => s.push_str("\\'"),
-                        b'\\' => s.push_str("\\\\"),
-                        32..=126 => s.push(byte as char), // printable ASCII
-                        _ => s.push_str(&format!("\\x{:02x}", byte)), // hex escape
-                    }
-                }
-                s.push('\'');
-                s
-            }
-            TreewalkValue::ByteArray(b) => {
-                let bytes = TreewalkValue::Bytes(b.borrow().raw().to_vec());
-                format!("bytearray({})", bytes.repr())
-            }
-            TreewalkValue::Bool(b) => match b {
-                true => "True".into(),
-                false => "False".into(),
-            },
-            TreewalkValue::List(l) => l.to_string(),
-            TreewalkValue::Set(s) => s.to_string(),
-            TreewalkValue::FrozenSet(s) => s.to_string(),
-            TreewalkValue::Range(r) => r.to_string(),
-            TreewalkValue::Tuple(t) => t.to_string(),
-            TreewalkValue::Zip(_) => "<zip>".into(),
-            TreewalkValue::Slice(s) => s.to_string(),
-            TreewalkValue::Complex(c) => c.to_string(),
-            TreewalkValue::Dict(d) => d.to_string(),
-            TreewalkValue::MappingProxy(d) => d.to_string(),
-            TreewalkValue::DictItems(d) => format!("dict_items({d})"),
-            TreewalkValue::DictKeys(d) => format!("dict_keys({d})"),
-            TreewalkValue::DictValues(d) => format!("dict_values({d})"),
-            TreewalkValue::StrIter(_) => "<str_ascii_iterator>".to_string(),
-            TreewalkValue::BytesIter(_) => "<bytes_iterator>".to_string(),
-            TreewalkValue::ByteArrayIter(_) => "<byte_array_iterator>".to_string(),
-            TreewalkValue::ListIter(_) => "<list_iterator>".to_string(),
-            TreewalkValue::ReversedIter(_) => "<list_reverseiterator>".to_string(),
-            TreewalkValue::SetIter(_) => "<set_iterator>".to_string(),
-            TreewalkValue::DictItemsIter(_) => "<dict_itemiterator>".to_string(),
-            TreewalkValue::DictKeysIter(_) => "<dict_keyiterator>".to_string(),
-            TreewalkValue::DictValuesIter(_) => "<dict_valueiterator>".to_string(),
-            TreewalkValue::RangeIter(_) => "<range_iterator>".to_string(),
-            TreewalkValue::TupleIter(_) => "<tuple_iterator>".to_string(),
-            TreewalkValue::Code(_) => "<code object>".to_string(),
-            TreewalkValue::Cell(_) => "<cell>".to_string(),
-            TreewalkValue::Module(m) => m.to_string(),
-            TreewalkValue::Exception(_) => "<exception>".to_string(),
-            TreewalkValue::StopIteration(_) => "<stop_iteration>".to_string(),
-            TreewalkValue::Traceback(_) => "<traceback>".to_string(),
-            TreewalkValue::Frame => "<frame>".to_string(),
-            TreewalkValue::TypeNode(t) => format!("<type {t:?}>"),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(m) => m.to_string(),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(o) => o.to_string(),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonClass(_) => "<class>".into(),
-        }
-    }
-
     /// Check for object identity, as opposed to object value evaluated in `PartialEq` above.
     pub fn is(&self, other: &Self) -> bool {
         match (self, other) {
@@ -347,7 +246,6 @@ impl TreewalkValue {
             TreewalkValue::Code(_) => Type::Code,
             TreewalkValue::Module(_) => Type::Module,
             TreewalkValue::Exception(e) => e.get_type(),
-            TreewalkValue::StopIteration(_) => Type::StopIteration,
             TreewalkValue::Traceback(_) => Type::Traceback,
             TreewalkValue::Frame => Type::Frame,
             #[cfg(feature = "c_stdlib")]
@@ -600,22 +498,9 @@ impl TreewalkValue {
     }
 }
 
-impl From<&TreewalkValue> for String {
-    // This gives us Into<String> for free, which is useful when constructing error messages.
-    fn from(value: &TreewalkValue) -> Self {
-        value.to_string()
-    }
-}
-
-impl Display for TreewalkValue {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.repr())
-    }
-}
-
 impl Debug for TreewalkValue {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.repr())
+        write!(f, "{}", MemphisValue::from(self.clone()))
     }
 }
 
@@ -625,9 +510,7 @@ impl From<TreewalkValue> for MemphisValue {
             TreewalkValue::None => MemphisValue::None,
             TreewalkValue::Int(i) => MemphisValue::Integer(i),
             TreewalkValue::Float(i) => MemphisValue::Float(i),
-            TreewalkValue::Str(_) => {
-                MemphisValue::Str(value.as_str().expect("failed to get string"))
-            }
+            TreewalkValue::Str(s) => MemphisValue::Str(s.as_str().to_string()),
             TreewalkValue::Bool(val) => MemphisValue::Boolean(val),
             TreewalkValue::List(i) => {
                 let items = i
@@ -636,63 +519,114 @@ impl From<TreewalkValue> for MemphisValue {
                     .collect::<Vec<MemphisValue>>();
                 MemphisValue::List(items)
             }
-            TreewalkValue::Ellipsis => MemphisValue::Unimplemented("ellipsis"),
-            TreewalkValue::NotImplemented => MemphisValue::Unimplemented("not_implemented"),
-            TreewalkValue::Class(_) => MemphisValue::Unimplemented("class"),
-            TreewalkValue::Object(_) => MemphisValue::Unimplemented("object"),
-            TreewalkValue::Module(_) => MemphisValue::Unimplemented("module"),
-            TreewalkValue::Super(_) => MemphisValue::Unimplemented("super"),
-            TreewalkValue::Classmethod(_) => MemphisValue::Unimplemented("classmethod"),
-            TreewalkValue::Staticmethod(_) => MemphisValue::Unimplemented("staticmethod"),
-            TreewalkValue::Property(_) => MemphisValue::Unimplemented("property"),
-            TreewalkValue::DataDescriptor(_) => MemphisValue::Unimplemented("data_descriptor"),
-            TreewalkValue::NonDataDescriptor(_) => {
-                MemphisValue::Unimplemented("non_data_descriptor")
+            TreewalkValue::Tuple(i) => {
+                let items = i
+                    .into_iter()
+                    .map(|item| item.into())
+                    .collect::<Vec<MemphisValue>>();
+                MemphisValue::Tuple(items)
             }
-            TreewalkValue::Function(_) => MemphisValue::Unimplemented("function"),
-            TreewalkValue::Method(_) => MemphisValue::Unimplemented("method"),
-            TreewalkValue::BuiltinFunction(_) => MemphisValue::Unimplemented("builtin_func"),
-            TreewalkValue::BuiltinMethod(_) => MemphisValue::Unimplemented("builtin_method"),
-            TreewalkValue::Generator(_) => MemphisValue::Unimplemented("generator"),
-            TreewalkValue::Coroutine(_) => MemphisValue::Unimplemented("coroutine"),
-            TreewalkValue::Code(_) => MemphisValue::Unimplemented("code"),
-            TreewalkValue::Cell(_) => MemphisValue::Unimplemented("cell"),
-            TreewalkValue::Bytes(_) => MemphisValue::Unimplemented("bytes"),
-            TreewalkValue::ByteArray(_) => MemphisValue::Unimplemented("byte_array"),
-            TreewalkValue::Set(_) => MemphisValue::Unimplemented("set"),
-            TreewalkValue::FrozenSet(_) => MemphisValue::Unimplemented("frozenset"),
-            TreewalkValue::Zip(_) => MemphisValue::Unimplemented("zip"),
-            TreewalkValue::Slice(_) => MemphisValue::Unimplemented("slice"),
-            TreewalkValue::Complex(_) => MemphisValue::Unimplemented("complex"),
-            TreewalkValue::Dict(_) => MemphisValue::Unimplemented("dict"),
-            TreewalkValue::DictItems(_) => MemphisValue::Unimplemented("dict_items"),
-            TreewalkValue::DictKeys(_) => MemphisValue::Unimplemented("dict_keys"),
-            TreewalkValue::DictValues(_) => MemphisValue::Unimplemented("dict_values"),
-            TreewalkValue::MappingProxy(_) => MemphisValue::Unimplemented("mappingproxy"),
-            TreewalkValue::Range(_) => MemphisValue::Unimplemented("range"),
-            TreewalkValue::Tuple(_) => MemphisValue::Unimplemented("tuple"),
-            TreewalkValue::Exception(_) => MemphisValue::Unimplemented("exception"),
-            TreewalkValue::StopIteration(_) => MemphisValue::Unimplemented("stop_iteration"),
-            TreewalkValue::Traceback(_) => MemphisValue::Unimplemented("traceback"),
-            TreewalkValue::Frame => MemphisValue::Unimplemented("frame"),
-            TreewalkValue::ListIter(_) => MemphisValue::Unimplemented("list_iter"),
-            TreewalkValue::ReversedIter(_) => MemphisValue::Unimplemented("reversed_iter"),
-            TreewalkValue::SetIter(_) => MemphisValue::Unimplemented("set_iter"),
-            TreewalkValue::DictItemsIter(_) => MemphisValue::Unimplemented("dict_items_iter"),
-            TreewalkValue::DictKeysIter(_) => MemphisValue::Unimplemented("dict_keys_iter"),
-            TreewalkValue::DictValuesIter(_) => MemphisValue::Unimplemented("dict_values_iter"),
-            TreewalkValue::RangeIter(_) => MemphisValue::Unimplemented("range_iter"),
-            TreewalkValue::TupleIter(_) => MemphisValue::Unimplemented("tuple_iter"),
-            TreewalkValue::StrIter(_) => MemphisValue::Unimplemented("str_iter"),
-            TreewalkValue::BytesIter(_) => MemphisValue::Unimplemented("bytes_iter"),
-            TreewalkValue::ByteArrayIter(_) => MemphisValue::Unimplemented("bytes_array_iter"),
-            TreewalkValue::TypeNode(_) => MemphisValue::Unimplemented("type_node"),
+            TreewalkValue::Set(i) => {
+                let items = i
+                    .into_iter()
+                    .map(|item| item.into())
+                    .collect::<Vec<MemphisValue>>();
+                MemphisValue::Set(items)
+            }
+            TreewalkValue::FrozenSet(i) => {
+                let items = i
+                    .into_iter()
+                    .map(|item| item.into())
+                    .collect::<Vec<MemphisValue>>();
+                MemphisValue::FrozenSet(items)
+            }
+            TreewalkValue::Ellipsis => MemphisValue::Ellipsis,
+            TreewalkValue::NotImplemented => MemphisValue::NotImplemented,
+            TreewalkValue::Class(c) => MemphisValue::Class(c.borrow().name().to_string()),
+            TreewalkValue::Object(o) => {
+                MemphisValue::Object(o.borrow().class().borrow().name().to_string())
+            }
+            TreewalkValue::Module(m) => MemphisValue::Module(m.borrow().name().to_string()),
+            TreewalkValue::Super(_) => MemphisValue::Super,
+            TreewalkValue::Classmethod(_) => MemphisValue::Classmethod,
+            TreewalkValue::Staticmethod(_) => MemphisValue::Staticmethod,
+            TreewalkValue::Property(_) => MemphisValue::Property,
+            TreewalkValue::DataDescriptor(_) => MemphisValue::DataDescriptor,
+            TreewalkValue::NonDataDescriptor(_) => MemphisValue::NonDataDescriptor,
+            TreewalkValue::Function(f) => MemphisValue::Function(f.borrow().name().to_string()),
+            TreewalkValue::Method(m) => MemphisValue::Method(m.borrow().name()),
+            TreewalkValue::BuiltinFunction(f) => MemphisValue::BuiltinFunction(f.name()),
+            TreewalkValue::BuiltinMethod(f) => MemphisValue::BuiltinMethod(f.name()),
+            TreewalkValue::Generator(_) => MemphisValue::Generator,
+            TreewalkValue::Coroutine(_) => MemphisValue::Coroutine,
+            TreewalkValue::Code(_) => MemphisValue::Code,
+            TreewalkValue::Cell(_) => MemphisValue::Cell,
+            TreewalkValue::Bytes(b) => MemphisValue::Bytes(b),
+            TreewalkValue::ByteArray(b) => MemphisValue::ByteArray(b.borrow().raw().to_vec()),
+            TreewalkValue::Zip(_) => MemphisValue::Zip,
+            TreewalkValue::Slice(s) => MemphisValue::Slice(s.start, s.stop, s.step),
+            TreewalkValue::Range(r) => MemphisValue::Range(r.start, r.stop, r.step),
+            TreewalkValue::Complex(c) => MemphisValue::Complex(c.re, c.im),
+            TreewalkValue::Dict(i) => {
+                let items = i
+                    .borrow()
+                    .to_items()
+                    .items()
+                    .iter()
+                    .map(|(key, value)| (key.clone().into(), value.clone().into()))
+                    .collect();
+                MemphisValue::Dict(items)
+            }
+            TreewalkValue::DictItems(i) => {
+                let items = i
+                    .items()
+                    .iter()
+                    .map(|(key, value)| (key.clone().into(), value.clone().into()))
+                    .collect();
+                MemphisValue::DictItems(items)
+            }
+            TreewalkValue::DictKeys(i) => {
+                let items = i
+                    .into_iter()
+                    .map(|item| item.into())
+                    .collect::<Vec<MemphisValue>>();
+                MemphisValue::DictKeys(items)
+            }
+            TreewalkValue::DictValues(i) => {
+                let items = i
+                    .into_iter()
+                    .map(|item| item.into())
+                    .collect::<Vec<MemphisValue>>();
+                MemphisValue::DictValues(items)
+            }
+            TreewalkValue::MappingProxy(i) => {
+                let items = i
+                    .to_items()
+                    .items()
+                    .iter()
+                    .map(|(key, value)| (key.clone().into(), value.clone().into()))
+                    .collect();
+                MemphisValue::MappingProxy(items)
+            }
+            TreewalkValue::Exception(_) => MemphisValue::Exception,
+            TreewalkValue::Traceback(_) => MemphisValue::Traceback,
+            TreewalkValue::Frame => MemphisValue::Frame,
+            TreewalkValue::ListIter(_) => MemphisValue::ListIter,
+            TreewalkValue::ReversedIter(_) => MemphisValue::ReversedIter,
+            TreewalkValue::SetIter(_) => MemphisValue::SetIter,
+            TreewalkValue::DictItemsIter(_) => MemphisValue::DictItemsIter,
+            TreewalkValue::DictKeysIter(_) => MemphisValue::DictKeysIter,
+            TreewalkValue::DictValuesIter(_) => MemphisValue::DictValuesIter,
+            TreewalkValue::RangeIter(_) => MemphisValue::RangeIter,
+            TreewalkValue::TupleIter(_) => MemphisValue::TupleIter,
+            TreewalkValue::StrIter(_) => MemphisValue::StrIter,
+            TreewalkValue::BytesIter(_) => MemphisValue::BytesIter,
+            TreewalkValue::ByteArrayIter(_) => MemphisValue::ByteArrayIter,
+            TreewalkValue::TypeNode(_) => MemphisValue::TypeNode,
             #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(_) => MemphisValue::Unimplemented("cpython_module"),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(_) => MemphisValue::Unimplemented("cpython_object"),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonClass(_) => MemphisValue::Unimplemented("cpython_class"),
+            TreewalkValue::CPythonModule(_)
+            | TreewalkValue::CPythonObject(_)
+            | TreewalkValue::CPythonClass(_) => unimplemented!(),
         }
     }
 }

@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::{Display, Error, Formatter},
-};
+use std::collections::HashMap;
 
 use crate::{bytecode_vm::runtime::Reference, domain::ModuleName};
 
@@ -36,11 +33,5 @@ impl Module {
     #[cfg(test)]
     pub fn global_store(&self) -> &HashMap<String, Reference> {
         &self.global_store
-    }
-}
-
-impl Display for Module {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<module '{}'>", self.name())
     }
 }

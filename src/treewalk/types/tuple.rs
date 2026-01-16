@@ -1,12 +1,10 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
         macros::*,
         protocols::{Callable, IndexRead, TryEvalFrom},
         result::Raise,
-        utils::{check_args, format_comma_separated, Args},
+        utils::{check_args, Args},
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
@@ -68,12 +66,6 @@ impl TryEvalFrom for Tuple {
     ) -> TreewalkResult<Self> {
         let iter = value.as_iterator().raise(interpreter)?;
         Ok(Tuple::new(iter.collect()))
-    }
-}
-
-impl Display for Tuple {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "({})", format_comma_separated(self.clone()))
     }
 }
 

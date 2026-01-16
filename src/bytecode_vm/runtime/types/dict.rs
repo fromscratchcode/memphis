@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
-use crate::bytecode_vm::{runtime::Reference, DomainResult, VirtualMachine, VmValue};
+use crate::bytecode_vm::runtime::Reference;
+#[cfg(test)]
+use crate::bytecode_vm::{DomainResult, VirtualMachine, VmValue};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Dict {
     // Python 3.7+ preserves dict insertion order, we could use IndexMap if we want that.
-    items: HashMap<Reference, Reference>,
+    pub items: HashMap<Reference, Reference>,
 }
 
 impl Dict {
@@ -17,6 +19,7 @@ impl Dict {
         Self { items: dict }
     }
 
+    #[cfg(test)]
     pub fn resolved_items(&self, vm: &VirtualMachine) -> DomainResult<Vec<(VmValue, VmValue)>> {
         self.items
             .iter()

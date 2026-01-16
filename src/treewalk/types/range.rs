@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
@@ -46,16 +44,6 @@ impl Default for Range {
             start: Self::DEFAULT_START,
             stop: Self::DEFAULT_STOP,
             step: Self::DEFAULT_STEP,
-        }
-    }
-}
-
-impl Display for Range {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        if self.step == 1 {
-            write!(f, "range({}, {})", self.start, self.stop)
-        } else {
-            write!(f, "range({}, {}, {})", self.start, self.stop, self.step)
         }
     }
 }

@@ -23,7 +23,19 @@ impl MemphisContext {
         )
     }
 
-    pub fn new(engine: Engine, text: Text, origin: ModuleOrigin) -> Self {
+    pub fn run(&mut self) -> MemphisResult<MemphisValue> {
+        self.context.run()
+    }
+
+    pub fn read(&self, name: &str) -> Option<MemphisValue> {
+        self.context.read(name)
+    }
+
+    pub fn add_text(&mut self, line: Text) {
+        self.context.add_text(line);
+    }
+
+    fn new(engine: Engine, text: Text, origin: ModuleOrigin) -> Self {
         let context: Box<dyn Interpreter> = match engine {
             Engine::Treewalk => Box::new(TreewalkContext::new(text, origin)),
             Engine::BytecodeVm => Box::new(VmContext::new(text, origin)),
@@ -31,17 +43,5 @@ impl MemphisContext {
             Engine::LlvmBackend => todo!(),
         };
         Self { context }
-    }
-
-    pub fn run(&mut self) -> MemphisResult<MemphisValue> {
-        self.context.run()
-    }
-
-    pub fn read(&mut self, name: &str) -> Option<MemphisValue> {
-        self.context.read(name)
-    }
-
-    pub fn add_text(&mut self, line: Text) {
-        self.context.add_text(line);
     }
 }

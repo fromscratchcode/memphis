@@ -16,6 +16,7 @@ mod stack_frame;
 pub mod test_utils;
 mod text;
 mod type_enum;
+pub mod utils;
 mod value;
 
 pub use call_stack::DebugCallStack;

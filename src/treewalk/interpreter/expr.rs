@@ -1,11 +1,8 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Write,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     core::Container,
-    domain::Identifier,
+    domain::{Identifier, MemphisValue},
     parser::types::{
         Ast, BinOp, CallArgs, Callee, CompareOp, DictOperation, Expr, FStringPart, ForClause,
         LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
@@ -359,8 +356,7 @@ impl TreewalkInterpreter {
         params: &SliceParams,
     ) -> TreewalkResult<TreewalkValue> {
         let object_result = self.evaluate_expr(object)?;
-        let slice = Slice::resolve(self, params)?;
-
+        let slice = self.evaluate_slice(params)?;
         self.load_index(&object_result, &TreewalkValue::Slice(slice))
     }
 
@@ -373,7 +369,7 @@ impl TreewalkInterpreter {
                 }
                 FStringPart::Expr(e) => {
                     let r = self.evaluate_expr(&e.expr)?;
-                    write!(result, "{r}").unwrap();
+                    result.push_str(&MemphisValue::from(r).to_string());
                 }
             }
         }
@@ -409,5 +405,23 @@ impl TreewalkInterpreter {
     fn evaluate_yield_from(&self, expr: &Expr) -> TreewalkResult<TreewalkValue> {
         let gen = self.evaluate_expr(expr)?;
         Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(gen)))
+    }
+
+    pub fn evaluate_slice(&self, params: &SliceParams) -> TreewalkResult<Slice> {
+        let evaluate_to_integer = |expr_option: &Option<Expr>| -> TreewalkResult<Option<i64>> {
+            match expr_option {
+                Some(expr) => {
+                    let integer = self.evaluate_expr(expr)?.as_int().raise(self)?;
+                    Ok(Some(integer))
+                }
+                None => Ok(None),
+            }
+        };
+
+        let start = evaluate_to_integer(&params.start)?;
+        let stop = evaluate_to_integer(&params.stop)?;
+        let step = evaluate_to_integer(&params.step)?;
+
+        Ok(Slice::new(start, stop, step))
     }
 }

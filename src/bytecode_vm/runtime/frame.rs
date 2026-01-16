@@ -117,7 +117,7 @@ impl Frame {
             .locals
             .iter()
             .take(arg_count) // only the actual args, not all locals
-            .map(|r| format!("{}", r))
+            .map(|r| format!("{:?}", r))
             .collect();
 
         format!("{}({})", func_name, args_preview.join(", "))

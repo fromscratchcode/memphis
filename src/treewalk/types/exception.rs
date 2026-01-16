@@ -75,8 +75,12 @@ impl Exception {
         Self::new_from_str(ExceptionKind::NameError, name)
     }
 
-    pub fn key_error(key: impl Into<String>) -> Self {
-        Self::new_from_str(ExceptionKind::KeyError, key)
+    pub fn key_error(key: &TreewalkValue) -> Self {
+        Self::new(ExceptionKind::KeyError, vec![key.clone()])
+    }
+
+    pub fn key_error_str(key: &str) -> Self {
+        Self::key_error(&TreewalkValue::Str(Str::new(key)))
     }
 
     pub fn attribute_error(object_type: impl Into<String>, attr: impl Into<String>) -> Self {

@@ -43,7 +43,7 @@ impl TreewalkInterpreter {
         S: AsRef<str>,
     {
         log(LogLevel::Debug, || {
-            format!("Member access {}.{}", result, field.as_ref())
+            format!("Member access {:?}.{}", result, field.as_ref())
         });
         result
             .clone()

@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     core::{log, Container, LogLevel},
     domain::Type,
@@ -182,13 +180,15 @@ impl Container<Class> {
     }
 
     pub fn get_from_class(&self, name: &str) -> Option<TreewalkValue> {
-        log(LogLevel::Debug, || format!("Searching for: {self}::{name}"));
+        log(LogLevel::Debug, || {
+            format!("Searching for: {self:?}::{name}")
+        });
         search(&self.mro(), name)
     }
 
     pub fn get_from_metaclass(&self, name: &str) -> Option<TreewalkValue> {
         log(LogLevel::Debug, || {
-            format!("Searching for: {}::{}", self.borrow().metaclass(), name)
+            format!("Searching for: {:?}::{}", self.borrow().metaclass(), name)
         });
         search(&self.borrow().metaclass().mro(), name)
     }
@@ -218,7 +218,7 @@ impl MemberRead for Container<Class> {
     ) -> TreewalkResult<Option<TreewalkValue>> {
         if let Some(attr) = self.get_from_class(name) {
             log(LogLevel::Debug, || {
-                format!("Found: {self}::{name} on class [from class]")
+                format!("Found: {self:?}::{name} on class [from class]")
             });
             return Ok(Some(interpreter.resolve_descriptor(
                 &attr,
@@ -229,7 +229,7 @@ impl MemberRead for Container<Class> {
 
         if let Some(attr) = self.get_from_metaclass(name) {
             log(LogLevel::Debug, || {
-                format!("Found: {self}::{name} on metaclass")
+                format!("Found: {self:?}::{name} on metaclass")
             });
             return Ok(Some(interpreter.resolve_descriptor(
                 &attr,
@@ -268,12 +268,6 @@ impl MemberWrite for Container<Class> {
     ) -> TreewalkResult<()> {
         self.borrow_mut().set_on_class(name, value);
         Ok(())
-    }
-}
-
-impl Display for Container<Class> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<class '{}'>", self.borrow().name())
     }
 }
 

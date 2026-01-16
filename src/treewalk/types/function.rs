@@ -1,7 +1,4 @@
-use std::{
-    any::Any,
-    fmt::{Display, Error, Formatter},
-};
+use std::any::Any;
 
 use crate::{
     core::{log, Container, LogLevel},
@@ -184,17 +181,19 @@ impl MemberRead for Container<Function> {
         interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        log(LogLevel::Debug, || format!("Searching for: {self}.{name}"));
+        log(LogLevel::Debug, || {
+            format!("Searching for: {self:?}.{name}")
+        });
 
         if let Some(attr) = self.borrow().scope.get(name) {
-            log(LogLevel::Debug, || format!("Found: {self}.{name}"));
+            log(LogLevel::Debug, || format!("Found: {self:?}.{name}"));
             return Ok(Some(attr));
         }
 
         let class = interpreter.state.class_of_type(&Type::Function);
 
         if let Some(attr) = class.get_from_class(name) {
-            log(LogLevel::Debug, || format!("Found: {class}::{name}"));
+            log(LogLevel::Debug, || format!("Found: {class:?}::{name}"));
             let instance = TreewalkValue::Function(self.clone());
             let owner = interpreter.state.class_of_value(&instance);
             return Ok(Some(interpreter.resolve_descriptor(
@@ -248,12 +247,6 @@ impl Callable for Container<Function> {
         // returning a reference to self, not self directly. This is required so that there is a
         // known size at compile-time.
         self
-    }
-}
-
-impl Display for Container<Function> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<function {} at {:p}>", self.borrow().name, self)
     }
 }
 

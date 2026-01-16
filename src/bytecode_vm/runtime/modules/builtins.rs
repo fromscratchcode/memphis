@@ -239,7 +239,7 @@ fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let rendered: Vec<String> = args
         .iter()
         .map(|arg| {
-            let value = vm.deref(*arg).raise(vm)?;
+            let value = vm.normalize_vm_ref(*arg).raise(vm)?;
             Ok(value.to_string())
         })
         .collect::<VmResult<_>>()?;

@@ -1,14 +1,11 @@
-use std::{
-    cmp::Ordering,
-    fmt::{Display, Error, Formatter},
-};
+use std::cmp::Ordering;
 
 use crate::treewalk::{utils::Contextual, TreewalkValue};
 
 /// A helper to hold a pair of `TreewalkValue` objects but which enforces the first hold a reference
 /// to its interpreter via a `ContextualTreewalkValue`. We need this for `DictItems` since the first
 /// will become the keys of a `Dict`.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ContextualPair {
     key: Contextual<TreewalkValue>,
     value: TreewalkValue,
@@ -29,12 +26,6 @@ impl ContextualPair {
 
     pub fn second(&self) -> &TreewalkValue {
         &self.value
-    }
-}
-
-impl Display for ContextualPair {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "contextual({}, {})", self.key, self.value)
     }
 }
 

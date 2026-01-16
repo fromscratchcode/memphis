@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Debug, Display, Error, Formatter},
+    fmt::{Debug, Error, Formatter},
     time::Instant,
 };
 
@@ -11,6 +11,8 @@ use crate::{
 #[derive(Clone, Debug)]
 pub enum CoroutineState {
     Ready,
+    #[allow(dead_code)]
+    // We don't read the payload here right now, not sure what this should be yet.
     WaitingOn(Container<Coroutine>),
     SleepingUntil(Instant),
     Finished(Reference),
@@ -21,12 +23,6 @@ pub struct Coroutine {
     pub frame: Frame,
     pub state: CoroutineState,
     pub waiters: Vec<Container<Coroutine>>,
-}
-
-impl Display for Coroutine {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<coroutine '{}'>", self.frame.function.name())
-    }
 }
 
 impl Debug for Coroutine {

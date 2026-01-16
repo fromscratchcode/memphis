@@ -1,5 +1,3 @@
-use std::fmt::{Display, Formatter};
-
 use crate::bytecode_vm::{runtime::Reference, VirtualMachine, VmResult};
 
 pub type BuiltinFn = fn(&mut VirtualMachine, Vec<Reference>) -> VmResult<Reference>;
@@ -24,11 +22,5 @@ impl BuiltinFunction {
 
     pub fn name(&self) -> &str {
         &self.name
-    }
-}
-
-impl Display for BuiltinFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<builtin function '{}'>", self.name())
     }
 }

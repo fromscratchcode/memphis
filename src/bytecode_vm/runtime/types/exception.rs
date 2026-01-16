@@ -1,6 +1,6 @@
 use crate::{
-    bytecode_vm::{runtime::Reference, VirtualMachine},
-    domain::{ExceptionKind, MemphisException, Type},
+    bytecode_vm::{runtime::Reference, DomainResult, VirtualMachine},
+    domain::{ExceptionKind, MemphisException},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,13 +14,10 @@ impl Exception {
         let args = self
             .payload
             .iter()
-            .map(|r| vm.normalize_value(*r))
-            .collect();
+            .map(|r| vm.normalize_vm_ref(*r))
+            .collect::<DomainResult<Vec<_>>>()
+            .unwrap();
         MemphisException::new(self.kind.clone(), args)
-    }
-
-    pub fn get_type(&self) -> Type {
-        self.kind.get_type()
     }
 
     fn new(kind: ExceptionKind, payload: Vec<Reference>) -> Self {

@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Display, Error, Formatter},
-    time::Duration,
-};
+use std::time::Duration;
 
 use crate::{
     bytecode_vm::{
@@ -15,7 +12,7 @@ use crate::{
         },
     },
     core::{floats_equal, Container},
-    domain::{MemphisValue, Type},
+    domain::Type,
 };
 
 #[derive(Clone, Debug)]
@@ -74,17 +71,6 @@ impl PartialEq for VmValue {
     }
 }
 
-impl From<Reference> for VmValue {
-    fn from(value: Reference) -> Self {
-        match value {
-            Reference::Int(i) => VmValue::Int(i),
-            Reference::Float(i) => VmValue::Float(i),
-            // This requires a lookup using VM state and must be converted before this function.
-            Reference::ObjectRef(_) => unreachable!(),
-        }
-    }
-}
-
 impl From<&Constant> for VmValue {
     fn from(value: &Constant) -> Self {
         match value {
@@ -94,33 +80,6 @@ impl From<&Constant> for VmValue {
             Constant::Float(i) => VmValue::Float(*i),
             Constant::String(i) => VmValue::String(i.to_string()),
             Constant::Code(i) => VmValue::Code(i.clone()),
-        }
-    }
-}
-
-impl Display for VmValue {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match self {
-            VmValue::None => write!(f, "None"),
-            VmValue::Int(i) => write!(f, "{i}"),
-            VmValue::String(i) => write!(f, "{i}"),
-            VmValue::Bool(b) => match b {
-                true => write!(f, "True"),
-                false => write!(f, "False"),
-            },
-            VmValue::Range(i) => write!(f, "{i}"),
-            VmValue::RangeIter(_) => write!(f, "<rangeiter>"),
-            VmValue::Code(i) => write!(f, "{i}"),
-            VmValue::BuiltinFunction(i) => write!(f, "{i}"),
-            VmValue::Function(i) => write!(f, "{i}"),
-            VmValue::Method(i) => write!(f, "{i}"),
-            VmValue::Module(i) => write!(f, "{}", i.borrow()),
-            VmValue::Coroutine(i) => write!(f, "{}", i.borrow()),
-            VmValue::SleepFuture(_) => write!(f, "<sleepfuture>"),
-            _ => unimplemented!(
-                "Trait Display for type {:?} unimplemented in the bytecode VM.",
-                self
-            ),
         }
     }
 }
@@ -226,28 +185,6 @@ impl VmValue {
         match self {
             VmValue::Coroutine(i) => Some(i),
             _ => None,
-        }
-    }
-}
-
-impl From<VmValue> for MemphisValue {
-    fn from(value: VmValue) -> Self {
-        match value {
-            VmValue::None => MemphisValue::None,
-            VmValue::Int(val) => MemphisValue::Integer(val),
-            VmValue::Float(val) => MemphisValue::Float(val),
-            VmValue::String(val) => MemphisValue::Str(val),
-            VmValue::Bool(val) => MemphisValue::Boolean(val),
-            VmValue::List(i) => {
-                let items = i
-                    .items
-                    .into_iter()
-                    .map(VmValue::from)
-                    .map(|item| item.into())
-                    .collect::<Vec<MemphisValue>>();
-                MemphisValue::List(items)
-            }
-            _ => unimplemented!("Conversion not implemented for type {:?}", value),
         }
     }
 }

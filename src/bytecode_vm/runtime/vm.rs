@@ -264,30 +264,69 @@ impl VirtualMachine {
                 .get(reference)
                 .cloned()
                 .ok_or_else(Exception::runtime_error)?,
-            // convert primitives directly
-            _ => reference.into(),
+            Reference::Int(i) => VmValue::Int(i),
+            Reference::Float(f) => VmValue::Float(f),
         };
 
         Ok(val)
     }
 
-    pub fn normalize_value(&self, r: Reference) -> MemphisValue {
-        let value = self.deref(r).unwrap();
+    pub fn normalize_vm_ref(&self, r: Reference) -> DomainResult<MemphisValue> {
+        let value = self.deref(r)?;
         self.normalize_vm_value(value)
     }
 
-    fn normalize_vm_value(&self, value: VmValue) -> MemphisValue {
-        match value {
+    pub fn normalize_vm_value(&self, value: VmValue) -> DomainResult<MemphisValue> {
+        let val = match value {
             VmValue::None => MemphisValue::None,
             VmValue::Int(i) => MemphisValue::Integer(i),
+            VmValue::Float(f) => MemphisValue::Float(f),
             VmValue::String(s) => MemphisValue::Str(s),
             VmValue::Bool(b) => MemphisValue::Boolean(b),
-            VmValue::List(l) => {
-                let items = l.items.iter().map(|r| self.normalize_value(*r)).collect();
+            VmValue::List(i) => {
+                let items = i
+                    .items
+                    .iter()
+                    .map(|r| self.normalize_vm_ref(*r))
+                    .collect::<DomainResult<Vec<_>>>()?;
                 MemphisValue::List(items)
             }
-            _ => todo!(),
-        }
+            VmValue::Tuple(i) => {
+                let items = i
+                    .items
+                    .iter()
+                    .map(|r| self.normalize_vm_ref(*r))
+                    .collect::<DomainResult<Vec<_>>>()?;
+                MemphisValue::Tuple(items)
+            }
+            VmValue::Dict(i) => {
+                let items = i
+                    .items
+                    .iter()
+                    .map(|(k, v)| Ok((self.normalize_vm_ref(*k)?, self.normalize_vm_ref(*v)?)))
+                    .collect::<DomainResult<Vec<(_, _)>>>()?;
+                MemphisValue::Dict(items)
+            }
+            VmValue::Range(r) => MemphisValue::Range(r.start, r.stop, r.step),
+            VmValue::Method(m) => MemphisValue::Method(m.name()),
+            VmValue::Function(f) => MemphisValue::Function(f.name().to_string()),
+            VmValue::Module(m) => MemphisValue::Module(m.borrow().name().to_string()),
+            VmValue::Coroutine(_) => MemphisValue::Coroutine,
+            VmValue::Generator(_) => MemphisValue::Generator,
+            VmValue::Class(c) => MemphisValue::Class(c.name().to_string()),
+            VmValue::Object(o) => {
+                let class_name = self.normalize_vm_ref(o.class)?;
+                MemphisValue::Object(class_name.to_string())
+            }
+            VmValue::Code(_) => MemphisValue::Code,
+            VmValue::ListIter(_) => MemphisValue::ListIter,
+            VmValue::RangeIter(_) => MemphisValue::RangeIter,
+            VmValue::TupleIter(_) => MemphisValue::TupleIter,
+            VmValue::BuiltinFunction(f) => MemphisValue::BuiltinFunction(f.name().to_string()),
+            VmValue::SleepFuture(_) => todo!(),
+        };
+
+        Ok(val)
     }
 
     /// Resolves an attribute without applying method binding (used in tests or low-level access).

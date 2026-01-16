@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    fmt::{Display, Error, Formatter},
-};
+use std::collections::HashSet;
 
 use crate::{
     domain::{Dunder, Type},
@@ -10,7 +7,7 @@ use crate::{
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         types::iterators::SetIter,
-        utils::{check_args, format_comma_separated, Args},
+        utils::{check_args, Args},
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
@@ -53,12 +50,6 @@ impl IntoIterator for FrozenSet {
         let mut items: Vec<TreewalkValue> = self.cloned_items().into_iter().collect();
         items.sort();
         SetIter::new(items)
-    }
-}
-
-impl Display for FrozenSet {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "frozenset({{{}}})", format_comma_separated(self.clone()))
     }
 }
 

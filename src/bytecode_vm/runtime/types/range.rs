@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Range {
     pub start: i64,
@@ -29,16 +27,6 @@ impl Range {
             current: self.start,
             stop: self.stop,
             step: self.step,
-        }
-    }
-}
-
-impl Display for Range {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        if self.step == 1 {
-            write!(f, "range({}, {})", self.start, self.stop)
-        } else {
-            write!(f, "range({}, {}, {})", self.start, self.stop, self.step)
         }
     }
 }

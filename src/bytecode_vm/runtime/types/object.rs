@@ -7,7 +7,7 @@ use crate::bytecode_vm::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Object {
-    class: Reference,
+    pub class: Reference,
     namespace: Namespace,
 }
 

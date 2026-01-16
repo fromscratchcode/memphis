@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    fmt::{Display, Error, Formatter},
-};
+use std::collections::HashSet;
 
 use crate::{
     core::Container,
@@ -10,7 +7,7 @@ use crate::{
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
-        utils::{check_args, format_comma_separated, Args},
+        utils::{check_args, Args},
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
@@ -55,12 +52,6 @@ impl TryEvalFrom for Set {
     ) -> TreewalkResult<Self> {
         let iter = value.as_iterator().raise(interpreter)?;
         Ok(Set::new(iter.collect()))
-    }
-}
-
-impl Display for Container<Set> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{{{}}}", format_comma_separated(self.clone()))
     }
 }
 

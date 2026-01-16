@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
@@ -17,8 +15,8 @@ const DEFAULT_IM: f64 = 0.0;
 
 #[derive(Clone, PartialEq)]
 pub struct Complex {
-    re: f64,
-    im: f64,
+    pub re: f64,
+    pub im: f64,
 }
 
 impl_typed!(Complex, Type::Complex);
@@ -51,16 +49,6 @@ impl Complex {
         let imag_part = imag_str.parse::<f64>().ok()?;
 
         Some(Self::new(real_part, imag_part))
-    }
-}
-
-impl Display for Complex {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        if self.re == DEFAULT_RE {
-            write!(f, "{}j", self.im)
-        } else {
-            write!(f, "({}+{}j)", self.re, self.im)
-        }
     }
 }
 

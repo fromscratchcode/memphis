@@ -1,7 +1,4 @@
-use std::{
-    any::Any,
-    fmt::{Display, Error, Formatter},
-};
+use std::any::Any;
 
 use crate::{
     core::{log, Container, LogLevel},
@@ -153,11 +150,13 @@ impl MemberRead for Container<Object> {
         interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        log(LogLevel::Debug, || format!("Searching for: {self}.{name}"));
+        log(LogLevel::Debug, || {
+            format!("Searching for: {self:?}.{name}")
+        });
 
         if let Some(attr) = self.borrow().scope.get(name) {
             log(LogLevel::Debug, || {
-                format!("Found: {self}.{name} on instance")
+                format!("Found: {self:?}.{name} on instance")
             });
             return Ok(Some(attr));
         }
@@ -165,7 +164,7 @@ impl MemberRead for Container<Object> {
         if let Some(attr) = self.borrow().class.get_from_class(name) {
             log(LogLevel::Debug, || {
                 format!(
-                    "Found: {}::{} on class [from object]",
+                    "Found: {:?}::{} on class [from object]",
                     self.borrow().class,
                     name
                 )
@@ -199,7 +198,7 @@ impl MemberWrite for Container<Object> {
         if let Some(attr) = self.borrow().class.get_from_class(name) {
             log(LogLevel::Debug, || {
                 format!(
-                    "Found data descriptor: {}::{} on class",
+                    "Found data descriptor: {:?}::{} on class",
                     self.borrow().class,
                     name
                 )
@@ -211,7 +210,7 @@ impl MemberWrite for Container<Object> {
         }
 
         log(LogLevel::Debug, || {
-            format!("Setting: {self}.{name} on instance")
+            format!("Setting: {self:?}.{name} on instance")
         });
         self.borrow_mut().scope.insert(name, value);
         Ok(())
@@ -225,7 +224,7 @@ impl MemberWrite for Container<Object> {
         if let Some(attr) = self.borrow().class.get_from_class(name) {
             log(LogLevel::Debug, || {
                 format!(
-                    "Found data descriptor: {}::{} on class",
+                    "Found data descriptor: {:?}::{} on class",
                     self.borrow().class,
                     name
                 )
@@ -264,7 +263,7 @@ impl MemberWrite for Container<Object> {
         }
 
         log(LogLevel::Debug, || {
-            format!("Deleting: {self}.{name} on instance")
+            format!("Deleting: {self:?}.{name} on instance")
         });
         self.borrow_mut().scope.delete(name);
         Ok(())
@@ -325,17 +324,6 @@ impl DataDescriptor for Container<Object> {
         )?;
 
         Ok(())
-    }
-}
-
-impl Display for Container<Object> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(
-            f,
-            "<{} object at {:p}>",
-            self.borrow().class.borrow().name(),
-            self
-        )
     }
 }
 

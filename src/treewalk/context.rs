@@ -79,7 +79,7 @@ impl Interpreter for TreewalkContext {
         self.run_inner().map(Into::into).map_err(Into::into)
     }
 
-    fn read(&mut self, name: &str) -> Option<MemphisValue> {
+    fn read(&self, name: &str) -> Option<MemphisValue> {
         self.read_inner(name).map(Into::into)
     }
 

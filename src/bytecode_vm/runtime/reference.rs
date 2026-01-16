@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::{Display, Error, Formatter},
     hash::{Hash, Hasher},
 };
 
@@ -36,17 +35,11 @@ impl Reference {
     pub fn display_annotated(&self, heap: &Heap) -> String {
         match self {
             Self::ObjectRef(index) => format!(
-                "ObjectRef({}) => {}",
+                "ObjectRef({}) => {:?}",
                 index,
                 heap.get(*self).expect("Heap lookup failed")
             ),
-            _ => format!("{}", self),
+            _ => format!("{:?}", self),
         }
-    }
-}
-
-impl Display for Reference {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{self:?}")
     }
 }

@@ -1,11 +1,7 @@
-use std::{
-    cmp::Ordering,
-    fmt::{Display, Error, Formatter},
-};
+use std::cmp::Ordering;
 
 use crate::{
     domain::{Dunder, Type},
-    parser::types::{Expr, SliceParams},
     treewalk::{
         macros::*,
         protocols::Callable,
@@ -28,30 +24,6 @@ impl_method_provider!(Slice, [NewBuiltin]);
 impl Slice {
     pub fn new(start: Option<i64>, stop: Option<i64>, step: Option<i64>) -> Self {
         Self { start, stop, step }
-    }
-
-    pub fn resolve(
-        interpreter: &TreewalkInterpreter,
-        params: &SliceParams,
-    ) -> TreewalkResult<Self> {
-        let evaluate_to_integer = |expr_option: &Option<Expr>| -> TreewalkResult<Option<i64>> {
-            match expr_option {
-                Some(expr) => {
-                    let integer = interpreter
-                        .evaluate_expr(expr)?
-                        .as_int()
-                        .raise(interpreter)?;
-                    Ok(Some(integer))
-                }
-                None => Ok(None),
-            }
-        };
-
-        let start = evaluate_to_integer(&params.start)?;
-        let stop = evaluate_to_integer(&params.stop)?;
-        let step = evaluate_to_integer(&params.step)?;
-
-        Ok(Self::new(start, stop, step))
     }
 
     /// Adjusting start and stop according to Python's slicing rules of negative indices
@@ -97,19 +69,6 @@ impl Slice {
         }
 
         result
-    }
-}
-
-impl Display for Slice {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let format_val =
-            |val: &Option<i64>| val.map_or("None".to_string(), |number| number.to_string());
-
-        let start = format_val(&self.start);
-        let stop = format_val(&self.stop);
-        let step = format_val(&self.step);
-
-        write!(f, "slice({start}, {stop}, {step})")
     }
 }
 

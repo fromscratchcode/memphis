@@ -1,7 +1,4 @@
-use std::{
-    collections::{hash_map::Keys, HashMap},
-    fmt::{Debug, Display, Error, Formatter},
-};
+use std::collections::{hash_map::Keys, HashMap};
 
 use crate::{
     core::Container,
@@ -16,7 +13,7 @@ use crate::{
     },
 };
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, PartialEq, Clone)]
 pub struct Dict {
     items: HashMap<Contextual<TreewalkValue>, TreewalkValue>,
 }
@@ -129,12 +126,6 @@ impl TryEvalFrom for Container<Dict> {
             }
             _ => Exception::type_error("Expected a dict").raise(interpreter),
         }
-    }
-}
-
-impl Display for Container<Dict> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        self.borrow().to_items().fmt_as_mapping(f)
     }
 }
 

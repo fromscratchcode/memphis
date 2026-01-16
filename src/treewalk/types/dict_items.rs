@@ -1,19 +1,16 @@
-use std::{
-    collections::HashMap,
-    fmt::{Display, Error, Formatter},
-};
+use std::collections::HashMap;
 
 use crate::treewalk::{
     macros::*,
     type_system::CloneableIterable,
     types::{Dict, DictKeys, DictValues, Exception, Tuple},
-    utils::{format_comma_separated_with, Contextual, ContextualPair},
+    utils::{Contextual, ContextualPair},
     DomainResult, TreewalkInterpreter, TreewalkValue,
 };
 
 impl_iterable!(DictItemsIter);
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, PartialEq, Clone)]
 pub struct DictItems {
     items: Vec<ContextualPair>,
 }
@@ -61,6 +58,13 @@ impl DictItems {
         Self { items }
     }
 
+    pub fn items(&self) -> Vec<(TreewalkValue, TreewalkValue)> {
+        self.items
+            .iter()
+            .map(|item| (item.first_inner().clone(), item.second().clone()))
+            .collect()
+    }
+
     fn keys(&self) -> Vec<TreewalkValue> {
         self.items
             .iter()
@@ -89,24 +93,6 @@ impl DictItems {
         }
 
         Dict::new_inner(items)
-    }
-
-    pub fn fmt_as_mapping(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        let items = self.items.clone();
-        let formatted = format_comma_separated_with(items, |pair| {
-            format!("'{}': {}", pair.first_inner(), pair.second())
-        });
-        write!(f, "{{{formatted}}}")
-    }
-}
-
-impl Display for DictItems {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let items = self.items.clone();
-        let formatted = format_comma_separated_with(items, |pair| {
-            format!("('{}', {})", pair.first_inner(), pair.second())
-        });
-        write!(f, "[{formatted}]")
     }
 }
 

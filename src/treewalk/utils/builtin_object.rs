@@ -29,12 +29,12 @@ impl MemberRead for BuiltinObject {
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
         log(LogLevel::Debug, || {
-            format!("Searching for: {}.{}", self.class, name)
+            format!("Searching for: {:?}.{}", self.class, name)
         });
 
         if let Some(attr) = self.class.get_from_class(name) {
             log(LogLevel::Debug, || {
-                format!("Found: {}::{} on builtin class", self.class, name)
+                format!("Found: {:?}::{} on builtin class", self.class, name)
             });
             return Ok(Some(interpreter.resolve_descriptor(
                 &attr,

@@ -1121,7 +1121,6 @@ l = {1} <= {2}
     fn tuples() {
         let input = r#"
 a = (1,2,3)
-print(a)
 b = (1,2.1)
 c = tuple([1,2])
 d = tuple({1,2})

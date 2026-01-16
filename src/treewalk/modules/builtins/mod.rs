@@ -1,6 +1,6 @@
 use crate::{
     core::Container,
-    domain::{Dunder, ModuleName},
+    domain::{Dunder, MemphisValue, ModuleName},
     treewalk::{
         protocols::{Callable, Iterable},
         result::Raise,
@@ -267,7 +267,10 @@ impl Callable for PrintBuiltin {
         println!(
             "{}",
             args.iter_args()
-                .map(ToString::to_string)
+                .map(|a| {
+                    let mv: MemphisValue = a.clone().into();
+                    mv.to_string()
+                })
                 .collect::<Vec<_>>()
                 .join(" ")
         );

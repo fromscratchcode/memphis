@@ -87,7 +87,7 @@ fn insert_kwarg(
     value: TreewalkValue,
 ) -> DomainResult<()> {
     if kwargs.contains_key(key) {
-        Err(Exception::key_error(key))
+        Err(Exception::key_error_str(key))
     } else {
         kwargs.insert(key.to_string(), value);
         Ok(())

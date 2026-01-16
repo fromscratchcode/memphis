@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     bytecode_vm::{compiler::CodeObject, runtime::Reference},
     domain::FunctionType,
@@ -35,11 +33,5 @@ impl FunctionObject {
 
     pub fn name(&self) -> &str {
         self.code_object.name()
-    }
-}
-
-impl Display for FunctionObject {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<function '{}'>", self.name())
     }
 }

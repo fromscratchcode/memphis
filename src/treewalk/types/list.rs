@@ -1,8 +1,4 @@
-use std::{
-    collections::VecDeque,
-    fmt::{Display, Error, Formatter},
-    ops::Add,
-};
+use std::{collections::VecDeque, ops::Add};
 
 use crate::{
     core::Container,
@@ -13,7 +9,7 @@ use crate::{
         result::Raise,
         type_system::CloneableIterable,
         types::Slice,
-        utils::{check_args, format_comma_separated, Args},
+        utils::{check_args, Args},
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
@@ -135,12 +131,6 @@ impl TryEvalFrom for List {
     ) -> TreewalkResult<Self> {
         let iter = value.as_iterator().raise(interpreter)?;
         Ok(List::new(iter.collect()))
-    }
-}
-
-impl Display for Container<List> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "[{}]", format_comma_separated(self.clone()))
     }
 }
 

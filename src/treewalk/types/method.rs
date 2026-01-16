@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     core::Container,
     treewalk::{
@@ -20,7 +18,7 @@ impl Method {
     }
 
     pub fn name(&self) -> String {
-        format!("{} of {}", self.function.name(), &self.receiver)
+        format!("{} of {:?}", self.function.name(), &self.receiver)
     }
 
     pub fn receiver(&self) -> TreewalkValue {
@@ -45,11 +43,5 @@ impl Callable for Container<Method> {
 
     fn receiver(&self) -> Option<TreewalkValue> {
         Some(self.borrow().receiver())
-    }
-}
-
-impl Display for Container<Method> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<bound method {}>", self.name())
     }
 }

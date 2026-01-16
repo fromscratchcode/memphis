@@ -1,9 +1,9 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::{
     core::Container,
     treewalk::{
-        protocols::IndexRead, types::Dict, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        protocols::IndexRead,
+        types::{Dict, DictItems},
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -15,6 +15,10 @@ impl MappingProxy {
     pub fn new(dict: Container<Dict>) -> Self {
         Self(dict)
     }
+
+    pub fn to_items(&self) -> DictItems {
+        self.0.borrow().to_items()
+    }
 }
 
 impl IndexRead for MappingProxy {
@@ -24,11 +28,5 @@ impl IndexRead for MappingProxy {
         index: TreewalkValue,
     ) -> TreewalkResult<Option<TreewalkValue>> {
         self.0.getitem(interpreter, index)
-    }
-}
-
-impl Display for MappingProxy {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "mappingproxy({})", self.0)
     }
 }

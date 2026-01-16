@@ -1,5 +1,3 @@
-use std::fmt::{Display, Error, Formatter};
-
 use crate::bytecode_vm::runtime::{types::FunctionObject, Reference};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,12 +12,6 @@ impl Method {
     }
 
     pub fn name(&self) -> String {
-        format!("{} of {}", self.function.name(), &self.receiver)
-    }
-}
-
-impl Display for Method {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<bound method {}>", self.name())
+        format!("{} of {:?}", self.function.name(), &self.receiver)
     }
 }

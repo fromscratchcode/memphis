@@ -1,9 +1,6 @@
 #[cfg(feature = "c_stdlib")]
 use std::collections::hash_map::Iter;
-use std::{
-    fmt::{Display, Error, Formatter},
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     core::Container,
@@ -111,12 +108,6 @@ impl MemberRead for Module {
 
     fn dir(&self) -> Vec<String> {
         self.scope.symbols()
-    }
-}
-
-impl Display for Container<Module> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "<module '{}'>", self.borrow().name())
     }
 }
 

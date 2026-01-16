@@ -1,8 +1,4 @@
-use std::{
-    fmt::{Display, Error, Formatter},
-    ops::Deref,
-    str,
-};
+use std::{ops::Deref, str};
 
 use crate::{
     core::Container,
@@ -40,6 +36,10 @@ impl Str {
         Self(str.to_string())
     }
 
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
     pub fn decode(bytes: &[u8], encoding: Encoding) -> DomainResult<Self> {
         let str = match encoding {
             Encoding::Utf8 => str::from_utf8(bytes).map_err(|_| {
@@ -73,12 +73,6 @@ impl Str {
 impl From<String> for Str {
     fn from(s: String) -> Self {
         Str(s)
-    }
-}
-
-impl Display for Str {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.0)
     }
 }
 

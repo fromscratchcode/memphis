@@ -1,8 +1,10 @@
-use crate::bytecode_vm::{runtime::Reference, DomainResult, VirtualMachine, VmValue};
+use crate::bytecode_vm::runtime::Reference;
+#[cfg(test)]
+use crate::bytecode_vm::{DomainResult, VirtualMachine, VmValue};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Tuple {
-    items: Vec<Reference>,
+    pub items: Vec<Reference>,
 }
 
 impl Tuple {
@@ -20,6 +22,7 @@ impl Tuple {
         }
     }
 
+    #[cfg(test)]
     pub fn resolved_items(&self, vm: &VirtualMachine) -> DomainResult<Vec<VmValue>> {
         self.items.iter().map(|r| vm.deref(*r)).collect()
     }

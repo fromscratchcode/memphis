@@ -31,10 +31,10 @@ impl TreewalkInterpreter {
         S: AsRef<str>,
     {
         log(LogLevel::Debug, || {
-            format!("Calling method {}.{}", receiver, name.as_ref())
+            format!("Calling method {:?}.{}", receiver, name.as_ref())
         });
         log(LogLevel::Trace, || {
-            format!("... from module: {}", self.state.current_module())
+            format!("... from module: {:?}", self.state.current_module())
         });
         log(LogLevel::Trace, || {
             format!(
@@ -43,7 +43,7 @@ impl TreewalkInterpreter {
             )
         });
         if let Some(class) = self.state.current_class() {
-            log(LogLevel::Trace, || format!("... from class: {class}"));
+            log(LogLevel::Trace, || format!("... from class: {class:?}"));
         }
 
         let method = self.load_method(receiver, name)?;

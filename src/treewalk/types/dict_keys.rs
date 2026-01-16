@@ -1,6 +1,4 @@
-use std::fmt::{Display, Error, Formatter};
-
-use crate::treewalk::{macros::*, utils::format_comma_separated_with, TreewalkValue};
+use crate::treewalk::{macros::*, TreewalkValue};
 
 impl_iterable!(DictKeysIter);
 
@@ -12,14 +10,6 @@ pub struct DictKeys {
 impl DictKeys {
     pub fn new(items: Vec<TreewalkValue>) -> Self {
         Self { items }
-    }
-}
-
-impl Display for DictKeys {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let items = self.items.clone();
-        let formatted = format_comma_separated_with(items, |key| format!("'{key}'"));
-        write!(f, "[{formatted}]")
     }
 }
 
