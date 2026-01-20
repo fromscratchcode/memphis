@@ -37,10 +37,6 @@ impl TreewalkContext {
         interpreter.execute(&mut parser)
     }
 
-    pub fn read_inner(&self, name: &str) -> Option<TreewalkValue> {
-        self.interpreter.load_var(name).ok()
-    }
-
     pub fn add_text_inner(&mut self, line: Text) {
         self.lexer.add_text(&line);
     }
@@ -77,10 +73,6 @@ impl TreewalkContext {
 impl Interpreter for TreewalkContext {
     fn run(&mut self) -> MemphisResult<MemphisValue> {
         self.run_inner().map(Into::into).map_err(Into::into)
-    }
-
-    fn read(&self, name: &str) -> Option<MemphisValue> {
-        self.read_inner(name).map(Into::into)
     }
 
     fn add_text(&mut self, line: Text) {

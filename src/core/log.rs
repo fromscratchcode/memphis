@@ -14,7 +14,7 @@ pub enum LogLevel {
     Trace,
 }
 
-static CURRENT_LOG_LEVEL: LogLevel = LogLevel::Info;
+static CURRENT_LOG_LEVEL: LogLevel = LogLevel::Debug;
 
 /// Accept a closure to avoid calling the construction of the formatted strings until necessary
 /// (i.e. we know that our logging level asks for it).

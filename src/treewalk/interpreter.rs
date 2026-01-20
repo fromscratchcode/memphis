@@ -228,7 +228,7 @@ a = 2 + 3 * 4
 b = a + 5
 c = None
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(14));
         assert_read_eq!(ctx, "b", int!(19));
@@ -244,7 +244,7 @@ b = type(str.join)
 # TODO Python shows <class 'builtin_function_or_method'>
 c = type(a.join)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", str!("foo"));
         assert_type_eq!(ctx, "b", Type::BuiltinMethod);
@@ -483,7 +483,7 @@ c = type(a.join)
 print(3)
 a = type(print)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::BuiltinFunction);
     }
@@ -499,7 +499,7 @@ b = type(iter(""))
 for i in iter("abcde"):
     print(i)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", StrIter);
         assert_type_eq!(ctx, "b", Type::StrIter);
@@ -513,7 +513,7 @@ def foo(a, b):
 
 foo(2, 3)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "foo", Function);
 
@@ -556,7 +556,7 @@ w = _f.__qualname__
 x = _f.__annotations__
 y = _f.__type_params__
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         let b = extract!(ctx, "b", Function).borrow().clone();
@@ -596,7 +596,7 @@ def foo():
 a = foo()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(4));
     }
@@ -613,7 +613,7 @@ elif y > -10:
 elif y > -20:
     z = "Greater than -20"
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", str!("Greater than 0"));
 
@@ -627,7 +627,7 @@ elif y > -10:
 elif y > -20:
     z = "Greater than -20"
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", str!("Greater than -10"));
 
@@ -641,7 +641,7 @@ elif y > -10:
 elif y > -20:
     z = "Greater than -20"
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", str!("Greater than -20"));
 
@@ -655,7 +655,7 @@ elif y > -10:
 elif y > -20:
     z = "Greater than -20"
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", str!("Empty"));
 
@@ -671,7 +671,7 @@ elif y > -20:
 else:
     z = "Else"
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", str!("Else"));
 
@@ -682,7 +682,7 @@ if 4 in range(5):
 else:
     z = 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", int!(1));
     }
@@ -695,7 +695,7 @@ while z < 10:
     z = z + 1
     print("done")
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", int!(10));
     }
@@ -711,7 +711,7 @@ class Foo:
         print(self.x)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "Foo", Class);
     }
@@ -727,7 +727,7 @@ class Foo:
 foo = Foo(3)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "Foo", Class);
         assert_variant!(ctx, "foo", Object);
@@ -748,7 +748,7 @@ class Foo:
 foo = Foo(3)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "Foo", Class);
         assert_variant!(ctx, "foo", Object);
@@ -778,7 +778,7 @@ foo = Foo(3)
 x = foo.bar()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "x", int!(3));
 
@@ -794,7 +794,7 @@ foo = Foo()
 foo.bar()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "Foo", Class);
         assert_variant!(ctx, "foo", Object);
@@ -806,7 +806,7 @@ foo.bar()
 
     #[test]
     fn regular_import() {
-        let ctx = run_path("src/fixtures/imports/regular_import.py");
+        let mut ctx = run_path("src/fixtures/imports/regular_import.py");
 
         assert_read_eq!(ctx, "x", int!(5));
         assert_read_eq!(ctx, "y", int!(6));
@@ -814,55 +814,55 @@ foo.bar()
         // classes (as callables) to their module.
         assert_variant!(ctx, "z", Class);
 
-        let ctx = run_path("src/fixtures/imports/regular_import_b.py");
+        let mut ctx = run_path("src/fixtures/imports/regular_import_b.py");
 
         assert_read_eq!(ctx, "y", int!(7));
     }
 
     #[test]
     fn selective_import() {
-        let ctx = run_path("src/fixtures/imports/selective_import_a.py");
+        let mut ctx = run_path("src/fixtures/imports/selective_import_a.py");
         assert_read_eq!(ctx, "x", int!(5));
 
-        let ctx = run_path("src/fixtures/imports/selective_import_b.py");
+        let mut ctx = run_path("src/fixtures/imports/selective_import_b.py");
         assert_read_eq!(ctx, "y", int!(6));
         assert_read_eq!(ctx, "z", int!(6));
 
         let e = run_path_expect_error("src/fixtures/imports/selective_import_c.py");
         assert_name_error!(e.exception, "something_third");
 
-        let ctx = run_path("src/fixtures/imports/selective_import_d.py");
+        let mut ctx = run_path("src/fixtures/imports/selective_import_d.py");
         assert_read_eq!(ctx, "z", int!(8));
 
-        let ctx = run_path("src/fixtures/imports/selective_import_e.py");
+        let mut ctx = run_path("src/fixtures/imports/selective_import_e.py");
         assert_read_eq!(ctx, "x", int!(8));
 
-        let ctx = run_path("src/fixtures/imports/selective_import_f.py");
+        let mut ctx = run_path("src/fixtures/imports/selective_import_f.py");
         assert_read_eq!(ctx, "y", int!(6));
         assert_read_eq!(ctx, "z", int!(6));
     }
 
     #[test]
     fn selective_import_relative() {
-        let ctx = run_path("src/fixtures/imports/relative/main_a.py");
+        let mut ctx = run_path("src/fixtures/imports/relative/main_a.py");
         assert_read_eq!(ctx, "x", int!(2));
     }
 
     #[test]
     fn regular_import_relative_parent_package() {
-        let ctx = run_path("src/fixtures/imports/relative/main_b.py");
+        let mut ctx = run_path("src/fixtures/imports/relative/main_b.py");
         assert_read_eq!(ctx, "x", int!(2));
     }
 
     #[test]
     fn regular_import_relative_alias() {
-        let ctx = run_path("src/fixtures/imports/relative/main_c.py");
+        let mut ctx = run_path("src/fixtures/imports/relative/main_c.py");
         assert_read_eq!(ctx, "x", int!(2));
     }
 
     #[test]
     fn relative_import_from_package() {
-        let ctx = run_path("src/fixtures/imports/pkg_test/test_app.py");
+        let mut ctx = run_path("src/fixtures/imports/pkg_test/test_app.py");
         assert_read_eq!(ctx, "a", int!(111));
     }
 
@@ -879,7 +879,7 @@ g = float()
 h = float(3.99)
 i = float(3)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", float!(3.14));
         assert_read_eq!(ctx, "b", float!(3.1425));
@@ -897,7 +897,7 @@ def add(x, y):
 
 z = add(2.1, 3)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", float!(5.1));
 
@@ -922,7 +922,7 @@ h = -(2+3)
 i = +3
 j = +(-3)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", float!(-3.14));
         assert_read_eq!(ctx, "b", int!(-3));
@@ -1047,7 +1047,7 @@ s(5)
 t = [1,2]
 t.extend([3,4])
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(3),]);
         assert_read_eq!(ctx, "b", list![int!(1), float!(2.1)]);
@@ -1096,7 +1096,7 @@ new_set.add("five")
 k = {1} <= {1,2}
 l = {1} <= {2}
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", set![int!(1), int!(2), int!(3),]);
         assert_read_eq!(ctx, "b", set![float!(2.1), int!(1),]);
@@ -1132,7 +1132,7 @@ i = (4,)
 j = 9, 10
 k = tuple()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", tuple![int!(1), int!(2), int!(3),]);
         assert_read_eq!(ctx, "b", tuple![int!(1), float!(2.1)]);
@@ -1163,7 +1163,7 @@ d = (1,2,3)
 e = d[0]
 f = (1,2,3)[1]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(10), int!(2), int!(3),]);
         assert_read_eq!(ctx, "b", int!(1));
@@ -1207,7 +1207,7 @@ for i in a:
     print(b)
 print(b)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(20));
         assert_read_eq!(ctx, "i", int!(8));
@@ -1223,7 +1223,7 @@ for i in a:
     print(b)
 print(b)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(20));
         assert_read_eq!(ctx, "i", int!(8));
@@ -1239,7 +1239,7 @@ for i in a:
     print(b)
 print(b)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(20));
         assert_read_eq!(ctx, "i", int!(8));
@@ -1251,7 +1251,7 @@ for i in range(5):
     b = b + i
 print(b)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(10));
 
@@ -1262,7 +1262,7 @@ for k, v in a.items():
     b = b + v
 print(b)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(3));
     }
@@ -1286,7 +1286,7 @@ for i in r:
 
 f = next(iter(range(5)))
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", RangeIter);
         assert_type_eq!(ctx, "b", Type::RangeIter);
@@ -1336,7 +1336,7 @@ s = type(NotImplemented)
 
 t = type(slice)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_eq!(extract!(ctx, "b", Class).borrow().name(), "Foo");
         assert_eq!(
@@ -1371,7 +1371,7 @@ c = [ i * 2 for i in a if False ]
 d = [ j * 2 for j in a if j > 2 ]
 e = [x * y for x in range(1,3) for y in range(1,3)]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", list![int!(2), int!(4), int!(6),]);
         assert_read_eq!(ctx, "c", list![]);
@@ -1385,7 +1385,7 @@ e = [x * y for x in range(1,3) for y in range(1,3)]
 a = [1,2,3]
 b = { i * 2 for i in a }
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", set![int!(2), int!(4), int!(6),]);
     }
@@ -1402,7 +1402,7 @@ f = a != [8,9]
 g = a != [8,10,9]
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", bool!(true));
         assert_read_eq!(ctx, "c", bool!(false));
@@ -1421,7 +1421,7 @@ c = next(a)
 d = next(a)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(5));
         assert_read_eq!(ctx, "c", int!(4));
@@ -1442,7 +1442,7 @@ c = next(a)
 d = next(a)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(5));
         assert_read_eq!(ctx, "c", int!(4));
@@ -1474,7 +1474,7 @@ for i in countdown(5):
     z = z + i
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", int!(12));
 
@@ -1487,7 +1487,7 @@ def countdown(n):
 z = [ i for i in countdown(5) ]
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", list![int!(5), int!(4), int!(3)]);
     }
@@ -1505,7 +1505,7 @@ for i in countdown(5):
     z = z + i
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", int!(15));
 
@@ -1519,7 +1519,7 @@ for i in countdown(5):
     z = z + i
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "z", int!(10));
 
@@ -1531,7 +1531,7 @@ def countdown():
 a = list(countdown())
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(2), int!(4),]);
 
@@ -1555,7 +1555,7 @@ b = [ i for i in countdown(3) ]
 c = [ i for i in countdown(7) ]
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(4), int!(6),]);
         assert_read_eq!(ctx, "b", list![int!(3), int!(2), int!(1)]);
@@ -1573,7 +1573,7 @@ gen = g()
 a = list(gen)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(1)]);
     }
@@ -1595,7 +1595,7 @@ except StopIteration as e:
     b = e.value
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
         assert_read_eq!(ctx, "b", int!(42));
@@ -1617,7 +1617,7 @@ a = f.baz()
 b = f.x
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "Foo", Class);
         assert_variant!(ctx, "Parent", Class);
@@ -1642,7 +1642,7 @@ a = f.baz()
 b = f.bar()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(4));
         assert_read_eq!(ctx, "b", int!(11));
@@ -1652,7 +1652,7 @@ class abstractclassmethod(classmethod):
     pass
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         // This used to throw an error based on classmethod not yet being a class. This is
         // found in abc.py in the Python standard lib.
@@ -1719,7 +1719,7 @@ d = child_three.three()
 e = child_three.one()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "d", int!(3));
         assert_read_eq!(ctx, "e", int!(1));
@@ -1738,7 +1738,7 @@ child = Child()
 c = child.three()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "c", int!(3));
 
@@ -1764,7 +1764,7 @@ e = type(b)
 f = type(c)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", Super);
         assert_variant!(ctx, "b", Super);
@@ -1787,7 +1787,7 @@ child = Child()
 a = child.one()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
 
@@ -1815,7 +1815,7 @@ a = child.one()
 b = child.two()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert_read_eq!(ctx, "b", int!(5));
@@ -1836,7 +1836,7 @@ child = Child()
 b = child.two()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(2));
 
@@ -1858,7 +1858,7 @@ child = Child()
 b = child.two()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(12));
     }
@@ -1873,7 +1873,7 @@ class Foo(Bar, Baz): pass
 a = Foo.__mro__
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         let mro = extract!(ctx, "a", Tuple)
             .into_iter()
@@ -1895,7 +1895,7 @@ a = Foo.__mro__
         let input = r#"
 a = { "b": 4, 'c': 5 }
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(
             ctx,
@@ -1934,7 +1934,7 @@ u = type({}.items())
 v = [ val for val in a ]
 w = { key for key, value in a.items() }
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(
             ctx,
@@ -1999,7 +1999,7 @@ b = a.get("b")
 c = a.get("d")
 d = a.get("d", 99)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(4));
         assert_read_eq!(ctx, "c", none!());
@@ -2009,7 +2009,7 @@ d = a.get("d", 99)
 a = { "b": 4, 'c': 5 }
 b = { **a }
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(
             ctx,
@@ -2022,7 +2022,7 @@ inner = { 'key': 'inner' }
 b = { 'key': 'outer', **inner }
 c = { **inner, 'key': 'outer' }
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(
             ctx,
@@ -2049,7 +2049,7 @@ e = dict({'three': 3, 'one': 1, 'two': 2})
 f = dict({'one': 1, 'three': 3}, two=2)
 g = a == b == c == d == e == f
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(
             ctx,
@@ -2128,7 +2128,7 @@ except:
 finally:
     a = 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(3));
 
@@ -2138,7 +2138,7 @@ try:
 except:
     a = 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(2));
 
@@ -2148,7 +2148,7 @@ try:
 except:
     a = 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", float!(4.0));
 
@@ -2160,7 +2160,7 @@ except:
 finally:
     a = 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(3));
 
@@ -2185,7 +2185,7 @@ except ZeroDivisionError:
 except Exception:
     a = 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(2));
 
@@ -2198,7 +2198,7 @@ except ZeroDivisionError:
 except Exception:
     a = 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(3));
 
@@ -2211,7 +2211,7 @@ except ZeroDivisionError:
 except:
     a = 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(3));
 
@@ -2224,7 +2224,7 @@ except ZeroDivisionError:
 except Exception as e:
     a = 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(3));
         let e = extract!(ctx, "e", Exception);
@@ -2237,7 +2237,7 @@ try:
 except (ZeroDivisionError, Exception):
     a = 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(2));
 
@@ -2248,7 +2248,7 @@ try:
 except (Exception, ZeroDivisionError):
     a = 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(2));
 
@@ -2262,7 +2262,7 @@ except Exception as e:
 else:
     a = 4
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(4));
 
@@ -2278,7 +2278,7 @@ else:
 finally:
     a = 5
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
 
@@ -2304,7 +2304,7 @@ try:
 except excs():
     x = 42
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_read_eq!(ctx, "x", int!(42));
     }
 
@@ -2319,7 +2319,7 @@ try:
 except excs():
     x = 42
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_read_eq!(ctx, "x", int!(42));
     }
 
@@ -2333,7 +2333,7 @@ try:
 except E:
     x = 42
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_read_eq!(ctx, "x", int!(42));
     }
 
@@ -2421,7 +2421,7 @@ except ZeroDivisionError:
 def test_kwargs(**kwargs):
     print(kwargs['a'])
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         let expected_args = RuntimeParams {
             args: vec![],
@@ -2439,7 +2439,7 @@ a = test_kwargs(a=5, b=2)
 # A second test to ensure the value is not being set using b=2
 b = test_kwargs(a=5, b=2)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert_read_eq!(ctx, "b", int!(5));
@@ -2452,7 +2452,7 @@ a = test_kwargs(**{'a': 5, 'b': 2})
 c = {'a': 4, 'b': 3}
 b = test_kwargs(**c)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert_read_eq!(ctx, "b", int!(4));
@@ -2465,7 +2465,7 @@ first = {'a': 44 }
 second = {'b': 55 }
 b = test_kwargs(**first, **second)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", tuple![int!(44), int!(55),]);
 
@@ -2496,7 +2496,7 @@ def test_args(*args):
 c = [0, 1]
 b = test_args(*c)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(1));
 
@@ -2507,7 +2507,7 @@ def test_args(*args):
 c = [2, 3]
 b = test_args(0, 1, *c)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(1));
 
@@ -2518,7 +2518,7 @@ def test_args(one, two, *args):
 c = [2, 3]
 b = test_args(0, 1, *c)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(3));
 
@@ -2561,7 +2561,7 @@ def test_args(one, two, *args):
 
 b = test_args(1, 2)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", tuple![]);
 
@@ -2573,7 +2573,7 @@ class Foo:
 foo = Foo(a=5)
 a = foo.a
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
     }
@@ -2590,7 +2590,7 @@ c = foo(1, b=4)
 d = foo(a=1, b=4)
 e = foo(b=5, a=6)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", tuple![int!(1), int!(2)]);
         assert_read_eq!(ctx, "b", tuple![int!(1), int!(3)]);
@@ -2604,7 +2604,7 @@ def foo(a, b=2, c=3):
 
 a = foo(a=10, c=30)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", tuple![int!(10), int!(2), int!(30)]);
 
@@ -2628,7 +2628,7 @@ def f(x=[]):
 a = f()
 b = f()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(1), int!(1)]);
         assert_read_eq!(ctx, "b", list![int!(1), int!(1)]);
@@ -2646,7 +2646,7 @@ def _cell_factory():
 a = type(_cell_factory()[0])
 b = _cell_factory()[0].cell_contents
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::Cell);
         assert_read_eq!(ctx, "b", int!(1));
@@ -2663,7 +2663,7 @@ a = type(_cell_factory()[0])
 b = _cell_factory()[0].cell_contents
 c = len(_cell_factory())
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::Cell);
         assert_read_eq!(ctx, "b", int!(1));
@@ -2682,7 +2682,7 @@ a = _cell_factory()[0].cell_contents
 b = _cell_factory()[1].cell_contents
 c = len(_cell_factory())
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
         assert_read_eq!(ctx, "b", int!(2));
@@ -2700,7 +2700,7 @@ def _cell_factory():
 
 c = len(_cell_factory())
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "c", int!(1));
 
@@ -2714,7 +2714,7 @@ def _cell_factory():
 
 c = _cell_factory()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "c", none!());
     }
@@ -2732,7 +2732,7 @@ def get_val_undecorated():
 
 a = test_decorator(get_val_undecorated)()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(4));
     }
@@ -2757,7 +2757,7 @@ def twice_decorated():
 b = once_decorated()
 c = twice_decorated()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(4));
         assert_read_eq!(ctx, "c", int!(8));
@@ -2781,7 +2781,7 @@ def get_larger_val():
 a = get_val()
 b = get_larger_val()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
         assert_read_eq!(ctx, "b", int!(8));
@@ -2803,7 +2803,7 @@ class Foo:
 f = Foo(7)
 a = f.calculate(2)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(14));
 
@@ -2826,7 +2826,7 @@ class Foo:
 f = Foo(7)
 a = f.calculate(2)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(42));
     }
@@ -2843,7 +2843,7 @@ class Foo:
 f = Foo()
 a = f.calculate(2)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(18));
     }
@@ -2912,7 +2912,7 @@ l = type(errno)
 sys.modules['os.path'] = "os_path"
 m = sys.modules['os.path']
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", Int);
         assert_variant!(ctx, "b", Float);
@@ -2957,7 +2957,7 @@ with MyContextManager() as cm:
 
 a = cm.a
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(3));
 
@@ -3009,10 +3009,10 @@ with MyContextManager() as cm:
         let input = r#"
 a = 4
 del a
+a
 "#;
-        let ctx = run(input);
-
-        assert_eq!(read_optional(&ctx, "a"), None);
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "a");
 
         let input = r#"
 a = {'b': 1, 'c': 2}
@@ -3026,7 +3026,7 @@ c = a['b']
 a = [0,1,2]
 del a[1]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(0), int!(2)]);
 
@@ -3059,11 +3059,16 @@ b = 5
 c = 6
 del a, c
 "#;
-        let ctx = run(input);
+        // a is gone
+        let e = eval_expect_error(&format!("{input}\na"));
+        assert_name_error!(e.exception, "a");
 
-        assert_eq!(read_optional(&ctx, "a"), None);
-        assert_read_eq!(ctx, "b", int!(5));
-        assert_eq!(read_optional(&ctx, "c"), None);
+        // b is still there
+        assert_eval_eq!(&format!("{input}\nb"), int!(5));
+
+        // c is gone
+        let e = eval_expect_error(&format!("{input}\nc"));
+        assert_name_error!(e.exception, "c");
     }
 
     #[test]
@@ -3076,14 +3081,14 @@ b'hello'
         let input = r#"
 a = iter(b'hello')
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", BytesIter);
 
         let input = r#"
 a = type(iter(b'hello'))
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::BytesIter);
 
@@ -3131,14 +3136,14 @@ bytearray('hello')
         let input = r#"
 a = iter(bytearray())
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", ByteArrayIter);
 
         let input = r#"
 a = type(iter(bytearray()))
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::ByteArrayIter);
     }
@@ -3164,14 +3169,14 @@ bytes('hello')
         let input = r#"
 a = iter(bytes())
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", BytesIter);
 
         let input = r#"
 a = type(iter(bytes()))
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::BytesIter);
     }
@@ -3182,7 +3187,7 @@ a = type(iter(bytes()))
 a = 5
 a += 1
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
 
@@ -3190,7 +3195,7 @@ a += 1
 a = 5
 a -= 1
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(4));
 
@@ -3198,7 +3203,7 @@ a -= 1
 a = 5
 a *= 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(10));
 
@@ -3206,7 +3211,7 @@ a *= 2
 a = 5
 a /= 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", float!(2.5));
 
@@ -3214,7 +3219,7 @@ a /= 2
 a = 0b0101
 a &= 0b0100
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(4));
 
@@ -3222,7 +3227,7 @@ a &= 0b0100
 a = 0b0101
 a |= 0b1000
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(13));
 
@@ -3230,7 +3235,7 @@ a |= 0b1000
 a = 0b0101
 a ^= 0b0100
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
 
@@ -3238,7 +3243,7 @@ a ^= 0b0100
 a = 5
 a //= 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(2));
 
@@ -3246,7 +3251,7 @@ a //= 2
 a = 0b0101
 a <<= 1
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(10));
 
@@ -3254,7 +3259,7 @@ a <<= 1
 a = 0b0101
 a >>= 1
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(2));
 
@@ -3262,7 +3267,7 @@ a >>= 1
 a = 11
 a %= 2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
 
@@ -3270,7 +3275,7 @@ a %= 2
 a = 2
 a **= 3
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(8));
     }
@@ -3354,7 +3359,7 @@ b = 0
 for i in iter([1,2,3]):
     b += i
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(6));
     }
@@ -3365,7 +3370,7 @@ for i in iter([1,2,3]):
 name = "John"
 a = f"Hello {name}"
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", str!("Hello John"));
     }
@@ -3380,7 +3385,7 @@ d = type(iter(reversed([])))
 
 e = [ i for i in reversed([1,2,3]) ]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", ReversedIter);
         assert_variant!(ctx, "b", ReversedIter);
@@ -3398,7 +3403,7 @@ for i in [1,2,3,4,5,6]:
         break
     a += i
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
 
@@ -3409,7 +3414,7 @@ for i in [1,2,3,4,5,6]:
         continue
     a += i
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(17));
 
@@ -3423,7 +3428,7 @@ while i < 6:
         break
     a += b[i-1]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
 
@@ -3437,7 +3442,7 @@ while i < 6:
         continue
     a += b[i-1]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(17));
 
@@ -3450,7 +3455,7 @@ for i in [1,2,3,4,5,6]:
 else:
     a = 1024
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
 
@@ -3461,7 +3466,7 @@ for i in [1,2,3,4,5,6]:
 else:
     a = 1024
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1024));
     }
@@ -3481,7 +3486,7 @@ g = [ i for i in zip(range(5), range(4), range(3)) ]
 
 h = [ i for i in zip([1,2,3], [4,5,6], strict=False) ]
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", Zip);
         assert_variant!(ctx, "b", Zip);
@@ -3550,7 +3555,7 @@ d = type(dict.__dict__['items'])
 # TODO this should fail
 e = type(object().__dict__)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::Type);
         assert_variant!(ctx, "b", MappingProxy);
@@ -3573,7 +3578,7 @@ f = int
 class MyClass:
     __class_getitem__ = classmethod(a)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", Class);
         assert_type_eq!(ctx, "b", Type::Type);
@@ -3593,7 +3598,7 @@ b = Foo.a
 Foo.a = 5
 c = Foo.a
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(6));
         assert_read_eq!(ctx, "c", int!(5));
@@ -3609,7 +3614,7 @@ b = Foo.a
 c = Foo().a
 d = Foo.a
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(6));
         assert_read_eq!(ctx, "c", int!(5));
@@ -3627,7 +3632,7 @@ class Foo:
 
 b = Foo.make()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         let method = extract_member!(ctx, "Foo", "make", Class);
         assert!(matches!(method, TreewalkValue::Method(_)));
@@ -3643,7 +3648,7 @@ class Foo:
 b = Foo.make()
 c = Foo().make()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(5));
         assert_read_eq!(ctx, "c", int!(5));
@@ -3664,7 +3669,7 @@ c = Foo.val
 d = Foo().val
 e = Foo().make()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(10));
         assert_read_eq!(ctx, "c", int!(10));
@@ -3711,7 +3716,7 @@ class Foo:
 b = Foo.make()
 c = Foo().make()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(5));
         assert_read_eq!(ctx, "c", int!(5));
@@ -3753,7 +3758,7 @@ a = singleton1.data
 b = singleton2.data
 c = singleton1 is singleton2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", str!("First"));
         assert_read_eq!(ctx, "b", str!("First"));
@@ -3778,7 +3783,7 @@ a = singleton1.data
 b = singleton2.data
 c = singleton1 is singleton2
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", str!("Second"));
         assert_read_eq!(ctx, "b", str!("Second"));
@@ -3791,7 +3796,7 @@ class Foo:
 
 a = Foo()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", none!());
     }
@@ -3821,7 +3826,7 @@ try:
 except Exception as e:
     d = e
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert_read_eq!(ctx, "b", int!(5));
@@ -3845,7 +3850,7 @@ class ConcreteImplementation(BaseInterface):
 # This should use the metaclass implementation.
 a = ConcreteImplementation.run()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
 
@@ -3865,7 +3870,7 @@ class Coroutine(metaclass=ABCMeta):
 
 a = Coroutine.register()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(33));
 
@@ -3890,7 +3895,7 @@ class Coroutine(metaclass=ChildMeta):
 
 a = Coroutine.register()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(33));
     }
@@ -3913,7 +3918,7 @@ global_modified()
 a = global_var_one
 b = global_var_two
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(10));
         assert_read_eq!(ctx, "b", int!(9));
@@ -3937,7 +3942,7 @@ def nonlocal_modified():
 a = nonlocal_shadow()
 b = nonlocal_modified()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert_read_eq!(ctx, "b", int!(4));
@@ -3959,7 +3964,7 @@ def outer():
 
 a = outer()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(20));
 
@@ -3995,7 +4000,7 @@ a = object
 b = object()
 c = object().__str__
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::Object);
         assert_variant!(ctx, "b", Object);
@@ -4010,7 +4015,7 @@ b = int()
 c = int(5)
 d = int('6')
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::Int);
         assert_read_eq!(ctx, "b", int!(0));
@@ -4044,7 +4049,7 @@ f = Child.three
 g = type(a)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", Method);
         //assert_type_is!(interpreter, "b", Function);
@@ -4076,7 +4081,7 @@ e = child.three()
 f = Child.three()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
         assert_read_eq!(ctx, "c", int!(2));
@@ -4120,7 +4125,7 @@ c = child.two()
 d = Child.two()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(11));
         assert_read_eq!(ctx, "c", int!(22));
@@ -4137,7 +4142,7 @@ a = foo()
 b, c = foo()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", tuple![int!(2), int!(3)]);
         assert_read_eq!(ctx, "b", int!(2));
@@ -4169,7 +4174,7 @@ f, g = {1, 2}
 h, i, j = range(1, 4)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(1));
         assert_read_eq!(ctx, "c", int!(2));
@@ -4186,7 +4191,7 @@ l = [1,2]
 a = (*l,)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", tuple![int!(1), int!(2)]);
 
@@ -4221,7 +4226,7 @@ a = 5 if True else 6
 b = 7 if False else 8
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert_read_eq!(ctx, "b", int!(8));
@@ -4254,7 +4259,7 @@ p = word[:2]
 r = [2,4,6][:]
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", list![int!(1), int!(2),]);
         assert_read_eq!(ctx, "c", list![int!(8), int!(9), int!(10),]);
@@ -4297,7 +4302,7 @@ class Foo:
 a = Foo().run
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
     }
@@ -4309,7 +4314,7 @@ def foo(cls, /):
     pass
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "foo", Function);
     }
@@ -4322,7 +4327,7 @@ b = globals()
 c = b['a']
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "c", int!(4));
     }
@@ -4339,7 +4344,7 @@ e = type(d)
 f = list(d)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(2));
         assert_read_eq!(ctx, "c", int!(4));
@@ -4359,7 +4364,7 @@ d = [ i for i in a ]
 e = frozenset().__contains__
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", frozenset![int!(1), int!(2),]);
         assert_read_eq!(ctx, "b", frozenset![]);
@@ -4382,7 +4387,7 @@ a = foo(88)
 b = foo()
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(88));
         assert_read_eq!(ctx, "b", int!(99));
@@ -4414,7 +4419,7 @@ a = getattr(f, 'val')
 b = getattr(f, 'val_two', 33)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(44));
         assert_read_eq!(ctx, "b", int!(33));
@@ -4455,7 +4460,7 @@ k = isinstance([], (int, list))
 l = isinstance([], (int, Foo))
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(true));
         assert_read_eq!(ctx, "b", bool!(false));
@@ -4502,7 +4507,7 @@ i = issubclass(object, object)
 j = issubclass(type, type)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(false));
         assert_read_eq!(ctx, "b", bool!(false));
@@ -4549,7 +4554,7 @@ j = bool(())
 k = bool((1))
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(false));
         assert_read_eq!(ctx, "b", bool!(true));
@@ -4570,7 +4575,7 @@ k = bool((1))
 a = memoryview
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_variant!(ctx, "a", Class);
     }
@@ -4592,7 +4597,7 @@ for number in countdown_from(3, 2):
     sum += number
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "sum", int!(9));
     }
@@ -4606,7 +4611,7 @@ def gen():
 a = list(gen())
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(3)]);
     }
@@ -4620,7 +4625,7 @@ def gen():
 a = list(gen())
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![]);
     }
@@ -4641,7 +4646,7 @@ def g2():
 a = list(g2())
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(42)]);
     }
@@ -4656,7 +4661,7 @@ except TypeError as exc:
     b = type(exc.__traceback__.tb_frame)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_type_eq!(ctx, "a", Type::Traceback);
         assert_type_eq!(ctx, "b", Type::Frame);
@@ -4671,7 +4676,7 @@ b = asyncio.sleep
 c = asyncio.create_task
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         // these should probably just return Function, not BuiltinFunction
         // testing here to confirm they do not get bound to their module
@@ -4686,7 +4691,7 @@ c = asyncio.create_task
 a = b = True
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(true));
         assert_read_eq!(ctx, "b", bool!(true));
@@ -4703,7 +4708,7 @@ a = f == g
 b = f != g
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(false));
         assert_read_eq!(ctx, "b", bool!(true));
@@ -4719,7 +4724,7 @@ a = f == g
 b = f != g
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(false));
         assert_read_eq!(ctx, "b", bool!(true));
@@ -4740,7 +4745,7 @@ c = f.__ne__
 d = c(g)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(true));
         assert_read_eq!(ctx, "b", bool!(false));
@@ -4766,7 +4771,7 @@ obj = MyClass()
 a = obj.attribute
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(44));
 
@@ -4813,15 +4818,14 @@ del obj.my_attr
 f = obj.my_attr
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", str!("default value"));
         assert_read_eq!(ctx, "b", str!("new value"));
         assert_read_eq!(ctx, "c", str!("default value"));
+        let d = read(&mut ctx, "d");
         assert_eq!(
-            ctx.interpreter()
-                .state
-                .class_name_of_value(&read(&ctx, "d")),
+            ctx.interpreter().state.class_name_of_value(&d),
             "Descriptor"
         );
         assert_read_eq!(ctx, "e", str!("custom value"));
@@ -4840,7 +4844,7 @@ f = complex("2.1+3.1j")
 g = complex(4.1, 5.1)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", complex!(4.0, 5.0));
         assert_type_eq!(ctx, "b", Type::Complex);
@@ -4863,7 +4867,7 @@ b = callable(foo)
 c = callable(MyClass)
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(false));
         assert_read_eq!(ctx, "b", bool!(true));
@@ -4905,7 +4909,7 @@ a = my['one']
 del my['one']
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(1));
         assert_member_eq!(ctx, "my", "inner", dict!(ctx.interpreter(), {}));
@@ -4933,7 +4937,7 @@ except Exception as e:
     the_exp = e
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
         assert!(extract!(ctx, "b", Int) != 0);
@@ -4953,7 +4957,7 @@ except Exception as e:
 
     #[test]
     fn name_dunder_script() {
-        let ctx = run_path("src/fixtures/name_dunder/main.py");
+        let mut ctx = run_path("src/fixtures/name_dunder/main.py");
         assert_read_eq!(ctx, "__name__", str!("__main__"));
         assert_read_eq!(ctx, "a", str!("second"));
         assert_read_eq!(ctx, "b", str!("inner.third"));
@@ -4968,7 +4972,7 @@ except Exception as e:
     #[test]
     fn package_dunder_namespace() {
         // This example does NOT have an __init__.py file
-        let ctx = run_path("src/fixtures/package_dunder/namespace/main.py");
+        let mut ctx = run_path("src/fixtures/package_dunder/namespace/main.py");
         assert_read_eq!(ctx, "__package__", none!());
         assert_read_eq!(ctx, "second_pkg", none!());
         assert_read_eq!(ctx, "third_pkg", str!("inner"));
@@ -4977,7 +4981,7 @@ except Exception as e:
     #[test]
     fn package_dunder_regular() {
         // This example does have an __init__.py file
-        let ctx = run_path("src/fixtures/package_dunder/regular/main.py");
+        let mut ctx = run_path("src/fixtures/package_dunder/regular/main.py");
         assert_read_eq!(ctx, "__package__", none!());
         assert_read_eq!(ctx, "second_pkg", none!());
         assert_read_eq!(ctx, "third_pkg", str!("inner"));
@@ -4992,7 +4996,7 @@ a = type(net.Connection)
 b = type(net.Socket)
 c = type(net)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_type_eq!(ctx, "a", Type::Type);
         assert_type_eq!(ctx, "b", Type::Type);
         assert_type_eq!(ctx, "c", Type::Module);
@@ -5001,7 +5005,7 @@ c = type(net)
 from memphis.net import Connection
 a = type(Connection)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_type_eq!(ctx, "a", Type::Type);
 
         let input = r#"
@@ -5009,7 +5013,7 @@ import memphis
 a = type(memphis.net.Connection)
 b = type(memphis.net.Socket)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_type_eq!(ctx, "a", Type::Type);
         assert_type_eq!(ctx, "b", Type::Type);
 
@@ -5022,7 +5026,7 @@ class LoggingConnection(net.Connection):
 a = issubclass(LoggingConnection, net.Connection)
 b = isinstance(LoggingConnection(), net.Connection)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_read_eq!(ctx, "a", bool!(true));
         assert_read_eq!(ctx, "b", bool!(true));
 
@@ -5031,7 +5035,7 @@ from memphis import net
 a = "send" in dir(net.Connection)
 b = "unsend" in dir(net.Connection)
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_read_eq!(ctx, "a", bool!(true));
         assert_read_eq!(ctx, "b", bool!(false));
     }
@@ -5051,7 +5055,7 @@ f = Foo()
 setattr(f, "123", 456)
 a = getattr(f, "123")
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_read_eq!(ctx, "a", int!(456));
     }
 
@@ -5064,7 +5068,7 @@ b = TypeError()
 c = TypeError("a")
 d = TypeError("a", "b")
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_type_eq!(ctx, "a", Type::TypeError);
         assert_type_eq!(ctx, "t", Type::TypeError);
         let b = extract!(ctx, "b", Exception);
@@ -5084,7 +5088,7 @@ a = StopIteration
 t = type(StopIteration())
 b = StopIteration()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
         assert_type_eq!(ctx, "a", Type::StopIteration);
         assert_type_eq!(ctx, "t", Type::StopIteration);
         let b = extract!(ctx, "b", Exception);

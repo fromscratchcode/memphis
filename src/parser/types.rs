@@ -57,6 +57,7 @@ impl Ast {
     pub fn rewrite_last_expr_to_return(&mut self) {
         if self.len() == 1 {
             if let StatementKind::Expression(expr) = &self.statements[0].kind {
+                dbg!(expr);
                 self.statements[0].kind = StatementKind::Return(vec![expr.clone()]);
             }
         }

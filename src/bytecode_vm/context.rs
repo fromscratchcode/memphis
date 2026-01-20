@@ -45,6 +45,7 @@ impl VmContext {
         let code = self
             .compile()
             .map_err(|_e| self.vm.raise(Exception::syntax_error()))?;
+        dbg!(&code.bytecode);
         self.vm.execute(code)
     }
 
@@ -53,12 +54,9 @@ impl VmContext {
         let mut ast = parser
             .parse()
             .map_err(|e| CompilerError::SyntaxError(e.to_string()))?;
+        dbg!(&ast);
         ast.rewrite_last_expr_to_return();
         self.compiler.compile(&ast)
-    }
-
-    pub fn read_inner(&self, name: &str) -> Option<VmValue> {
-        self.vm.read_global(name).ok()
     }
 
     pub fn add_text_inner(&mut self, line: Text) {
@@ -93,11 +91,6 @@ impl Interpreter for VmContext {
     fn run(&mut self) -> MemphisResult<MemphisValue> {
         let value = self.run_inner().map_err(|e| e.normalize(&self.vm))?;
         Ok(self.vm.normalize_vm_value(value).unwrap())
-    }
-
-    fn read(&self, name: &str) -> Option<MemphisValue> {
-        let value = self.read_inner(name)?;
-        Some(self.vm.normalize_vm_value(value).unwrap())
     }
 
     fn add_text(&mut self, line: Text) {

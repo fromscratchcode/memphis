@@ -1,6 +1,6 @@
 macro_rules! extract {
     ($ctx:expr, $input:expr, $variant:ident) => {{
-        match read(&$ctx, $input) {
+        match read(&mut $ctx, $input) {
             crate::treewalk::TreewalkValue::$variant(v) => v,
             _ => panic!("Expected {}: {}", stringify!($variant), $input),
         }

@@ -565,7 +565,7 @@ mod tests_vm_interpreter {
         let text = r#"
 x = [2,"Hello"]
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         let list = extract!(ctx, "x", List);
         let values = list.resolved_items(ctx.vm()).unwrap();
         assert_eq!(values, vec![int!(2), str!("Hello")]);
@@ -616,7 +616,7 @@ x = [2,"Hello"]
         let text = r#"
 x = (2,"Hello")
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         let tuple = extract!(ctx, "x", Tuple);
         let values = tuple.resolved_items(ctx.vm()).unwrap();
         assert_eq!(values, vec![int!(2), str!("Hello")]);
@@ -636,7 +636,7 @@ x = (2,"Hello")
         let text = r#"
 x = {"a": 22}
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         let dict = extract!(ctx, "x", Dict);
         let values = dict.resolved_items(ctx.vm()).unwrap();
         assert_eq!(values, vec![(str!("a"), int!(22))]);
@@ -698,7 +698,7 @@ x = {"a": 22}
         let text = r#"
 a = 5 - 3
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(2));
     }
 
@@ -707,7 +707,7 @@ a = 5 - 3
         let text = r#"
 a = "Hello World"
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", str!("Hello World"));
     }
 
@@ -718,7 +718,7 @@ a = 5 - 3
 b = 10
 c = None
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(2));
         assert_read_eq!(ctx, "b", int!(10));
         assert_read_eq!(ctx, "c", VmValue::None);
@@ -730,7 +730,7 @@ c = None
 a = 5 - 3
 b = 10 + a
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(2));
         assert_read_eq!(ctx, "b", int!(12));
     }
@@ -743,7 +743,7 @@ n = 4
 while i < n:
     i = i + 1
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "i", int!(4));
     }
 
@@ -763,7 +763,7 @@ j = bool(())
 k = bool((1))
 "#;
 
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", bool!(false));
         assert_read_eq!(ctx, "b", bool!(true));
@@ -785,7 +785,7 @@ s = 0
 for i in [2,3,11]:
     s = s + i
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "i", int!(11));
         assert_read_eq!(ctx, "s", int!(16));
     }
@@ -798,7 +798,7 @@ a = next(it)
 b = next(it)
 c = next(it)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(1));
         assert_read_eq!(ctx, "b", int!(2));
         assert_read_eq!(ctx, "c", int!(3));
@@ -815,7 +815,7 @@ s = 0
 for i in (2,3,11):
     s = s + i
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "i", int!(11));
         assert_read_eq!(ctx, "s", int!(16));
     }
@@ -828,7 +828,7 @@ a = next(it)
 b = next(it)
 c = next(it)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(1));
         assert_read_eq!(ctx, "b", int!(2));
         assert_read_eq!(ctx, "c", int!(3));
@@ -845,7 +845,7 @@ s = 0
 for i in range(2,10,2):
     s = s + i
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "i", int!(8));
         assert_read_eq!(ctx, "s", int!(20));
     }
@@ -886,7 +886,7 @@ g = gen()
 a = next(g)
 b = next(g)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(1));
         assert_read_eq!(ctx, "b", int!(2));
 
@@ -913,7 +913,7 @@ s = 11
 for i in gen():
     s = s + i
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "i", int!(2));
         assert_read_eq!(ctx, "s", int!(14));
     }
@@ -927,7 +927,7 @@ def gen():
 
 a = list(gen())
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(
             ctx,
             "a",
@@ -944,7 +944,7 @@ def gen():
 a = list(gen())
 "#;
 
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(
             ctx,
             "a",
@@ -970,7 +970,7 @@ def gen():
 a = list(gen())
 "#;
 
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(
             ctx,
             "a",
@@ -990,7 +990,7 @@ def foo(a, b):
 
 c = foo(2, 9)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "c", int!(11));
     }
 
@@ -1003,7 +1003,7 @@ def foo(a, b):
 
 d = foo(2, 9)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "d", int!(20));
     }
 
@@ -1033,7 +1033,7 @@ def foo(a, b):
 
 c = foo(2, 9)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "c", int!(29));
     }
 
@@ -1050,7 +1050,7 @@ def get_val_undecorated():
 
 a = test_decorator(get_val_undecorated)()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", float!(5.0));
     }
 
@@ -1068,7 +1068,7 @@ def once_decorated():
 
 b = once_decorated()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "b", int!(4));
     }
 
@@ -1087,7 +1087,7 @@ def twice_decorated():
 
 c = twice_decorated()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "c", int!(8));
     }
 
@@ -1112,7 +1112,7 @@ def get_larger_val():
 a = get_val()
 b = get_larger_val()
 "#;
-        let ctx = run(input);
+        let mut ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(6));
         assert_read_eq!(ctx, "b", int!(8));
@@ -1129,7 +1129,7 @@ def make_adder(x):
 adder = make_adder(10)
 a = adder(5)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "a", int!(15));
     }
 
@@ -1140,7 +1140,7 @@ class Foo:
     def bar():
         return 4
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         let class = extract!(ctx, "Foo", Class);
         assert_eq!(class.name(), "Foo");
     }
@@ -1154,7 +1154,7 @@ class Foo:
 
 f = Foo()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         let _ = extract!(ctx, "f", Object);
     }
 
@@ -1168,7 +1168,7 @@ class Foo:
 f = Foo()
 b = f.bar()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "b", int!(4));
 
         let text = r#"
@@ -1179,7 +1179,7 @@ class Foo:
 f = Foo()
 b = f.bar(11)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "b", int!(15));
     }
 
@@ -1192,7 +1192,7 @@ class Foo:
 f = Foo()
 f.x = 4
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_member_eq!(ctx, "f", "x", int!(4));
     }
 
@@ -1206,7 +1206,7 @@ class Foo:
 f = Foo()
 f.bar()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_member_eq!(ctx, "f", "x", int!(4));
     }
 
@@ -1219,7 +1219,7 @@ class Foo:
 
 f = Foo()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_member_eq!(ctx, "f", "x", int!(44));
     }
 
@@ -1232,7 +1232,7 @@ class Foo:
 
 f = Foo(33)
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_member_eq!(ctx, "f", "x", int!(33));
     }
 
@@ -1249,37 +1249,37 @@ class Foo:
 f = Foo(10)
 b = f.bar()
 "#;
-        let ctx = run(text);
+        let mut ctx = run(text);
         assert_read_eq!(ctx, "b", int!(10));
     }
 
     #[test]
     fn regular_import_same_file() {
-        let ctx = run_path("src/bytecode_vm/fixtures/imports/one/main.py");
+        let mut ctx = run_path("src/bytecode_vm/fixtures/imports/one/main.py");
         assert_read_eq!(ctx, "x", int!(5));
     }
 
     #[test]
     fn regular_import_function_in_other_file() {
-        let ctx = run_path("src/bytecode_vm/fixtures/imports/two/main.py");
+        let mut ctx = run_path("src/bytecode_vm/fixtures/imports/two/main.py");
         assert_read_eq!(ctx, "x", int!(33));
     }
 
     #[test]
     fn selective_import_relative() {
-        let ctx = run_path("src/fixtures/imports/relative/main_a.py");
+        let mut ctx = run_path("src/fixtures/imports/relative/main_a.py");
         assert_read_eq!(ctx, "x", int!(2));
     }
 
     #[test]
     fn regular_import_relative_parent_package() {
-        let ctx = run_path("src/fixtures/imports/relative/main_b.py");
+        let mut ctx = run_path("src/fixtures/imports/relative/main_b.py");
         assert_read_eq!(ctx, "x", int!(2));
     }
 
     #[test]
     fn regular_import_relative_alias() {
-        let ctx = run_path("src/fixtures/imports/relative/main_c.py");
+        let mut ctx = run_path("src/fixtures/imports/relative/main_c.py");
         assert_read_eq!(ctx, "x", int!(2));
     }
 

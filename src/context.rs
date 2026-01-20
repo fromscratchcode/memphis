@@ -27,10 +27,6 @@ impl MemphisContext {
         self.context.run()
     }
 
-    pub fn read(&self, name: &str) -> Option<MemphisValue> {
-        self.context.read(name)
-    }
-
     pub fn add_text(&mut self, line: Text) {
         self.context.add_text(line);
     }

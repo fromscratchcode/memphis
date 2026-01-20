@@ -49,33 +49,6 @@ impl VirtualMachine {
         self.run_loop()
     }
 
-    pub fn read_global(&self, name: &str) -> DomainResult<VmValue> {
-        let reference = self
-            .load_global_by_name(name)
-            .ok_or_else(Exception::runtime_error)?;
-        self.deref(reference)
-    }
-
-    /// Read a global variable from the `__main__` module.
-    // TODO this should really only be available in test/repl mode, but we currently call this in
-    // the Interpreter trait. The other option is splitting Interpreter into two traits and putting
-    // the read one behind a test/repl flag.
-    //
-    // We use unwrap here because:
-    // 1) the main module should always exist, and
-    // 2) constructing a real error with a heapified string would require this to take a mutable
-    //    reference to the VM, which would ripple through the tests.
-    fn load_global_by_name(&self, name: &str) -> Option<Reference> {
-        let module = self
-            .runtime
-            .borrow()
-            .read_module(&ModuleName::main())
-            .unwrap();
-
-        let module_binding = module.borrow();
-        module_binding.read(name)
-    }
-
     fn current_module(&self) -> DomainResult<Container<Module>> {
         Ok(self.current_frame()?.module.clone())
     }
@@ -622,12 +595,16 @@ impl VirtualMachine {
     fn run_loop(&mut self) -> VmResult<VmValue> {
         let mut result = self.none();
         while !self.call_stack.is_finished() {
+            if self.current_frame().is_ok() {
+                dbg!(&self.current_frame().unwrap());
+            }
             let (step_result, _frame) = self.run_top_frame()?;
             result = match step_result {
                 StepResult::Return(val) => val,
                 StepResult::Halt => self.none(),
                 other => panic!("Unexpected step result in `run_loop`: {other:?}"),
             };
+            dbg!(&result);
         }
 
         self.deref(result).raise(self)

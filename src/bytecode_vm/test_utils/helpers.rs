@@ -45,11 +45,13 @@ pub fn run_path_expect_error(path: &str) -> RaisedMemphisError {
     };
 }
 
-pub fn read(context: &VmContext, name: &str) -> VmValue {
-    context.read_inner(name).expect("Failed to read variable.")
+pub fn read(ctx: &mut VmContext, name: &str) -> VmValue {
+    ctx.add_text_inner(Text::new(name));
+    ctx.run_inner()
+        .expect(&format!("Failed to read var: {}", name))
 }
 
-pub fn read_attr(context: &VmContext, name: &str, attr: &str) -> VmValue {
+pub fn read_attr(context: &mut VmContext, name: &str, attr: &str) -> VmValue {
     let object = read(context, name);
     let reference = context
         .vm()

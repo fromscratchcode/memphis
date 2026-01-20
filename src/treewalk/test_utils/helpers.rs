@@ -44,10 +44,8 @@ pub fn run_path_expect_error(path: &str) -> RaisedException {
     };
 }
 
-pub fn read_optional(ctx: &TreewalkContext, name: &str) -> Option<TreewalkValue> {
-    ctx.read_inner(name)
-}
-
-pub fn read(ctx: &TreewalkContext, name: &str) -> TreewalkValue {
-    read_optional(&ctx, name).expect(&format!("Failed to read var: {}", name))
+pub fn read(ctx: &mut TreewalkContext, name: &str) -> TreewalkValue {
+    ctx.add_text_inner(Text::new(name));
+    ctx.run_inner()
+        .expect(&format!("Failed to read var: {}", name))
 }

@@ -492,6 +492,31 @@ foo()
     }
 
     #[test]
+    fn test_treewalk_last_returned_val() {
+        let code = r#"
+a = 10
+b = 12
+b
+a
+"#;
+        let return_val = run(code);
+        assert_eq!(return_val, "10");
+    }
+
+    #[test]
+    fn test_vm_last_returned_val() {
+        // We had a bug here where this would previously return 12.
+        let code = r#"
+a = 10
+b = 12
+b
+a
+"#;
+        let return_val = run_vm(code);
+        assert_eq!(return_val, "10");
+    }
+
+    #[test]
     fn test_repl_ctrl_c() {
         let mut events = string_to_events("123456789\n");
         let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));

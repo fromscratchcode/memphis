@@ -15,14 +15,14 @@ macro_rules! assert_eval_variant {
 
 macro_rules! assert_read_eq {
     ($ctx:expr, $input:expr, $expected:expr) => {
-        assert_eq!(read(&$ctx, $input), $expected);
+        assert_eq!(read(&mut $ctx, $input), $expected);
     };
 }
 
 macro_rules! assert_type_eq {
     ($ctx:expr, $name:expr, $type:expr) => {
         assert_eq!(
-            extract!(&$ctx, $name, Class).borrow().builtin_type(),
+            extract!(&mut $ctx, $name, Class).borrow().builtin_type(),
             &$type
         );
     };
@@ -31,7 +31,7 @@ macro_rules! assert_type_eq {
 macro_rules! assert_variant {
     ($ctx:expr, $input:expr, $pattern:ident) => {
         assert!(matches!(
-            read(&$ctx, $input),
+            read(&mut $ctx, $input),
             crate::treewalk::TreewalkValue::$pattern(_)
         ));
     };

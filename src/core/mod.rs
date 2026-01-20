@@ -11,7 +11,6 @@ use crate::domain::{MemphisResult, MemphisValue, Text};
 
 pub trait Interpreter {
     fn run(&mut self) -> MemphisResult<MemphisValue>;
-    fn read(&self, name: &str) -> Option<MemphisValue>;
     fn add_text(&mut self, line: Text);
 }
 

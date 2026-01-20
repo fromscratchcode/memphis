@@ -4,6 +4,7 @@ const NONE_INDEX: usize = 0;
 const TRUE_INDEX: usize = 1;
 const FALSE_INDEX: usize = 2;
 
+#[derive(Debug)]
 pub struct Heap {
     storage: Vec<VmValue>,
 }
