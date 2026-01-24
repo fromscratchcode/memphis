@@ -3,7 +3,7 @@ use crate::{
         compiler::{opcode::UnsignedOffset, CodeObject, Constant, Opcode},
         Compiler, CompilerError, CompilerResult,
     },
-    domain::{resolve_import_path, FromImportPath, FunctionType, Identifier, ModuleName},
+    domain::{resolve_import_path, FromImportPath, FunctionType, Identifier},
     parser::types::{
         Ast, ConditionalAst, Expr, FromImportMode, LoopIndex, Params, RegularImport, Statement,
         StatementKind,
@@ -334,9 +334,7 @@ impl Compiler {
         import_path: &FromImportPath,
         mode: &FromImportMode,
     ) -> CompilerResult<()> {
-        // TODO pass the real package here, we're not detecting __init__ here at the moment
-        let package = self.module_name.parent().unwrap_or(ModuleName::empty());
-        let module_name = resolve_import_path(import_path, &package)
+        let module_name = resolve_import_path(import_path, &self.package)
             .map_err(|e| CompilerError::import_error(e.message()))?;
 
         let index = self.get_or_set_nonlocal_index(&module_name.as_str())?;

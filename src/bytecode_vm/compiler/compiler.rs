@@ -17,8 +17,14 @@ mod stmt;
 
 /// A Python bytecode compiler.
 pub struct Compiler {
+    /// Track the filename so we can associate it with later `CodeObjects`.
     filename: String,
+
+    /// Track the module name so we can associate it with later `CodeObjects`.
     module_name: ModuleName,
+
+    /// We must know the package name for relative imports to work.
+    package: ModuleName,
 
     /// Keep a reference to the code object being constructed so we can associate things with it,
     /// (variable names, constants, etc.).
@@ -29,10 +35,11 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(module_name: &ModuleName, filename: &str) -> Self {
+    pub fn new(module_name: &ModuleName, package: &ModuleName, filename: &str) -> Self {
         Self {
             filename: filename.to_string(),
             module_name: module_name.clone(),
+            package: package.clone(),
             code_stack: vec![],
             line_number: 0,
         }
@@ -965,7 +972,8 @@ from .outer import foo
 from .outer import foo
 "#;
         let module_name = ModuleName::from_segments(&["pkg", "mod"]);
-        let code = compile_at_module(text, module_name.clone());
+        let pkg = ModuleName::from_segments(&["pkg"]);
+        let code = compile_at_pkg(text, module_name.clone(), pkg);
 
         let expected = CodeObject {
             module_name,
@@ -994,7 +1002,8 @@ from .outer import foo
 from .outer.inner import foo
 "#;
         let module_name = ModuleName::from_segments(&["pkg", "mod"]);
-        let code = compile_at_module(text, module_name.clone());
+        let pkg = ModuleName::from_segments(&["pkg"]);
+        let code = compile_at_pkg(text, module_name.clone(), pkg);
 
         let expected = CodeObject {
             module_name,
@@ -1023,7 +1032,8 @@ from .outer.inner import foo
 from ..outer import foo
 "#;
         let module_name = ModuleName::from_segments(&["pkg", "mod"]);
-        let err = compile_err_at_module(text, module_name);
+        let pkg = ModuleName::from_segments(&["pkg"]);
+        let err = compile_err_at_pkg(text, module_name, pkg);
 
         match err {
             CompilerError::ImportError(msg) => assert_eq!(

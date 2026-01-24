@@ -12,7 +12,11 @@ use crate::{
 };
 
 fn init() -> Compiler {
-    Compiler::new(&ModuleName::main(), "compiler_unit_test")
+    Compiler::new(
+        &ModuleName::main(),
+        &ModuleName::empty(),
+        "compiler_unit_test",
+    )
 }
 
 fn init_ctx(text: &str) -> VmContext {
@@ -34,9 +38,10 @@ pub fn compile(text: &str) -> CodeObject {
         .expect("Failed to compile test program!")
 }
 
-pub fn compile_at_module(text: &str, module_name: ModuleName) -> CodeObject {
+pub fn compile_at_pkg(text: &str, module: ModuleName, pkg: ModuleName) -> CodeObject {
     let mut ctx = init_ctx(text);
-    ctx.set_module_name(module_name);
+    ctx.set_module(module);
+    ctx.set_pkg(pkg);
     ctx.compile().expect("Failed to compile test program!")
 }
 
@@ -47,9 +52,10 @@ pub fn compile_err(text: &str) -> CompilerError {
     }
 }
 
-pub fn compile_err_at_module(text: &str, module_name: ModuleName) -> CompilerError {
+pub fn compile_err_at_pkg(text: &str, module: ModuleName, pkg: ModuleName) -> CompilerError {
     let mut ctx = init_ctx(text);
-    ctx.set_module_name(module_name);
+    ctx.set_module(module);
+    ctx.set_pkg(pkg);
     match ctx.compile() {
         Ok(_) => panic!("Expected an CompilerError!"),
         Err(e) => e,

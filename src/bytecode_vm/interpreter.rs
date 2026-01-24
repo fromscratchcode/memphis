@@ -1284,6 +1284,12 @@ b = f.bar()
     }
 
     #[test]
+    fn relative_import_from_package() {
+        let ctx = run_path("src/fixtures/imports/pkg_test/test_app.py");
+        assert_read_eq!(ctx, "a", int!(111));
+    }
+
+    #[test]
     fn regular_import_error() {
         let text = r#"
 import not_found

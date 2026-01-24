@@ -43,8 +43,8 @@ impl Exception {
         Self::new(ExceptionKind::ImportError, vec![msg])
     }
 
-    pub fn syntax_error() -> Self {
-        Self::new_empty(ExceptionKind::SyntaxError)
+    pub fn syntax_error(msg: Reference) -> Self {
+        Self::new(ExceptionKind::SyntaxError, vec![msg])
     }
 
     pub fn stop_iteration() -> Self {

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Error, Formatter};
+use crate::bytecode_vm::{runtime::types::Exception, VirtualMachine};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CompilerError {
@@ -12,15 +12,13 @@ impl CompilerError {
     pub fn import_error(msg: impl Into<String>) -> Self {
         Self::ImportError(msg.into())
     }
-}
 
-impl Display for CompilerError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    pub fn into_exception(self, vm: &mut VirtualMachine) -> Exception {
         match self {
-            Self::Unsupported(msg) => write!(f, "Unsupported feature: {msg}"),
-            Self::SyntaxError(msg) => write!(f, "Syntax error: {msg}"),
-            Self::Internal(msg) => write!(f, "Internal error: {msg}"),
-            Self::ImportError(msg) => write!(f, "ImportError: {msg}"),
+            CompilerError::SyntaxError(msg) => Exception::syntax_error(vm.intern_string(&msg)),
+            CompilerError::ImportError(msg) => Exception::import_error(vm.intern_string(&msg)),
+            CompilerError::Unsupported(msg) => Exception::syntax_error(vm.intern_string(&msg)),
+            CompilerError::Internal(msg) => Exception::syntax_error(vm.intern_string(&msg)),
         }
     }
 }

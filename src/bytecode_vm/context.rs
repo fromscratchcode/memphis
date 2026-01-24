@@ -2,8 +2,7 @@
 use crate::domain::Source;
 use crate::{
     bytecode_vm::{
-        compiler::CodeObject, runtime::types::Exception, Compiler, CompilerError, Runtime,
-        VirtualMachine, VmResult, VmValue,
+        compiler::CodeObject, Compiler, CompilerError, Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::{Container, Interpreter},
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
@@ -15,6 +14,7 @@ use crate::{
 pub struct VmContext {
     lexer: Lexer,
     module_name: ModuleName,
+    package: ModuleName,
     path_str: String,
     vm: VirtualMachine,
 }
@@ -23,12 +23,19 @@ impl VmContext {
     pub fn new(text: Text, origin: ModuleOrigin) -> Self {
         let state = Container::new(MemphisState::init(origin.clone()));
         let runtime = Container::new(Runtime::new());
-        Self::from_state(ModuleName::main(), text, origin, state, runtime)
+        Self::from_state(
+            ModuleName::main(),
+            ModuleName::empty(),
+            text,
+            origin,
+            state,
+            runtime,
+        )
     }
 
-    /// Initialize a context from a [`Source`] and existing treewalk state.
     pub fn from_state(
         module_name: ModuleName,
+        package: ModuleName,
         text: Text,
         origin: ModuleOrigin,
         state: Container<MemphisState>,
@@ -37,16 +44,17 @@ impl VmContext {
         Self {
             lexer: Lexer::new(&text),
             module_name,
+            package,
             path_str: origin.path_str(),
             vm: VirtualMachine::new(state, runtime),
         }
     }
 
     pub fn run_inner(&mut self) -> VmResult<VmValue> {
-        // TODO use a real syntax error here
-        let code = self
-            .compile()
-            .map_err(|_e| self.vm.raise(Exception::syntax_error()))?;
+        let code = self.compile().map_err(|e| {
+            let exc = e.into_exception(&mut self.vm);
+            self.vm.raise(exc)
+        })?;
         self.vm.execute(code)
     }
 
@@ -57,7 +65,7 @@ impl VmContext {
             .map_err(|e| CompilerError::SyntaxError(e.to_string()))?;
         ast.rewrite_last_expr_to_return();
 
-        let mut compiler = Compiler::new(&self.module_name, &self.path_str);
+        let mut compiler = Compiler::new(&self.module_name, &self.package, &self.path_str);
         compiler.compile(&ast)
     }
 
@@ -75,8 +83,13 @@ impl VmContext {
     }
 
     #[cfg(test)]
-    pub fn set_module_name(&mut self, name: ModuleName) {
+    pub fn set_module(&mut self, name: ModuleName) {
         self.module_name = name;
+    }
+
+    #[cfg(test)]
+    pub fn set_pkg(&mut self, name: ModuleName) {
+        self.package = name;
     }
 
     #[cfg(any(test, feature = "wasm"))]

@@ -66,11 +66,11 @@ fn list(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         0 => vec![],
         1 => collect_iterable(vm, args[0])?,
         _ => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "list expected at most 1 argument, got {}",
                 args.len()
             ));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -82,11 +82,11 @@ fn tuple(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         0 => vec![],
         1 => collect_iterable(vm, args[0])?,
         _ => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "tuple expected at most 1 argument, got {}",
                 args.len()
             ));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -98,11 +98,11 @@ fn bool(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         0 => false,
         1 => vm.deref(args[0]).to_boolean(),
         _ => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "bool expected at most 1 argument, got {}",
                 args.len()
             ));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -114,11 +114,11 @@ fn int(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         0 => 0,
         1 => vm.coerce_to_int(&vm.deref(args[0])).raise(vm)?,
         _ => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "int expected at most 1 argument, got {}",
                 args.len()
             ));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -143,18 +143,18 @@ fn range(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
             Range::new(start, stop, step)
         }
         0 => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "range expected at least 1 argument, got {}",
                 args.len()
             ));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            return Exception::type_error(msg).raise(vm);
         }
         _ => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "range expected at most 3 arguments, got {}",
                 args.len()
             ));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -165,8 +165,8 @@ fn expect_integer_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult
     match value.as_integer() {
         Some(i) => Ok(i),
         None => {
-            let msg = VmValue::String("Expected an integer".to_string());
-            Exception::type_error(vm.heapify(msg)).raise(vm)
+            let msg = vm.intern_string("Expected an integer");
+            Exception::type_error(msg).raise(vm)
         }
     }
 }
@@ -180,8 +180,8 @@ pub fn iter_internal(vm: &mut VirtualMachine, obj: VmValue) -> VmResult<Referenc
         VmValue::Tuple(tuple) => VmValue::TupleIter(Container::new(tuple.iter())),
         VmValue::Range(range) => VmValue::RangeIter(Container::new(range.iter())),
         _ => {
-            let msg = VmValue::String(format!("'{}' object is not iterable", obj.get_type()));
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            let msg = vm.intern_string(&format!("'{}' object is not iterable", obj.get_type()));
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -192,8 +192,8 @@ fn iter(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let iterable_ref = match args.len() {
         1 => args[0],
         _ => {
-            let msg = VmValue::String("iter expected exactly 1 argument".to_string());
-            return Exception::type_error(vm.heapify(msg)).raise(vm);
+            let msg = vm.intern_string("iter expected exactly 1 argument");
+            return Exception::type_error(msg).raise(vm);
         }
     };
 
@@ -214,19 +214,19 @@ pub fn next_internal(vm: &mut VirtualMachine, iter_ref: Reference) -> VmResult<O
             .next()
             .map(|i| vm.heapify(VmValue::Int(i)))),
         _ => {
-            let msg = VmValue::String(format!(
+            let msg = vm.intern_string(&format!(
                 "'{}' object is not an iterator",
                 iter_value.get_type()
             ));
-            Exception::type_error(vm.heapify(msg)).raise(vm)
+            Exception::type_error(msg).raise(vm)
         }
     }
 }
 
 fn next(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     if args.len() != 1 {
-        let msg = VmValue::String(format!("next() expected 1 argument, got {}", args.len()));
-        return Exception::type_error(vm.heapify(msg)).raise(vm);
+        let msg = vm.intern_string(&format!("next() expected 1 argument, got {}", args.len()));
+        return Exception::type_error(msg).raise(vm);
     }
 
     match next_internal(vm, args[0])? {

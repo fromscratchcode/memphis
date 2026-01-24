@@ -39,32 +39,32 @@ impl VirtualMachine {
             Opcode::Add => {
                 let result = self.binary_op(opcode, |a, b| a + b, false);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for +".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for +");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::Sub => {
                 let result = self.binary_op(opcode, |a, b| a - b, false);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for -".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for -");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::Mul => {
                 let result = self.binary_op(opcode, |a, b| a * b, false);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for *".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for *");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::Div => {
                 let result = self.binary_op(opcode, |a, b| a / b, true);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for /".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for /");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
@@ -93,32 +93,32 @@ impl VirtualMachine {
             Opcode::LessThan => {
                 let result = self.cmp_op(|a, b| a < b);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for <".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for <");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::LessThanOrEq => {
                 let result = self.cmp_op(|a, b| a <= b);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for <=".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for <=");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::GreaterThan => {
                 let result = self.cmp_op(|a, b| a > b);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for >".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for >");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::GreaterThanOrEq => {
                 let result = self.cmp_op(|a, b| a >= b);
                 if result.is_err() {
-                    let msg = VmValue::String("Unsupported operand types for >=".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand types for >=");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
@@ -151,8 +151,8 @@ impl VirtualMachine {
                 if let Some(right) = right {
                     self.push(Reference::Int(!right));
                 } else {
-                    let msg = VmValue::String("Unsupported operand type for '~'".to_string());
-                    let exp = Exception::type_error(self.heapify(msg));
+                    let msg = self.intern_string("Unsupported operand type for '~'");
+                    let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
@@ -347,8 +347,8 @@ impl VirtualMachine {
                             let init_fn = if let Some(init_fn) = init_fn {
                                 init_fn
                             } else {
-                                let msg = VmValue::String("Expected a function".to_string());
-                                let exp = Exception::type_error(self.heapify(msg));
+                                let msg = self.intern_string("Expected a function");
+                                let exp = Exception::type_error(msg);
                                 return self.raise_step(exp);
                             };
                             let method = Method::new(reference, init_fn.clone());
@@ -421,8 +421,8 @@ impl VirtualMachine {
                         return StepResult::Await(co.clone());
                     }
                     _ => {
-                        let msg = VmValue::String("Expected awaitable".to_string());
-                        let exp = Exception::type_error(self.heapify(msg));
+                        let msg = self.intern_string("Expected awaitable");
+                        let exp = Exception::type_error(msg);
                         return self.raise_step(exp);
                     }
                 }

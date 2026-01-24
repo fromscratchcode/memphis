@@ -48,8 +48,8 @@ fn expect_float_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<f
     match value.as_float() {
         Some(i) => Ok(i),
         None => {
-            let msg = VmValue::String("Expected a float".to_string());
-            Exception::type_error(vm.heapify(msg)).raise(vm)
+            let msg = vm.intern_string("Expected a float");
+            Exception::type_error(msg).raise(vm)
         }
     }
 }
@@ -61,8 +61,8 @@ fn expect_coroutine_or_raise(
     match value.as_coroutine() {
         Some(i) => Ok(i.clone()),
         None => {
-            let msg = VmValue::String("Expected a coroutine".to_string());
-            Exception::type_error(vm.heapify(msg)).raise(vm)
+            let msg = vm.intern_string("Expected a coroutine");
+            Exception::type_error(msg).raise(vm)
         }
     }
 }

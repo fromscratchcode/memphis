@@ -63,6 +63,11 @@ impl VirtualMachine {
         result
     }
 
+    pub fn intern_string(&mut self, val: &str) -> Reference {
+        let s = VmValue::String(val.to_string());
+        self.heapify(s)
+    }
+
     pub fn read_global(&self, name: &str) -> Option<VmValue> {
         let reference = self.load_global_by_name(name)?;
         Some(self.deref(reference))
@@ -97,8 +102,8 @@ impl VirtualMachine {
             return Ok(module);
         }
 
-        let msg = VmValue::String(format!("Failed to read module: {}", name));
-        Err(Exception::runtime_error_with(self.heapify(msg)))
+        let msg = self.intern_string(&format!("Failed to read module: {}", name));
+        Err(Exception::runtime_error_with(msg))
     }
 
     /// Check if the module is already present (e.g. Rust-backed or previously imported).
@@ -111,19 +116,20 @@ impl VirtualMachine {
     }
 
     fn import_from_source(&mut self, module_name: &ModuleName) -> VmResult<Container<Module>> {
-        let (_resolved, source) = self
+        let (resolved, source) = self
             .state
             .load_source(module_name)
             .map_err(|err| {
-                let msg = VmValue::String(err.message);
-                Exception::import_error(self.heapify(msg))
+                let msg = self.intern_string(&err.message);
+                Exception::import_error(msg)
             })
             .raise(self)?;
 
         let module = self.runtime.borrow_mut().create_module(module_name);
 
         let mut context = VmContext::from_state(
-            module_name.clone(),
+            resolved.name.clone(),
+            resolved.package.clone(),
             source.text().clone(),
             ModuleOrigin::File(source.path().to_path_buf()),
             self.state.clone(),
@@ -185,9 +191,9 @@ impl VirtualMachine {
     }
 
     fn load_global(&mut self, index: NonlocalIndex) -> DomainResult<Reference> {
-        let name = self.resolve_name(index);
+        let name = self.resolve_name(index).to_owned();
 
-        if let Some(val) = self.current_module().borrow().read(name) {
+        if let Some(val) = self.current_module().borrow().read(&name) {
             return Ok(val);
         }
 
@@ -196,13 +202,13 @@ impl VirtualMachine {
             .borrow()
             .read_module(&ModuleName::from_segments(&[Dunder::Builtins]))
         {
-            if let Some(val) = builtins.borrow().read(name) {
+            if let Some(val) = builtins.borrow().read(&name) {
                 return Ok(val);
             }
         }
 
-        let name = VmValue::String(name.to_string());
-        Err(Exception::name_error(self.heapify(name)))
+        let name_ref = self.intern_string(&name);
+        Err(Exception::name_error(name_ref))
     }
 
     fn resolve_name(&self, index: NonlocalIndex) -> &str {
@@ -362,12 +368,12 @@ impl VirtualMachine {
         match value {
             VmValue::Int(i) => Ok(*i),
             VmValue::String(s) => s.parse::<i64>().map_err(|_| {
-                let msg = VmValue::String("Invalid int literal".to_string());
-                Exception::value_error(self.heapify(msg))
+                let msg = self.intern_string("Invalid int literal");
+                Exception::value_error(msg)
             }),
             _ => {
-                let msg = VmValue::String("Cannot coerce to an int".to_string());
-                Err(Exception::type_error(self.heapify(msg)))
+                let msg = self.intern_string("Cannot coerce to an int");
+                Err(Exception::type_error(msg))
             }
         }
     }
@@ -500,9 +506,8 @@ impl VirtualMachine {
             (VmValue::Int(x), VmValue::Float(y)) => VmValue::Float(op(*x as f64, *y)),
             (VmValue::Float(x), VmValue::Int(y)) => VmValue::Float(op(*x, *y as f64)),
             _ => {
-                let msg =
-                    VmValue::String("Unsupported operand types for binary operation".to_string());
-                return Err(Exception::type_error(self.heapify(msg)));
+                let msg = self.intern_string("Unsupported operand types for binary operation");
+                return Err(Exception::type_error(msg));
             }
         };
 
@@ -519,8 +524,8 @@ impl VirtualMachine {
             (VmValue::Int(x), VmValue::Float(y)) => op(*x as f64, *y),
             (VmValue::Float(x), VmValue::Int(y)) => op(*x, *y as f64),
             _ => {
-                let msg = VmValue::String("Unsupported operand types for comparison".to_string());
-                return Err(Exception::type_error(self.heapify(msg)));
+                let msg = self.intern_string("Unsupported operand types for comparison");
+                return Err(Exception::type_error(msg));
             }
         };
 
@@ -532,8 +537,8 @@ impl VirtualMachine {
             VmValue::Int(x) => VmValue::Int(-x),
             VmValue::Float(x) => VmValue::Float(-x),
             _ => {
-                let msg = VmValue::String("Unsupported operand type for unary '-'".to_string());
-                return Err(Exception::type_error(self.heapify(msg)));
+                let msg = self.intern_string("Unsupported operand type for unary '-'");
+                return Err(Exception::type_error(msg));
             }
         };
 
