@@ -6,7 +6,7 @@ use crate::{
             types::{Coroutine, CoroutineState},
             Reference, StepResult,
         },
-        VirtualMachine, VmResult,
+        VirtualMachine,
     },
     core::{log, log_impure, Container, LogLevel},
 };
@@ -41,7 +41,7 @@ impl VmExecutor {
         &mut self,
         vm: *mut VirtualMachine,
         root: Container<Coroutine>,
-    ) -> VmResult<Reference> {
+    ) -> Reference {
         self.enqueue(root.clone());
 
         while self.has_work() {
@@ -58,14 +58,13 @@ impl VmExecutor {
                 continue;
             }
 
-            let coroutine = self.dequeue()?;
-
-            let step_result = get_vm_mut(vm).step_coroutine(coroutine.clone())?;
+            let coroutine = self.dequeue();
+            let step_result = get_vm_mut(vm).step_coroutine(coroutine.clone());
             self.handle_step_result(coroutine.clone(), step_result);
 
             if coroutine.same_identity(&root) {
                 if let CoroutineState::Finished(val) = coroutine.borrow().state {
-                    return Ok(val);
+                    return val;
                 }
             }
         }
@@ -128,7 +127,7 @@ impl VmExecutor {
             StepResult::Yield(_) => {
                 unimplemented!("Async generators not currently supported in the bytecode VM.")
             }
-            StepResult::Halt => panic!("Halt inside async runtime!"),
+            StepResult::Exception(_) => todo!(),
         }
     }
 
@@ -185,7 +184,7 @@ impl VmExecutor {
     /// # Panics
     /// - If the ready queue is empty.
     /// - If the coroutine is not in `Ready` state.
-    fn dequeue(&mut self) -> VmResult<Container<Coroutine>> {
+    fn dequeue(&mut self) -> Container<Coroutine> {
         let coroutine = self
             .ready_queue
             .pop_front()
@@ -197,7 +196,7 @@ impl VmExecutor {
         log(LogLevel::Debug, || {
             format!("==> Begining work on {:?}", coroutine.borrow())
         });
-        Ok(coroutine)
+        coroutine
     }
 }
 

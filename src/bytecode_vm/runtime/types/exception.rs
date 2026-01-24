@@ -1,5 +1,5 @@
 use crate::{
-    bytecode_vm::{runtime::Reference, DomainResult, VirtualMachine},
+    bytecode_vm::{runtime::Reference, VirtualMachine},
     domain::{ExceptionKind, MemphisException},
 };
 
@@ -15,8 +15,7 @@ impl Exception {
             .payload
             .iter()
             .map(|r| vm.normalize_vm_ref(*r))
-            .collect::<DomainResult<Vec<_>>>()
-            .unwrap();
+            .collect();
         MemphisException::new(self.kind.clone(), args)
     }
 

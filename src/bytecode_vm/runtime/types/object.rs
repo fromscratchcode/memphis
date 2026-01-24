@@ -25,7 +25,7 @@ impl Object {
             return Ok(Some(*result));
         }
 
-        let class = vm.deref(self.class)?;
+        let class = vm.deref(self.class);
         let class = class.as_class().ok_or_else(Exception::runtime_error)?;
         Ok(class.read(name))
     }

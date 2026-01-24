@@ -1,8 +1,5 @@
 use crate::{
-    bytecode_vm::{
-        runtime::{types::Exception, Frame},
-        DomainResult,
-    },
+    bytecode_vm::runtime::Frame,
     core::{log, Container, LogLevel},
     runtime::MemphisState,
 };
@@ -28,7 +25,7 @@ impl CallStack {
         // If we don't save the current line number, we won't properly record where in the current
         // file we called the next function from. We do something similar in the treewalk
         // interpreter.
-        if !self.is_finished() {
+        if !self.is_empty() {
             self.state.save_line_number();
         }
         self.state.push_stack_frame(&frame);
@@ -48,34 +45,20 @@ impl CallStack {
         }
     }
 
-    pub fn top(&self) -> Option<&Frame> {
-        self.stack.last()
+    pub fn top(&self) -> &Frame {
+        self.stack.last().expect("Empty call stack")
     }
 
-    pub fn top_mut(&mut self) -> Option<&mut Frame> {
-        self.stack.last_mut()
+    pub fn top_mut(&mut self) -> &mut Frame {
+        self.stack.last_mut().expect("Empty call stack")
     }
 
-    pub fn top_frame(&self) -> DomainResult<&Frame> {
-        self.top().ok_or_else(Exception::runtime_error)
-    }
-
-    pub fn top_frame_mut(&mut self) -> DomainResult<&mut Frame> {
-        if self.is_finished() {
-            // This only uses &self, so it happens before any &mut
-            let err = Exception::runtime_error();
-            return Err(err);
-        }
-
-        Ok(self.top_mut().expect("Unreachable"))
-    }
-
-    pub fn is_finished(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.stack.is_empty()
     }
 
-    pub fn advance_pc(&mut self) -> DomainResult<()> {
-        let frame = self.top_frame_mut()?;
+    pub fn advance_pc(&mut self) {
+        let frame = self.top_mut();
         log(LogLevel::Trace, || {
             format!(
                 "Advancing PC in module: {}",
@@ -83,12 +66,10 @@ impl CallStack {
             )
         });
         frame.pc += 1;
-        Ok(())
     }
 
-    pub fn jump_to_offset(&mut self, offset: isize) -> DomainResult<()> {
-        let frame = self.top_frame_mut()?;
+    pub fn jump_to_offset(&mut self, offset: isize) {
+        let frame = self.top_mut();
         frame.pc = (frame.pc as isize + offset) as usize;
-        Ok(())
     }
 }

@@ -14,7 +14,8 @@ use crate::{
 
 pub struct VmContext {
     lexer: Lexer,
-    compiler: Compiler,
+    module_name: ModuleName,
+    path_str: String,
     vm: VirtualMachine,
 }
 
@@ -35,7 +36,8 @@ impl VmContext {
     ) -> Self {
         Self {
             lexer: Lexer::new(&text),
-            compiler: Compiler::new(module_name, &origin.path_str()),
+            module_name,
+            path_str: origin.path_str(),
             vm: VirtualMachine::new(state, runtime),
         }
     }
@@ -54,11 +56,13 @@ impl VmContext {
             .parse()
             .map_err(|e| CompilerError::SyntaxError(e.to_string()))?;
         ast.rewrite_last_expr_to_return();
-        self.compiler.compile(&ast)
+
+        let mut compiler = Compiler::new(&self.module_name, &self.path_str);
+        compiler.compile(&ast)
     }
 
     pub fn read_inner(&self, name: &str) -> Option<VmValue> {
-        self.vm.read_global(name).ok()
+        self.vm.read_global(name)
     }
 
     pub fn add_text_inner(&mut self, line: Text) {
@@ -72,7 +76,7 @@ impl VmContext {
 
     #[cfg(test)]
     pub fn set_module_name(&mut self, name: ModuleName) {
-        self.compiler.set_module_name(name);
+        self.module_name = name;
     }
 
     #[cfg(any(test, feature = "wasm"))]
@@ -92,12 +96,12 @@ impl VmContext {
 impl Interpreter for VmContext {
     fn run(&mut self) -> MemphisResult<MemphisValue> {
         let value = self.run_inner().map_err(|e| e.normalize(&self.vm))?;
-        Ok(self.vm.normalize_vm_value(value).unwrap())
+        Ok(self.vm.normalize_vm_value(value))
     }
 
     fn read(&self, name: &str) -> Option<MemphisValue> {
         let value = self.read_inner(name)?;
-        Some(self.vm.normalize_vm_value(value).unwrap())
+        Some(self.vm.normalize_vm_value(value))
     }
 
     fn add_text(&mut self, line: Text) {

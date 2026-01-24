@@ -31,7 +31,7 @@ pub fn init_module(runtime: &mut Runtime) {
 
 /// This is intended to be functionally equivalent to `__build_class__` in CPython.
 pub fn build_class(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
-    let code_value = vm.deref(args[0]).raise(vm)?;
+    let code_value = vm.deref(args[0]);
     let code = code_value
         .as_code()
         .ok_or_else(Exception::runtime_error)
@@ -44,13 +44,13 @@ pub fn build_class(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Re
         .raise(vm)?;
     let frame = Frame::new(function, vec![], module);
 
-    let frame = vm.call_and_return_frame(frame)?;
+    let frame = vm.call_and_return_frame(frame);
     Ok(vm.heapify(VmValue::Class(Class::new(name, frame.namespace()))))
 }
 
 /// Given a reference to an object, build a collection over its iterator.
 fn collect_iterable(vm: &mut VirtualMachine, obj_ref: Reference) -> VmResult<Vec<Reference>> {
-    let obj = vm.deref(obj_ref).raise(vm)?;
+    let obj = vm.deref(obj_ref);
     let iter_ref = iter_internal(vm, obj)?;
 
     let mut collected = vec![];
@@ -96,7 +96,7 @@ fn tuple(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 fn bool(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let value = match args.len() {
         0 => false,
-        1 => vm.deref(args[0]).raise(vm)?.to_boolean(),
+        1 => vm.deref(args[0]).to_boolean(),
         _ => {
             let msg = VmValue::String(format!(
                 "bool expected at most 1 argument, got {}",
@@ -112,7 +112,7 @@ fn bool(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 fn int(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let value = match args.len() {
         0 => 0,
-        1 => vm.coerce_to_int(&vm.deref(args[0]).raise(vm)?).raise(vm)?,
+        1 => vm.coerce_to_int(&vm.deref(args[0])).raise(vm)?,
         _ => {
             let msg = VmValue::String(format!(
                 "int expected at most 1 argument, got {}",
@@ -128,18 +128,18 @@ fn int(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 fn range(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let range = match args.len() {
         1 => {
-            let stop = expect_integer_or_raise(vm, &vm.deref(args[0]).raise(vm)?)?;
+            let stop = expect_integer_or_raise(vm, &vm.deref(args[0]))?;
             Range::with_stop(stop)
         }
         2 => {
-            let start = expect_integer_or_raise(vm, &vm.deref(args[0]).raise(vm)?)?;
-            let stop = expect_integer_or_raise(vm, &vm.deref(args[1]).raise(vm)?)?;
+            let start = expect_integer_or_raise(vm, &vm.deref(args[0]))?;
+            let stop = expect_integer_or_raise(vm, &vm.deref(args[1]))?;
             Range::with_start_stop(start, stop)
         }
         3 => {
-            let start = expect_integer_or_raise(vm, &vm.deref(args[0]).raise(vm)?)?;
-            let stop = expect_integer_or_raise(vm, &vm.deref(args[1]).raise(vm)?)?;
-            let step = expect_integer_or_raise(vm, &vm.deref(args[2]).raise(vm)?)?;
+            let start = expect_integer_or_raise(vm, &vm.deref(args[0]))?;
+            let stop = expect_integer_or_raise(vm, &vm.deref(args[1]))?;
+            let step = expect_integer_or_raise(vm, &vm.deref(args[2]))?;
             Range::new(start, stop, step)
         }
         0 => {
@@ -197,16 +197,16 @@ fn iter(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         }
     };
 
-    let iterable_value = vm.deref(iterable_ref).raise(vm)?;
+    let iterable_value = vm.deref(iterable_ref);
     iter_internal(vm, iterable_value)
 }
 
 /// Internal method used by FOR_ITER
 /// For the public-facing builtin `next(it)`, we must return a StopIterator error to the user.
 pub fn next_internal(vm: &mut VirtualMachine, iter_ref: Reference) -> VmResult<Option<Reference>> {
-    let iter_value = vm.deref(iter_ref).raise(vm)?;
+    let iter_value = vm.deref(iter_ref);
     match iter_value {
-        VmValue::Generator(ref generator) => vm.resume_generator(generator.clone()),
+        VmValue::Generator(ref generator) => Ok(vm.resume_generator(generator.clone())),
         VmValue::ListIter(ref list_iter) => Ok(list_iter.borrow_mut().next()),
         VmValue::TupleIter(ref list_iter) => Ok(list_iter.borrow_mut().next()),
         VmValue::RangeIter(ref range_iter) => Ok(range_iter
@@ -238,11 +238,8 @@ fn next(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let rendered: Vec<String> = args
         .iter()
-        .map(|arg| {
-            let value = vm.normalize_vm_ref(*arg).raise(vm)?;
-            Ok(value.to_string())
-        })
-        .collect::<VmResult<_>>()?;
+        .map(|arg| vm.normalize_vm_ref(*arg).to_string())
+        .collect();
 
     println!("{}", rendered.join(" "));
 

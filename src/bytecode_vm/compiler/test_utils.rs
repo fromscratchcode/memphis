@@ -12,7 +12,7 @@ use crate::{
 };
 
 fn init() -> Compiler {
-    Compiler::new(ModuleName::main(), "compiler_unit_test")
+    Compiler::new(&ModuleName::main(), "compiler_unit_test")
 }
 
 fn init_ctx(text: &str) -> VmContext {
@@ -22,10 +22,10 @@ fn init_ctx(text: &str) -> VmContext {
 pub fn compile_stmt(stmt: Statement) -> Bytecode {
     let mut compiler = init();
     let ast = ast![stmt];
-    compiler
+    let code = compiler
         .compile(&ast)
         .expect("Failed to compile test Statement!");
-    compiler.bytecode()
+    code.bytecode
 }
 
 pub fn compile(text: &str) -> CodeObject {
@@ -65,7 +65,6 @@ pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
             Opcode::LoadConst(Index::new(0)),
             Opcode::MakeFunction,
             Opcode::StoreGlobal(Index::new(0)),
-            Opcode::Halt,
         ],
         arg_count: 0,
         varnames: vec![],
@@ -87,7 +86,6 @@ pub fn wrap_top_level_class(name: &str, cls: CodeObject) -> CodeObject {
             Opcode::LoadConst(Index::new(0)),
             Opcode::Call(1),
             Opcode::StoreGlobal(Index::new(0)),
-            Opcode::Halt,
         ],
         arg_count: 0,
         varnames: vec![],
@@ -104,16 +102,6 @@ macro_rules! assert_code_eq {
         _assert_code_eq(&$actual, &$expected)
     };
 }
-
-macro_rules! compile_incremental {
-        ( $( $line:expr ),* ) => {{
-            let mut context = $crate::bytecode_vm::VmContext::from_text($crate::domain::Text::default());
-            $(
-                context.add_text_inner($crate::domain::Text::new($line));
-            )*
-            context.compile().expect("Failed to compile")
-        }};
-    }
 
 /// This is designed to confirm everything in a CodeObject matches besides the Source and
 /// the line number mappings.
@@ -180,4 +168,3 @@ pub fn _assert_code_eq(actual: &CodeObject, expected: &CodeObject) {
 }
 
 pub(crate) use assert_code_eq;
-pub(crate) use compile_incremental;

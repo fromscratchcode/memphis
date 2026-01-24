@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::bytecode_vm::runtime::Reference;
 #[cfg(test)]
-use crate::bytecode_vm::{DomainResult, VirtualMachine, VmValue};
+use crate::bytecode_vm::{VirtualMachine, VmValue};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Dict {
@@ -20,10 +20,10 @@ impl Dict {
     }
 
     #[cfg(test)]
-    pub fn resolved_items(&self, vm: &VirtualMachine) -> DomainResult<Vec<(VmValue, VmValue)>> {
+    pub fn resolved_items(&self, vm: &VirtualMachine) -> Vec<(VmValue, VmValue)> {
         self.items
             .iter()
-            .map(|(k, v)| Ok((vm.deref(*k)?, vm.deref(*v)?)))
+            .map(|(k, v)| (vm.deref(*k), vm.deref(*v)))
             .collect()
     }
 }

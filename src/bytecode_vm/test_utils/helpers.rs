@@ -55,8 +55,5 @@ pub fn read_attr(context: &VmContext, name: &str, attr: &str) -> VmValue {
         .vm()
         .resolve_raw_attr(&object, attr)
         .expect("Failed to resolve");
-    context
-        .vm()
-        .deref(reference)
-        .expect("Failed to get owned value")
+    context.vm().deref(reference)
 }

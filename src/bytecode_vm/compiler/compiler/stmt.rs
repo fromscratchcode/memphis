@@ -399,24 +399,12 @@ mod tests_bytecode_stmt {
     use super::*;
 
     use crate::{
-        bytecode_vm::{
-            compiler::{test_utils::*, Bytecode},
-            indices::Index,
-        },
+        bytecode_vm::{compiler::test_utils::*, indices::Index},
         parser::{test_utils::*, types::ast},
     };
 
     fn ident(input: &str) -> Identifier {
         Identifier::new(input).expect("Invalid identifier")
-    }
-
-    impl Compiler {
-        pub fn bytecode(&self) -> Bytecode {
-            let code = self
-                .ensure_code_object()
-                .expect("Failed to fetch code object");
-            code.bytecode.clone()
-        }
     }
 
     #[test]

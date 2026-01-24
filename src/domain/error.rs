@@ -79,7 +79,14 @@ impl MemphisException {
 
 impl Display for MemphisException {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}: ", self.kind.display_name())?;
+        write!(f, "{}", self.kind.display_name())?;
+
+        // If this exception does not contain a payload, we're done.
+        if self.payload.is_empty() {
+            return Ok(());
+        } else {
+            write!(f, ": ")?;
+        }
 
         match self.kind {
             ExceptionKind::NameError => {
@@ -104,6 +111,13 @@ impl Display for MemphisException {
                     write!(f, "object has no attribute")
                 }
             },
+            ExceptionKind::TypeError => {
+                if let Some(MemphisValue::Str(msg)) = self.payload.first() {
+                    write!(f, "{}", msg)
+                } else {
+                    Ok(())
+                }
+            }
             _ => todo!(),
         }
     }

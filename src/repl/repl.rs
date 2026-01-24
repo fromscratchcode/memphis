@@ -450,6 +450,12 @@ mod tests {
     }
 
     #[test]
+    fn test_repl_name_error_vm() {
+        let return_val = run_vm("e\n");
+        assert!(return_val.contains("NameError: name 'e' is not defined"));
+    }
+
+    #[test]
     fn test_repl_expr() {
         let return_val = run("12345\n");
         assert_eq!(return_val, "12345");
@@ -522,5 +528,30 @@ foo()
         let events = string_to_events("undefined_var\nexit()\n");
         let exit_code = run_and_exit_code(events);
         assert_eq!(exit_code, 1);
+    }
+
+    #[test]
+    fn test_treewalk_last_returned_val() {
+        let code = r#"
+a = 10
+b = 12
+b
+a
+"#;
+        let return_val = run(code);
+        assert_eq!(return_val, "10");
+    }
+
+    #[test]
+    fn test_vm_last_returned_val() {
+        // We had a bug here where this would previously return 12.
+        let code = r#"
+a = 10
+b = 12
+b
+a
+"#;
+        let return_val = run_vm(code);
+        assert_eq!(return_val, "10");
     }
 }

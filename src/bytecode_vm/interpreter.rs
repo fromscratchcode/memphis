@@ -567,7 +567,7 @@ x = [2,"Hello"]
 "#;
         let ctx = run(text);
         let list = extract!(ctx, "x", List);
-        let values = list.resolved_items(ctx.vm()).unwrap();
+        let values = list.resolved_items(ctx.vm());
         assert_eq!(values, vec![int!(2), str!("Hello")]);
     }
 
@@ -618,7 +618,7 @@ x = (2,"Hello")
 "#;
         let ctx = run(text);
         let tuple = extract!(ctx, "x", Tuple);
-        let values = tuple.resolved_items(ctx.vm()).unwrap();
+        let values = tuple.resolved_items(ctx.vm());
         assert_eq!(values, vec![int!(2), str!("Hello")]);
     }
 
@@ -638,7 +638,7 @@ x = {"a": 22}
 "#;
         let ctx = run(text);
         let dict = extract!(ctx, "x", Dict);
-        let values = dict.resolved_items(ctx.vm()).unwrap();
+        let values = dict.resolved_items(ctx.vm());
         assert_eq!(values, vec![(str!("a"), int!(22))]);
     }
 

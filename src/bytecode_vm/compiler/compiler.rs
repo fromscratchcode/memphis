@@ -29,12 +29,11 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(module_name: ModuleName, filename: &str) -> Self {
-        let code = CodeObject::new(module_name.clone(), filename);
+    pub fn new(module_name: &ModuleName, filename: &str) -> Self {
         Self {
             filename: filename.to_string(),
-            module_name,
-            code_stack: vec![code],
+            module_name: module_name.clone(),
+            code_stack: vec![],
             line_number: 0,
         }
     }
@@ -42,8 +41,11 @@ impl Compiler {
     /// Compile the provided `Ast` and return a `CodeObject` which can be executed. This is not
     /// destructive, meaning multiple calls will build upon the same `CodeObject`.
     pub fn compile(&mut self, ast: &Ast) -> CompilerResult<CodeObject> {
-        self.compile_ast(ast)?;
-        self.finalize()
+        assert!(self.code_stack.is_empty());
+        let code = CodeObject::new(self.module_name.clone(), &self.filename);
+        let code = self.compile_ast_with_code(ast, code)?;
+        assert!(self.code_stack.is_empty());
+        Ok(code)
     }
 
     fn compile_ast(&mut self, ast: &Ast) -> CompilerResult<()> {
@@ -53,16 +55,7 @@ impl Compiler {
     fn compile_ast_with_code(&mut self, ast: &Ast, code: CodeObject) -> CompilerResult<CodeObject> {
         self.code_stack.push(code);
         self.compile_ast(ast)?;
-        self.code_stack
-            .pop()
-            .ok_or_else(|| internal_error("Code stack underflow."))
-    }
-
-    fn finalize(&self) -> CompilerResult<CodeObject> {
-        assert_eq!(self.code_stack.len(), 1);
-        let mut code = self.ensure_code_object()?.clone();
-        code.bytecode.push(Opcode::Halt);
-        Ok(code)
+        Ok(self.code_stack.pop().expect("Code stack underflow!"))
     }
 
     fn current_offset(&self) -> CompilerResult<UnsignedOffset> {
@@ -251,14 +244,6 @@ impl Compiler {
             .last()
             .ok_or_else(|| internal_error("Failed to find current code object."))
     }
-
-    #[cfg(test)]
-    pub fn set_module_name(&mut self, name: ModuleName) {
-        self.module_name = name.clone();
-        // We initialize the code stack in Compiler::new, so we must inject any overridden module
-        // names there too.
-        self.code_stack[0].module_name = name;
-    }
 }
 
 fn internal_error(msg: &str) -> CompilerError {
@@ -356,7 +341,6 @@ def foo():
                 Opcode::MakeFunction,
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -405,7 +389,6 @@ def foo():
                 Opcode::Call(1),
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(2)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -688,7 +671,6 @@ world()
                 Opcode::LoadGlobal(Index::new(1)),
                 Opcode::Call(0),
                 Opcode::PopTop,
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -865,7 +847,6 @@ f = Foo()
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -895,7 +876,6 @@ b = f.bar()
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(2)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -923,7 +903,6 @@ import a.b.c
             bytecode: vec![
                 Opcode::ImportName(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -951,7 +930,6 @@ import a.b.c as foo
             bytecode: vec![
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -997,7 +975,6 @@ from .outer import foo
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -1027,7 +1004,6 @@ from .outer.inner import foo
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -1056,55 +1032,5 @@ from ..outer import foo
             ),
             _ => panic!("Expected an ImportError"),
         }
-    }
-
-    #[test]
-    fn incremental_compilation() {
-        let first = r#"
-def foo():
-    return 10
-"#;
-        let second = r#"
-a = foo()
-"#;
-        let code = compile_incremental![first, second];
-
-        let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
-            bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
-            constants: vec![Constant::Int(10)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-        };
-
-        let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
-            bytecode: vec![
-                Opcode::LoadConst(Index::new(0)),
-                Opcode::MakeFunction,
-                Opcode::StoreGlobal(Index::new(0)),
-                Opcode::LoadGlobal(Index::new(0)),
-                Opcode::Call(0),
-                Opcode::StoreGlobal(Index::new(1)),
-                Opcode::Halt,
-            ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec!["foo".into(), "a".into()],
-            constants: vec![Constant::Code(fn_foo)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-        };
-
-        assert_code_eq!(code, expected);
     }
 }

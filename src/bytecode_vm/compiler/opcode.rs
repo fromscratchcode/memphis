@@ -145,8 +145,6 @@ pub enum Opcode {
     /// Given a module on the top of the stack, load all its members and bind them to their names
     /// in the current module scope.
     ImportAll,
-    /// Stop the VM
-    Halt,
     /// Used internally to the compiler when constructing jump offsets.
     Placeholder,
 }
@@ -246,7 +244,6 @@ impl Display for Opcode {
             Opcode::ImportAll => write!(f, "IMPORT_ALL"),
             Opcode::ImportName(i) => write!(f, "IMPORT_NAME {i}"),
             Opcode::ImportFrom(i) => write!(f, "IMPORT_FROM {i}"),
-            Opcode::Halt => write!(f, "HALT"),
             Opcode::Placeholder => unreachable!(),
         }
     }
