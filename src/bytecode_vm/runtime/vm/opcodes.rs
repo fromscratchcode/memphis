@@ -7,12 +7,12 @@ use crate::{
             types::{
                 Coroutine, Dict, Exception, FunctionObject, Generator, List, Method, Object, Tuple,
             },
-            BuiltinFunction, Frame, Reference, StepResult,
+            BuiltinFunction, Completion, FrameExit, Reference, StepResult, Suspension,
         },
         VirtualMachine, VmValue,
     },
     core::Container,
-    domain::{Dunder, FunctionType, ModuleName},
+    domain::{Dunder, ExceptionKind, FunctionType, ModuleName},
 };
 
 macro_rules! step {
@@ -28,7 +28,7 @@ macro_rules! step_raised {
     ($e:expr) => {
         match $e {
             Ok(t) => t,
-            Err(e) => return StepResult::Exception(e),
+            Err(e) => return StepResult::Exit(FrameExit::Completed(Completion::Exception(e))),
         }
     };
 }
@@ -39,7 +39,7 @@ impl VirtualMachine {
             Opcode::Add => {
                 let result = self.binary_op(opcode, |a, b| a + b, false);
                 if result.is_err() {
-                    let msg = self.intern_string("Unsupported operand types for +");
+                    let msg = self.intern_string("unsupported operand type(s) for +");
                     let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
@@ -47,7 +47,7 @@ impl VirtualMachine {
             Opcode::Sub => {
                 let result = self.binary_op(opcode, |a, b| a - b, false);
                 if result.is_err() {
-                    let msg = self.intern_string("Unsupported operand types for -");
+                    let msg = self.intern_string("unsupported operand type(s) for -");
                     let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
@@ -55,17 +55,23 @@ impl VirtualMachine {
             Opcode::Mul => {
                 let result = self.binary_op(opcode, |a, b| a * b, false);
                 if result.is_err() {
-                    let msg = self.intern_string("Unsupported operand types for *");
+                    let msg = self.intern_string("unsupported operand type(s) for *");
                     let exp = Exception::type_error(msg);
                     return self.raise_step(exp);
                 }
             }
             Opcode::Div => {
                 let result = self.binary_op(opcode, |a, b| a / b, true);
-                if result.is_err() {
-                    let msg = self.intern_string("Unsupported operand types for /");
-                    let exp = Exception::type_error(msg);
-                    return self.raise_step(exp);
+                match result {
+                    Err(r) if r.kind == ExceptionKind::TypeError => {
+                        let msg = self.intern_string("unsupported operand type(s) for /");
+                        let exp = Exception::type_error(msg);
+                        return self.raise_step(exp);
+                    }
+                    Err(exp) => {
+                        return self.raise_step(exp);
+                    }
+                    Ok(_) => {}
                 }
             }
             Opcode::Eq => {
@@ -242,19 +248,29 @@ impl VirtualMachine {
                     // Pop the iterator only if exhausted
                     let _ = self.pop();
                     self.call_stack.jump_to_offset(offset);
+                    return StepResult::Continue;
                 }
             }
             Opcode::Jump(offset) => {
                 self.call_stack.jump_to_offset(offset);
+                return StepResult::Continue;
             }
             Opcode::JumpIfFalse(offset) => {
                 if !self.peek_value().to_boolean() {
                     self.call_stack.jump_to_offset(offset);
+                    return StepResult::Continue;
                 }
             }
             Opcode::JumpIfTrue(offset) => {
                 if self.peek_value().to_boolean() {
                     self.call_stack.jump_to_offset(offset);
+                    return StepResult::Continue;
+                }
+            }
+            Opcode::PopJumpIfFalse(offset) => {
+                if !self.pop_value().to_boolean() {
+                    self.call_stack.jump_to_offset(offset);
+                    return StepResult::Continue;
                 }
             }
             Opcode::PopTop => {
@@ -309,9 +325,7 @@ impl VirtualMachine {
                         self.push(reference);
                     }
                     VmValue::Function(ref function) => {
-                        let module =
-                            step!(self, self.read_module(&function.code_object.module_name));
-                        let frame = Frame::new(function.clone(), args, module);
+                        let frame = self.frame_for_function(function.clone(), args);
                         match function.function_type() {
                             FunctionType::Regular => {
                                 let return_val_ref = step_raised!(self.call(frame));
@@ -328,11 +342,7 @@ impl VirtualMachine {
                         }
                     }
                     VmValue::Method(ref method) => {
-                        let module = step!(
-                            self,
-                            self.read_module(&method.function.code_object.module_name)
-                        );
-                        let frame = Frame::from_method(method.clone(), args, module);
+                        let frame = self.frame_for_method(method.clone(), args);
                         let return_val_ref = step_raised!(self.call(frame));
                         self.push(return_val_ref);
                     }
@@ -357,11 +367,7 @@ impl VirtualMachine {
                             // after the constructor executes.
                             self.push(reference);
 
-                            let module = step!(
-                                self,
-                                self.read_module(&method.function.code_object.module_name)
-                            );
-                            let frame = Frame::from_method(method, args, module);
+                            let frame = self.frame_for_method(method, args);
                             let _ = step_raised!(self.call(frame));
                         } else {
                             self.push(reference);
@@ -372,12 +378,12 @@ impl VirtualMachine {
             }
             Opcode::ReturnValue => {
                 let return_val_ref = self.pop();
-                return StepResult::Return(return_val_ref);
+                return StepResult::Exit(FrameExit::Completed(Completion::Return(return_val_ref)));
             }
             Opcode::YieldValue => {
                 let yield_val_ref = self.pop();
                 self.call_stack.advance_pc();
-                return StepResult::Yield(yield_val_ref);
+                return StepResult::Exit(FrameExit::Suspended(Suspension::Yield(yield_val_ref)));
             }
             Opcode::YieldFrom => {
                 if !self.current_frame().has_subgenerator() {
@@ -398,7 +404,8 @@ impl VirtualMachine {
                 let next_result = step_raised!(builtins::next_internal(self, iterator_ref));
                 match next_result {
                     Some(val) => {
-                        return StepResult::Yield(val); // yield and don't advance PC
+                        return StepResult::Exit(FrameExit::Suspended(Suspension::Yield(val)));
+                        // yield and don't advance PC
                     }
                     None => {
                         // Sub-generator is done, clean up and continue
@@ -415,10 +422,12 @@ impl VirtualMachine {
                 self.call_stack.advance_pc();
                 match value {
                     VmValue::SleepFuture(duration) => {
-                        return StepResult::Sleep(duration);
+                        return StepResult::Exit(FrameExit::Suspended(Suspension::Sleep(duration)));
                     }
                     VmValue::Coroutine(co) => {
-                        return StepResult::Await(co.clone());
+                        return StepResult::Exit(FrameExit::Suspended(Suspension::Await(
+                            co.clone(),
+                        )));
                     }
                     _ => {
                         let msg = self.intern_string("Expected awaitable");
@@ -434,10 +443,7 @@ impl VirtualMachine {
                 let inner_module = step_raised!(self.read_or_load_module(&module_name));
                 let inner_module_ref = self.heapify(VmValue::Module(inner_module));
 
-                let outer_module_ref = step!(
-                    self,
-                    build_module_chain(self, &module_name, inner_module_ref)
-                );
+                let outer_module_ref = build_module_chain(self, &module_name, inner_module_ref);
                 self.push(outer_module_ref);
             }
             Opcode::ImportFrom(index) => {
@@ -447,11 +453,57 @@ impl VirtualMachine {
                 let inner_module_ref = self.heapify(VmValue::Module(inner_module));
                 self.push(inner_module_ref);
             }
+            Opcode::PushExcInfo => {
+                let e = self
+                    .exception_stack
+                    .last()
+                    .expect("PUSH_EXC_INFO with no active exception");
+                let e_ref = self.heapify(VmValue::Exception(e.clone()));
+                self.push(e_ref);
+            }
+            Opcode::PopExcept => {
+                let _ = self
+                    .exception_stack
+                    .pop()
+                    .expect("POP_EXCEPT with no active exception");
+            }
+            Opcode::CheckExcMatch => {
+                let a = self.pop_value();
+                let b = self.peek_value();
+
+                // TODO this should really use isinstance, but we don't have that yet
+                let is_match = a.as_class().unwrap().name() == b.get_type().to_string();
+                let is_match_ref = self.to_heapified_bool(is_match);
+                self.push(is_match_ref);
+            }
+            Opcode::Reraise => {
+                let exc = self
+                    .exception_stack
+                    .last()
+                    .expect("RERAISE with no active exception")
+                    .clone();
+                return self.raise_step(exc);
+            }
+            Opcode::RaiseVarargs(n) => {
+                if n != 0 {
+                    panic!("RAISE_VARARGS with {n} args not supported yet");
+                }
+                let exc = if let Some(exc) = self.exception_stack.last().cloned() {
+                    exc
+                } else {
+                    let msg = self.intern_string("No active exception to reraise");
+                    Exception::runtime_error(msg)
+                };
+                return self.raise_step(exc);
+            }
             // This is in an internal error that indicates a jump offset was not properly set
             // by the compiler. This opcode should not leak into the VM.
             Opcode::Placeholder => panic!("Placeholder emitted in bytecode"),
         }
 
+        // Default behavior: advance the PC and Continue
+        // Any opcode that does not want pc += 1 must return before the default.
+        self.call_stack.advance_pc();
         StepResult::Continue
     }
 }

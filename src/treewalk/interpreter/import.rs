@@ -45,11 +45,8 @@ impl TreewalkInterpreter {
             // must be used as
             //
             // mypackage.myothermodule.add('1', '1')
-            let outer_module = import_utils::build_module_chain(module_name, module).raise(self)?;
-            let symbol_name = module_name
-                .head()
-                .ok_or_else(Exception::runtime_error)
-                .raise(self)?;
+            let outer_module = import_utils::build_module_chain(module_name, module);
+            let symbol_name = module_name.head();
             self.state.write(symbol_name, outer_module);
         }
 

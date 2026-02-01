@@ -9,7 +9,7 @@ mod tests_vm_interpreter {
             test_utils::*,
             VmValue,
         },
-        domain::test_utils::*,
+        domain::{test_utils::*, ExceptionKind},
     };
 
     #[test]
@@ -45,7 +45,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 + 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "Unsupported operand types for +");
+        assert_type_error!(e.exception, "unsupported operand type(s) for +");
     }
 
     #[test]
@@ -67,7 +67,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 - 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "Unsupported operand types for -");
+        assert_type_error!(e.exception, "unsupported operand type(s) for -");
     }
 
     #[test]
@@ -101,7 +101,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 * 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "Unsupported operand types for *");
+        assert_type_error!(e.exception, "unsupported operand type(s) for *");
     }
 
     #[test]
@@ -123,7 +123,7 @@ mod tests_vm_interpreter {
 
         let text = "4.1 / 'a'";
         let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "Unsupported operand types for /");
+        assert_type_error!(e.exception, "unsupported operand type(s) for /");
     }
 
     #[test]
@@ -1383,5 +1383,158 @@ middle_call()
             .ends_with("src/fixtures/call_stack/other.py"));
         assert!(call_stack.get(2).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(2).line_number(), 5);
+    }
+
+    #[test]
+    fn exception_classes() {
+        let text = r#"
+a = ZeroDivisionError
+"#;
+        let ctx = run(text);
+        let c = extract!(ctx, "a", Class);
+        assert_eq!(c.name(), "ZeroDivisionError");
+    }
+
+    #[test]
+    fn try_except_catch_all_caught() {
+        let text = r#"
+try:
+    a = 1 / 0
+except:
+    a = 42
+a
+"#;
+        assert_eval_eq!(text, int!(42));
+    }
+
+    #[test]
+    fn try_except_catch_all_no_exception() {
+        let text = r#"
+try:
+    a = 1 / 2
+except:
+    a = 42
+a
+"#;
+        assert_eval_eq!(text, float!(0.5));
+    }
+
+    #[test]
+    fn try_except_one_typed_handler_caught() {
+        let text = r#"
+try:
+    a = 1 / 0
+except ZeroDivisionError:
+    a = 42
+a
+"#;
+        assert_eval_eq!(text, int!(42));
+    }
+
+    #[test]
+    fn try_except_one_typed_handler_uncaught() {
+        let text = r#"
+try:
+    a = 4 + "4"
+except ZeroDivisionError:
+    a = 42
+a
+"#;
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "unsupported operand type(s) for +");
+    }
+
+    #[test]
+    fn try_except_one_typed_one_bare() {
+        let text = r#"
+try:
+    a = 4 + "4"
+except ZeroDivisionError:
+    a = 42
+except:
+    a = 99
+a
+"#;
+        assert_eval_eq!(text, int!(99));
+    }
+
+    #[test]
+    fn try_except_two_typed_caught() {
+        let text = r#"
+try:
+    a = 4 + "4"
+except ZeroDivisionError:
+    a = 42
+except TypeError:
+    a = 52
+a
+"#;
+        assert_eval_eq!(text, int!(52));
+    }
+
+    #[test]
+    fn try_except_two_typed_uncaught() {
+        let text = r#"
+try:
+    a = 4 + "4"
+except ZeroDivisionError:
+    a = 42
+except NameError:
+    a = 52
+a
+"#;
+        let e = eval_expect_error(text);
+        assert_type_error!(e.exception, "unsupported operand type(s) for +");
+    }
+
+    #[test]
+    fn try_except_typed_as_binds_exception() {
+        let text = r#"
+try:
+    a = 1 / 0
+except ZeroDivisionError as e:
+    a = e
+"#;
+        let ctx = run(text);
+        let exc = extract!(ctx, "a", Exception);
+        assert_eq!(exc.kind, ExceptionKind::DivisionByZero);
+    }
+
+    #[test]
+    fn try_except_two_default_handlers() {
+        // This also used to fail because we didn't properly initialize the VM before raising
+        // syntax errors.
+        let text = r#"
+try:
+    a = 4 + "4"
+except:
+    a = 42
+except:
+    a = 52
+a
+"#;
+        let e = eval_expect_error(text);
+        assert_syntax_error!(e.exception, "default 'except:' must be last");
+    }
+
+    #[test]
+    fn try_except_typed_as_reraise() {
+        let text = r#"
+try:
+    a = 1 / 0
+except ZeroDivisionError as e:
+    raise
+"#;
+        let e = eval_expect_error(text);
+        assert_div_by_zero_error!(e.exception, "integer division or modulo by zero");
+    }
+
+    #[test]
+    fn raise_without_active_exception() {
+        let input = r#"
+raise
+"#;
+        let e = eval_expect_error(input);
+        assert_runtime_error!(e.exception, "No active exception to reraise");
     }
 }

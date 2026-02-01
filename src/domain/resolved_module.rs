@@ -10,7 +10,7 @@ use crate::domain::ModuleName;
 /// This struct is intentionally short-lived: it represents the boundary between import resolution
 /// (what module this is) and execution (loading and evaluating its code).
 pub struct ResolvedModule {
-    pub name: ModuleName,    // __name__
-    pub package: ModuleName, // __package__
+    pub name: ModuleName,            // __name__
+    pub package: Option<ModuleName>, // __package__
     pub path: PathBuf,
 }

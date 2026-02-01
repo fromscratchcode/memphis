@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::bytecode_vm::{
-    runtime::{reference::Namespace, types::Exception, Reference},
+    runtime::{reference::Namespace, Reference},
     DomainResult, VirtualMachine,
 };
 
@@ -26,7 +26,8 @@ impl Object {
         }
 
         let class = vm.deref(self.class);
-        let class = class.as_class().ok_or_else(Exception::runtime_error)?;
+        // TODO there's a lot here we don't do yet
+        let class = class.as_class().unwrap();
         Ok(class.read(name))
     }
 

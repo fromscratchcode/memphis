@@ -4,7 +4,7 @@ use crate::{
     bytecode_vm::{
         compiler::Opcode,
         runtime::{
-            types::{FunctionObject, Method, Module},
+            types::{FunctionObject, Module},
             Reference,
         },
     },
@@ -44,12 +44,6 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn from_method(method: Method, args: Vec<Reference>, module: Container<Module>) -> Self {
-        let mut bound_args = vec![method.receiver];
-        bound_args.extend(args);
-        Self::new(method.function, bound_args, module)
-    }
-
     pub fn new(function: FunctionObject, args: Vec<Reference>, module: Container<Module>) -> Self {
         Frame {
             function,
@@ -59,6 +53,15 @@ impl Frame {
             module,
             yield_from: YieldFromState::None,
         }
+    }
+
+    pub fn next_pc(&self) -> usize {
+        self.pc + 1
+    }
+
+    /// Offsets should be applied from the _next_ instruction, not the current instruction.
+    pub fn pc_plus_offset(&self, offset: isize) -> usize {
+        (self.next_pc() as isize + offset) as usize
     }
 
     pub fn current_inst(&self) -> Opcode {

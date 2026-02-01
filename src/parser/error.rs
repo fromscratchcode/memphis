@@ -6,8 +6,13 @@ use crate::lexer::Token;
 pub enum ParserError {
     ExpectedToken(Token, Token),
     UnexpectedToken(Token),
-    ExpectedException(String),
-    SyntaxError,
+    SyntaxError(String),
+}
+
+impl ParserError {
+    pub fn syntax_error(msg: impl Into<String>) -> Self {
+        Self::SyntaxError(msg.into())
+    }
 }
 
 impl Display for ParserError {
@@ -19,11 +24,8 @@ impl Display for ParserError {
             ParserError::UnexpectedToken(token) => {
                 write!(f, "Unexpected token \"{token:?}\"")
             }
-            ParserError::ExpectedException(s) => {
-                write!(f, "Expected exception: \"{s:?}\" is not defined")
-            }
-            ParserError::SyntaxError => {
-                write!(f, "SyntaxError")
+            ParserError::SyntaxError(msg) => {
+                write!(f, "{msg}")
             }
         }
     }

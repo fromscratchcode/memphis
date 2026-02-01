@@ -91,7 +91,6 @@ impl Display for CompilerError {
         match self {
             Self::Unsupported(msg) => write!(f, "Unsupported feature: {msg}"),
             Self::SyntaxError(msg) => write!(f, "Syntax error: {msg}"),
-            Self::Internal(msg) => write!(f, "Internal error: {msg}"),
             Self::ImportError(msg) => write!(f, "ImportError: {msg}"),
         }
     }

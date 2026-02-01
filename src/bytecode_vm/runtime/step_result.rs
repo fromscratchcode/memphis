@@ -10,10 +10,25 @@ use crate::{
 
 #[derive(Debug)]
 pub enum StepResult {
-    Exception(RaisedException),
+    Continue,
+    Exit(FrameExit),
+}
+
+#[derive(Debug)]
+pub enum FrameExit {
+    Completed(Completion),
+    Suspended(Suspension),
+}
+
+#[derive(Debug)]
+pub enum Completion {
     Return(Reference),
+    Exception(RaisedException),
+}
+
+#[derive(Debug)]
+pub enum Suspension {
     Yield(Reference),
     Await(Container<Coroutine>),
     Sleep(Duration),
-    Continue,
 }

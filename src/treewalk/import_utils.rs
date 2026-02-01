@@ -1,10 +1,7 @@
 use crate::{
     core::Container,
     domain::ModuleName,
-    treewalk::{
-        types::{Exception, Module},
-        DomainResult, TreewalkValue,
-    },
+    treewalk::{types::Module, TreewalkValue},
 };
 
 /// Construct a module chain given a `ModuleName` and a leaf `TreewalkValue`.
@@ -19,15 +16,9 @@ use crate::{
 /// mypackage.myothermodule.add('1', '1')
 /// ```
 /// `myothermodule` must become a submodule of `mypackage`.
-pub fn build_module_chain(
-    full_name: &ModuleName,
-    leaf_value: TreewalkValue,
-) -> DomainResult<TreewalkValue> {
+pub fn build_module_chain(full_name: &ModuleName, leaf_value: TreewalkValue) -> TreewalkValue {
     let mut inner = leaf_value;
-    let mut child_key = full_name
-        .tail()
-        .ok_or_else(Exception::runtime_error)?
-        .to_owned(); // last segment, e.g. "d"
+    let mut child_key = full_name.tail().to_owned();
 
     // parents() yields:
     // ["a.b.c", "a.b", "a"]
@@ -40,11 +31,8 @@ pub fn build_module_chain(
         inner = TreewalkValue::Module(Container::new(outer));
 
         // Next iteration the child key becomes this parent's last segment
-        child_key = parent_name
-            .tail()
-            .ok_or_else(Exception::runtime_error)?
-            .to_owned();
+        child_key = parent_name.tail().to_owned();
     }
 
-    Ok(inner)
+    inner
 }

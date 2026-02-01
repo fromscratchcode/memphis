@@ -6,7 +6,7 @@ use crate::{
         runtime::{
             modules::builtins,
             types::{Coroutine, Exception, FunctionObject, Generator, Method, Module},
-            CallStack, Frame, Reference, StepResult, VmExecutor,
+            CallStack, Completion, Frame, FrameExit, Reference, StepResult, Suspension, VmExecutor,
         },
         DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
     },
@@ -25,6 +25,8 @@ pub struct VirtualMachine {
     pub executor: VmExecutor,
 
     call_stack: CallStack,
+
+    exception_stack: Vec<Exception>,
 }
 
 impl VirtualMachine {
@@ -36,6 +38,7 @@ impl VirtualMachine {
             runtime,
             executor: VmExecutor::default(),
             call_stack,
+            exception_stack: vec![],
         }
     }
 
@@ -45,7 +48,20 @@ impl VirtualMachine {
     }
 
     pub fn raise_step(&mut self, exc: Exception) -> StepResult {
-        StepResult::Exception(self.raise(exc))
+        StepResult::Exit(FrameExit::Completed(Completion::Exception(self.raise(exc))))
+    }
+
+    /// This sets up a minimal call stack, just enough to throw an exception encountered upstream.
+    pub fn init_and_raise(
+        &mut self,
+        exception: Exception,
+        module_name: ModuleName,
+        path_str: &str,
+    ) -> RaisedException {
+        let code = CodeObject::new_root(module_name, path_str);
+        let frame = self.frame_for_code(code);
+        self.call_stack.push(frame);
+        self.raise(exception)
     }
 
     pub fn execute(&mut self, code: CodeObject) -> VmResult<VmValue> {
@@ -53,14 +69,16 @@ impl VirtualMachine {
             self.call_stack.is_empty(),
             "VM execute called with non-empty call stack"
         );
-        self.load(code).raise(self)?;
 
-        let result = self.run_loop();
+        log(LogLevel::Debug, || format!("{:?}", code));
+        let frame = self.frame_for_code(code);
+
+        let result = self.call(frame);
         assert!(
             self.call_stack.is_empty(),
             "VM execute returned with non-empty call stack"
         );
-        result
+        result.map(|reference| self.deref(reference))
     }
 
     pub fn intern_string(&mut self, val: &str) -> Reference {
@@ -83,12 +101,7 @@ impl VirtualMachine {
     // 2) constructing a real error with a heapified string would require this to take a mutable
     //    reference to the VM, which would ripple through the tests.
     fn load_global_by_name(&self, name: &str) -> Option<Reference> {
-        let module = self
-            .runtime
-            .borrow()
-            .read_module(&ModuleName::main())
-            .unwrap();
-
+        let module = self.read_module(&ModuleName::main());
         let module_binding = module.borrow();
         module_binding.read(name)
     }
@@ -97,13 +110,12 @@ impl VirtualMachine {
         self.current_frame().module.clone()
     }
 
-    pub fn read_module(&mut self, name: &ModuleName) -> DomainResult<Container<Module>> {
+    pub fn read_module(&self, name: &ModuleName) -> Container<Module> {
         if let Some(module) = self.runtime.borrow().read_module(name) {
-            return Ok(module);
+            module
+        } else {
+            panic!("VM consistency error: Module not found!");
         }
-
-        let msg = self.intern_string(&format!("Failed to read module: {}", name));
-        Err(Exception::runtime_error_with(msg))
     }
 
     /// Check if the module is already present (e.g. Rust-backed or previously imported).
@@ -197,14 +209,9 @@ impl VirtualMachine {
             return Ok(val);
         }
 
-        if let Some(builtins) = self
-            .runtime
-            .borrow()
-            .read_module(&ModuleName::from_segments(&[Dunder::Builtins]))
-        {
-            if let Some(val) = builtins.borrow().read(&name) {
-                return Ok(val);
-            }
+        let builtins = self.read_module(&ModuleName::from_segments(&[Dunder::Builtins]));
+        if let Some(val) = builtins.borrow().read(&name) {
+            return Ok(val);
         }
 
         let name_ref = self.intern_string(&name);
@@ -328,6 +335,7 @@ impl VirtualMachine {
             VmValue::TupleIter(_) => MemphisValue::TupleIter,
             VmValue::BuiltinFunction(f) => MemphisValue::BuiltinFunction(f.name().to_string()),
             VmValue::SleepFuture(_) => todo!(),
+            VmValue::Exception(_) => MemphisValue::Exception,
         }
     }
 
@@ -464,6 +472,18 @@ impl VirtualMachine {
             } else {
                 self.binary_numeric_op(op, &a, &b, force_float)?
             }
+        } else if opcode == Opcode::Div {
+            match b {
+                VmValue::Int(0) => {
+                    let msg = self.intern_string("integer division or modulo by zero");
+                    return Err(Exception::div_by_zero_error(msg));
+                }
+                VmValue::Float(0.0) => {
+                    let msg = self.intern_string("float division by zero");
+                    return Err(Exception::div_by_zero_error(msg));
+                }
+                _ => self.binary_numeric_op(op, &a, &b, force_float)?,
+            }
         } else {
             self.binary_numeric_op(op, &a, &b, force_float)?
         };
@@ -559,30 +579,29 @@ impl VirtualMachine {
         }
     }
 
-    // === Declarative VM Call Interface ===
-
     /// Push a new `Frame` to the call stack and immediately execute it to completion, returning
     /// its return value.
     pub fn call(&mut self, frame: Frame) -> VmResult<Reference> {
-        let (step_result, _frame) = self.run_frame(frame);
+        let (step_result, _frame) = self.run_frame_to_completion(frame);
         match step_result {
-            StepResult::Return(val) => Ok(val),
-            StepResult::Exception(e) => Err(e),
-            _ => panic!(),
+            Completion::Return(val) => Ok(val),
+            Completion::Exception(e) => Err(e),
         }
     }
 
     /// Push a new `Frame` to the call stack and immediately execute it to completion, returning
     /// the frame. Useful for class definitions.
     pub fn call_and_return_frame(&mut self, frame: Frame) -> Frame {
-        let (step_result, frame) = self.run_frame(frame);
+        let (step_result, frame) = self.run_frame_to_completion(frame);
         match step_result {
-            StepResult::Return(val) => assert_eq!(
+            Completion::Return(val) => assert_eq!(
                 val,
                 self.none(),
                 "`call_and_return_frame` expects the frame to return None."
             ),
-            other => panic!("Unexpected step result in `call_and_return_frame`: {other:?}"),
+            Completion::Exception(_) => {
+                panic!("Unexpected exception during class body");
+            }
         }
         frame
     }
@@ -591,19 +610,21 @@ impl VirtualMachine {
         let frame = generator.borrow_mut().frame.clone();
         let (step_result, new_frame) = self.run_frame(frame);
         let return_val = match step_result {
-            StepResult::Yield(val) => Some(val),
-            StepResult::Return(_) => None,
-            StepResult::Sleep(_) | StepResult::Await(_) => {
-                panic!("Async generators are not currently supported.")
+            FrameExit::Suspended(Suspension::Yield(val)) => Some(val),
+            FrameExit::Suspended(Suspension::Sleep(_) | Suspension::Await(_)) => {
+                unimplemented!("Async generators are not currently supported.")
             }
-            other => panic!("Unexpected step result in `resume_generator`: {other:?}"),
+            FrameExit::Completed(Completion::Return(_)) => None,
+            FrameExit::Completed(Completion::Exception(_)) => {
+                unimplemented!("Exceptions inside generators are not currently supported.")
+            }
         };
         generator.borrow_mut().frame = new_frame;
 
         return_val
     }
 
-    pub fn step_coroutine(&mut self, coroutine: Container<Coroutine>) -> StepResult {
+    pub fn resume_coroutine(&mut self, coroutine: Container<Coroutine>) -> FrameExit {
         let (step_result, new_frame) = self.run_frame(coroutine.borrow().frame.clone());
         coroutine.borrow_mut().frame = new_frame;
         step_result
@@ -612,45 +633,47 @@ impl VirtualMachine {
     /// Push a frame and run it, capturing the result and returning the frame.
     /// We need to capture the frame when it is finished for creating new Classes and for saving
     /// the state of a Coroutine.
-    fn run_frame(&mut self, frame: Frame) -> (StepResult, Frame) {
+    fn run_frame(&mut self, frame: Frame) -> (FrameExit, Frame) {
         self.call_stack.push(frame);
-        self.run_top_frame()
-    }
-
-    // === Internal Execution Flow ===
-
-    /// Executes all frames in the call stack to completion.
-    /// This is the main loop of the VM.
-    fn run_loop(&mut self) -> VmResult<VmValue> {
-        let mut result = self.none();
-        while !self.call_stack.is_empty() {
-            let (step_result, _frame) = self.run_top_frame();
-            result = match step_result {
-                StepResult::Return(val) => val,
-                StepResult::Exception(e) => return Err(e),
-                other => panic!("Unexpected step result in `run_loop`: {other:?}"),
-            };
-        }
-
-        Ok(self.deref(result))
-    }
-
-    /// Run the top frame in the call stack to completion and then return.
-    fn run_top_frame(&mut self) -> (StepResult, Frame) {
         while !self.call_stack.top().is_finished() {
             let result = self.step_frame();
             match result {
                 StepResult::Continue => continue,
-                _ => {
+                StepResult::Exit(FrameExit::Completed(Completion::Exception(e))) => {
+                    let frame = self.current_frame();
+                    if let Some(target_pc) = frame.function.code_object.target_pc_for(frame.pc) {
+                        // Jump directly to the handler. This is in place of advancing the PC,
+                        // which only happens in execute_opcode for a StepResult::Continue.
+                        self.current_frame_mut().pc = target_pc;
+                        self.exception_stack.push(e.exception);
+
+                        // Swallow the exception and keep running now that we are in a handler
+                        continue;
+                    } else {
+                        // No handler: propagate
+                        let frame = self.call_stack.pop().expect("Empty call stack!");
+                        return (FrameExit::Completed(Completion::Exception(e)), frame);
+                    }
+                }
+                StepResult::Exit(e) => {
+                    // Frame was suspended
                     let frame = self.call_stack.pop().expect("Empty call stack!");
-                    return (result, frame);
+                    return (e, frame);
                 }
             }
         }
 
         // If we fell out of the loop: frame is finished with no explicit return
         let frame = self.call_stack.pop().expect("Empty call stack!");
-        (StepResult::Return(self.none()), frame)
+        (FrameExit::Completed(Completion::Return(self.none())), frame)
+    }
+
+    fn run_frame_to_completion(&mut self, frame: Frame) -> (Completion, Frame) {
+        let (reason, frame) = self.run_frame(frame);
+        match reason {
+            FrameExit::Completed(c) => (c, frame),
+            FrameExit::Suspended(_) => panic!("Frame ended in a suspended state."),
+        }
     }
 
     /// Run the next instruction on the top frame in the call stack.
@@ -665,24 +688,25 @@ impl VirtualMachine {
         log_impure(LogLevel::Debug, || self.dump_frame());
         log(LogLevel::Debug, || frame.current_inst_annotated());
 
-        let result = self.execute_opcode(opcode);
-
-        if matches!(result, StepResult::Continue) {
-            self.call_stack.advance_pc();
-        }
-
-        result
+        self.execute_opcode(opcode)
     }
 
-    fn load(&mut self, code: CodeObject) -> DomainResult<()> {
-        log(LogLevel::Debug, || format!("{code:?}"));
+    pub fn frame_for_function(&self, function: FunctionObject, args: Vec<Reference>) -> Frame {
+        let module = self.read_module(&function.code_object.module_name);
+        Frame::new(function, args, module)
+    }
 
+    pub fn frame_for_method(&self, method: Method, args: Vec<Reference>) -> Frame {
+        let mut bound_args = vec![method.receiver];
+        bound_args.extend(args);
+
+        let module = self.read_module(&method.function.code_object.module_name);
+        Frame::new(method.function, bound_args, module)
+    }
+
+    pub fn frame_for_code(&self, code: CodeObject) -> Frame {
         let function = FunctionObject::new(code);
-        let module = self.read_module(&function.code_object.module_name)?;
-        let frame = Frame::new(function, vec![], module);
-
-        self.call_stack.push(frame);
-        Ok(())
+        self.frame_for_function(function, vec![])
     }
 }
 

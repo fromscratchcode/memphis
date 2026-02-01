@@ -4,7 +4,7 @@ use crate::{
     bytecode_vm::{
         runtime::{
             types::{Coroutine, CoroutineState},
-            Reference, StepResult,
+            Completion, FrameExit, Reference, Suspension,
         },
         VirtualMachine,
     },
@@ -59,7 +59,7 @@ impl VmExecutor {
             }
 
             let coroutine = self.dequeue();
-            let step_result = get_vm_mut(vm).step_coroutine(coroutine.clone());
+            let step_result = get_vm_mut(vm).resume_coroutine(coroutine.clone());
             self.handle_step_result(coroutine.clone(), step_result);
 
             if coroutine.same_identity(&root) {
@@ -96,9 +96,9 @@ impl VmExecutor {
         }
     }
 
-    fn handle_step_result(&mut self, co: Container<Coroutine>, step_result: StepResult) {
+    fn handle_step_result(&mut self, co: Container<Coroutine>, step_result: FrameExit) {
         match step_result {
-            StepResult::Await(awaited) => {
+            FrameExit::Suspended(Suspension::Await(awaited)) => {
                 // Suspend the parent
                 co.borrow_mut().state = CoroutineState::WaitingOn(awaited.clone());
 
@@ -108,11 +108,14 @@ impl VmExecutor {
                 // What if awaited hasn't ever been started? Is that possible?
                 // self.queue.push(awaited);
             }
-            StepResult::Sleep(dur) => {
+            FrameExit::Suspended(Suspension::Sleep(dur)) => {
                 co.borrow_mut().state = CoroutineState::SleepingUntil(Instant::now() + dur);
                 self.sleeping.push(co.clone());
             }
-            StepResult::Return(val) => {
+            FrameExit::Suspended(Suspension::Yield(_)) => {
+                unimplemented!("Async generators not currently supported in the bytecode VM.")
+            }
+            FrameExit::Completed(Completion::Return(val)) => {
                 co.borrow_mut().state = CoroutineState::Finished(val);
 
                 // Wake any parents waiting on this coroutine
@@ -121,13 +124,9 @@ impl VmExecutor {
                     self.requeue(parent);
                 }
             }
-            StepResult::Continue => {
-                self.enqueue(co.clone());
+            FrameExit::Completed(Completion::Exception(_)) => {
+                unimplemented!("Exceptions not currently handled inside coroutines.")
             }
-            StepResult::Yield(_) => {
-                unimplemented!("Async generators not currently supported in the bytecode VM.")
-            }
-            StepResult::Exception(_) => todo!(),
         }
     }
 

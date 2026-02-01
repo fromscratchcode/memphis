@@ -10,28 +10,21 @@ pub struct ModuleName(Vec<String>);
 
 impl ModuleName {
     pub fn new(segments: Vec<String>) -> Self {
+        assert!(!segments.is_empty());
         Self(segments)
     }
 
     pub fn from_segments<S: AsRef<str>>(segments: &[S]) -> Self {
-        Self(segments.iter().map(|s| s.as_ref().to_string()).collect())
+        Self::new(segments.iter().map(|s| s.as_ref().to_string()).collect())
     }
 
     pub fn from_dotted(s: &str) -> Self {
         let segments = s.split('.').map(|s| s.to_string()).collect();
-        ModuleName::new(segments)
-    }
-
-    pub fn empty() -> Self {
-        Self::new(vec![])
+        Self::new(segments)
     }
 
     pub fn main() -> Self {
         Self::from_segments(&[Dunder::Main])
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 
     pub fn as_str(&self) -> String {
@@ -42,12 +35,18 @@ impl ModuleName {
         &self.0
     }
 
-    pub fn head(&self) -> Option<&str> {
-        self.0.first().map(|s| s.as_str())
+    pub fn head(&self) -> &str {
+        self.0
+            .first()
+            .map(|s| s.as_str())
+            .expect("Invalid ModuleName")
     }
 
-    pub fn tail(&self) -> Option<&str> {
-        self.0.last().map(|s| s.as_str())
+    pub fn tail(&self) -> &str {
+        self.0
+            .last()
+            .map(|s| s.as_str())
+            .expect("Invalid ModuleName")
     }
 
     pub fn parent(&self) -> Option<ModuleName> {
@@ -60,8 +59,6 @@ impl ModuleName {
     /// hierarchy.
     ///
     /// Returns `None` if removing `n` segments would underflow or erase the module name entirely.
-    /// The empty module name (`ModuleName([])`) is a valid state, but it should only be
-    /// constructed explicitly (not reached by stripping).
     ///
     /// Python-specific relative import semantics (e.g. dot handling) are layered on top of this
     /// operation in the resolver.
@@ -168,12 +165,6 @@ mod tests {
     #[test]
     fn parent_of_one_segment_is_none() {
         let m = ModuleName::from_segments(&["a"]);
-        assert_eq!(m.parent(), None);
-    }
-
-    #[test]
-    fn parent_of_empty_is_none() {
-        let m = ModuleName::empty();
         assert_eq!(m.parent(), None);
     }
 }

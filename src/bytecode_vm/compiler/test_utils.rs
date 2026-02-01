@@ -12,11 +12,7 @@ use crate::{
 };
 
 fn init() -> Compiler {
-    Compiler::new(
-        &ModuleName::main(),
-        &ModuleName::empty(),
-        "compiler_unit_test",
-    )
+    Compiler::new(&ModuleName::main(), &None, "compiler_unit_test")
 }
 
 fn init_ctx(text: &str) -> VmContext {
@@ -30,6 +26,14 @@ pub fn compile_stmt(stmt: Statement) -> Bytecode {
         .compile(&ast)
         .expect("Failed to compile test Statement!");
     code.bytecode
+}
+
+pub fn expect_err(stmt: Statement) -> CompilerError {
+    let mut compiler = init();
+    let ast = ast![stmt];
+    compiler
+        .compile(&ast)
+        .expect_err("Expected an error while compiling Statement!")
 }
 
 pub fn compile(text: &str) -> CodeObject {
@@ -79,6 +83,7 @@ pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
         constants: vec![Constant::Code(func)],
         line_map: vec![],
         function_type: FunctionType::Regular,
+        exception_table: vec![],
     }
 }
 
@@ -100,6 +105,7 @@ pub fn wrap_top_level_class(name: &str, cls: CodeObject) -> CodeObject {
         constants: vec![Constant::Code(cls)],
         line_map: vec![],
         function_type: FunctionType::Regular,
+        exception_table: vec![],
     }
 }
 

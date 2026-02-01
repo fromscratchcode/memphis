@@ -1,6 +1,6 @@
 use crate::{
     bytecode_vm::{
-        compiler::{Constant, Opcode},
+        compiler::{Constant, JumpKind, Opcode},
         Compiler, CompilerError, CompilerResult,
     },
     domain::Identifier,
@@ -10,12 +10,30 @@ use crate::{
 impl Compiler {
     pub fn compile_expr(&mut self, expr: &Expr) -> CompilerResult<()> {
         match expr {
-            Expr::None => self.compile_none(),
-            Expr::Boolean(value) => self.compile_bool(*value),
-            Expr::Integer(value) => self.compile_int(*value),
-            Expr::Float(value) => self.compile_float(*value),
-            Expr::StringLiteral(value) => self.compile_string_literal(value),
-            Expr::Variable(name) => self.compile_load(name),
+            Expr::None => {
+                self.compile_none();
+                Ok(())
+            }
+            Expr::Boolean(value) => {
+                self.compile_bool(*value);
+                Ok(())
+            }
+            Expr::Integer(value) => {
+                self.compile_int(*value);
+                Ok(())
+            }
+            Expr::Float(value) => {
+                self.compile_float(*value);
+                Ok(())
+            }
+            Expr::StringLiteral(value) => {
+                self.compile_string_literal(value);
+                Ok(())
+            }
+            Expr::Variable(name) => {
+                self.compile_load(name);
+                Ok(())
+            }
             Expr::List(items) => self.compile_list(items),
             Expr::Tuple(items) => self.compile_tuple(items),
             Expr::Dict(dict_op) => self.compile_dict(dict_op),
@@ -34,35 +52,35 @@ impl Compiler {
         }
     }
 
-    fn compile_none(&mut self) -> CompilerResult<()> {
-        self.compile_constant(Constant::None)
+    fn compile_none(&mut self) {
+        self.compile_constant(Constant::None);
     }
 
-    fn compile_bool(&mut self, bool: bool) -> CompilerResult<()> {
-        self.compile_constant(Constant::Boolean(bool))
+    fn compile_bool(&mut self, bool: bool) {
+        self.compile_constant(Constant::Boolean(bool));
     }
 
-    fn compile_int(&mut self, int: i64) -> CompilerResult<()> {
-        self.compile_constant(Constant::Int(int))
+    fn compile_int(&mut self, int: i64) {
+        self.compile_constant(Constant::Int(int));
     }
 
-    fn compile_float(&mut self, float: f64) -> CompilerResult<()> {
-        self.compile_constant(Constant::Float(float))
+    fn compile_float(&mut self, float: f64) {
+        self.compile_constant(Constant::Float(float));
     }
 
-    fn compile_string_literal(&mut self, value: &str) -> CompilerResult<()> {
-        self.compile_constant(Constant::String(value.to_string()))
+    fn compile_string_literal(&mut self, value: &str) {
+        self.compile_constant(Constant::String(value.to_string()));
     }
 
     fn compile_list(&mut self, items: &[Expr]) -> CompilerResult<()> {
         self.compile_expr_slice(items)?;
-        self.emit(Opcode::BuildList(items.len()))?;
+        self.emit(Opcode::BuildList(items.len()));
         Ok(())
     }
 
     fn compile_tuple(&mut self, items: &[Expr]) -> CompilerResult<()> {
         self.compile_expr_slice(items)?;
-        self.emit(Opcode::BuildTuple(items.len()))?;
+        self.emit(Opcode::BuildTuple(items.len()));
         Ok(())
     }
 
@@ -75,7 +93,7 @@ impl Compiler {
             self.compile_expr(key)?;
             self.compile_expr(value)?;
         }
-        self.emit(Opcode::BuildMap(dict_ops.len()))?;
+        self.emit(Opcode::BuildMap(dict_ops.len()));
         Ok(())
     }
 
@@ -91,7 +109,7 @@ impl Compiler {
             _ => return Err(CompilerError::Unsupported(format!("unary op: {op:?}"))),
         };
         if let Some(opcode) = opcode {
-            self.emit(opcode)?;
+            self.emit(opcode);
         }
         Ok(())
     }
@@ -108,7 +126,7 @@ impl Compiler {
         let opcode = Opcode::try_from_bin_op(bin_op)
             .ok_or_else(|| CompilerError::Unsupported(format!("binary op: {bin_op:?}")))?;
 
-        self.emit(opcode)?;
+        self.emit(opcode);
         Ok(())
     }
 
@@ -130,9 +148,13 @@ impl Compiler {
             panic!("Comparison chain must have >= 1 op.");
         }
 
+        let chain_end = {
+            let frame = self.frame_mut();
+            frame.new_label()
+        };
+
         self.compile_expr(left)?;
 
-        let mut false_jumps = vec![];
         for (i, (op, right)) in ops.iter().enumerate() {
             let last_op = i == ops.len() - 1;
 
@@ -140,28 +162,24 @@ impl Compiler {
 
             // Preserve the right-hand side for the next comparison
             if !last_op {
-                self.emit(Opcode::DupTop)?;
-                self.emit(Opcode::RotThree)?;
+                self.emit(Opcode::DupTop);
+                self.emit(Opcode::RotThree);
             }
 
-            self.emit(Opcode::from(op))?;
+            self.emit(Opcode::from(op));
 
             // If any comparison evaluates to False, jump to end.
             // Otherwise, pop the True and continue the chain.
             // Unless it's the last operation, and we should leave the result on the stack.
             if !last_op {
-                // At the end of the loop, we will patch this with a JumpIfFalse
-                false_jumps.push(self.emit_placeholder()?);
+                self.frame_mut()
+                    .emit_jump_to(chain_end, JumpKind::JumpIfFalse);
 
-                self.emit(Opcode::PopTop)?;
+                self.emit(Opcode::PopTop);
             }
         }
 
-        // Patch all fail jumps to here
-        for placeholder in false_jumps {
-            let offset = self.forward_offset_to(placeholder)?;
-            self.emit_at(placeholder, Opcode::JumpIfFalse(offset))?;
-        }
+        self.frame_mut().bind_label(chain_end);
 
         Ok(())
     }
@@ -172,41 +190,43 @@ impl Compiler {
         op: &LogicalOp,
         right: &Expr,
     ) -> CompilerResult<()> {
+        let jump_kind = match op {
+            LogicalOp::And => JumpKind::JumpIfFalse,
+            LogicalOp::Or => JumpKind::JumpIfTrue,
+        };
+
         // Compile the first operand.
         self.compile_expr(left)?;
 
-        // This will be replaced with a jmp.
-        let ph = self.emit_placeholder()?;
+        let condition_end = {
+            let frame = self.frame_mut();
+            frame.new_label()
+        };
+
+        self.frame_mut().emit_jump_to(condition_end, jump_kind);
 
         // Discard the first operand if we got this far.
-        self.emit(Opcode::PopTop)?;
+        self.emit(Opcode::PopTop);
 
         // Compile the second operand.
         self.compile_expr(right)?;
 
-        // Calculate the offset which represents the position after this logical op, then update
-        // the placeholder.
-        let offset = self.forward_offset_to(ph)?;
-        let opcode = match op {
-            LogicalOp::And => Opcode::JumpIfFalse(offset),
-            LogicalOp::Or => Opcode::JumpIfTrue(offset),
-        };
-        self.emit_at(ph, opcode)?;
+        self.frame_mut().bind_label(condition_end);
 
         Ok(())
     }
 
     fn compile_member_access(&mut self, object: &Expr, field: &Identifier) -> CompilerResult<()> {
         self.compile_expr(object)?;
-        let attr_index = self.get_or_set_nonlocal_index(field.as_str())?;
-        self.emit(Opcode::LoadAttr(attr_index))?;
+        let attr_index = self.get_or_set_nonlocal_index(field.as_str());
+        self.emit(Opcode::LoadAttr(attr_index));
         Ok(())
     }
 
     fn compile_function_call(&mut self, callee: &Callee, args: &CallArgs) -> CompilerResult<()> {
         match callee {
             Callee::Expr(callee) => self.compile_expr(callee)?,
-            Callee::Symbol(name) => self.compile_load(name)?,
+            Callee::Symbol(name) => self.compile_load(name),
         };
 
         // We push the args onto the stack in reverse call order so that we will pop
@@ -215,7 +235,7 @@ impl Compiler {
             self.compile_expr(arg)?;
         }
 
-        self.emit(Opcode::Call(args.args.len()))?;
+        self.emit(Opcode::Call(args.args.len()));
         Ok(())
     }
 
@@ -224,19 +244,19 @@ impl Compiler {
             self.compile_expr(expr)?;
         }
 
-        self.emit(Opcode::YieldValue)?;
+        self.emit(Opcode::YieldValue);
         Ok(())
     }
 
     fn compile_yield_from(&mut self, expr: &Expr) -> CompilerResult<()> {
         self.compile_expr(expr)?;
-        self.emit(Opcode::YieldFrom)?;
+        self.emit(Opcode::YieldFrom);
         Ok(())
     }
 
     fn compile_await(&mut self, expr: &Expr) -> CompilerResult<()> {
         self.compile_expr(expr)?;
-        self.emit(Opcode::Await)?;
+        self.emit(Opcode::Await);
         Ok(())
     }
 

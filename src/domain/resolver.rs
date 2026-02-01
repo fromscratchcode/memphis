@@ -18,24 +18,24 @@ impl ImportResolutionError {
 
 pub fn resolve_import_path(
     import_path: &FromImportPath,
-    current_package: &ModuleName,
+    current_package: &Option<ModuleName>,
 ) -> Result<ModuleName, ImportResolutionError> {
     match import_path {
         FromImportPath::Absolute(mp) => Ok(resolve_absolute_path(mp)),
         FromImportPath::Relative(levels, tail) => {
-            if current_package.is_empty() {
-                return Err(ImportResolutionError::NoParentPackage);
+            if let Some(package) = current_package {
+                // - One leading dot (`.`) refers to the current package
+                // - Additional dots (`..`, `...`) walk upward in the package hierarchy
+                //
+                // Since `current_package` already names the containing package,
+                // we strip `levels - 1` segments to compute the base.
+                let base = package
+                    .strip_last(*levels - 1)
+                    .ok_or(ImportResolutionError::BeyondTopLevel)?;
+                Ok(base.join(tail.segments_as_str()))
+            } else {
+                Err(ImportResolutionError::NoParentPackage)
             }
-
-            // - One leading dot (`.`) refers to the current package
-            // - Additional dots (`..`, `...`) walk upward in the package hierarchy
-            //
-            // Since `current_package` already names the containing package,
-            // we strip `levels - 1` segments to compute the base.
-            let base = current_package
-                .strip_last(*levels - 1)
-                .ok_or(ImportResolutionError::BeyondTopLevel)?;
-            Ok(base.join(tail.segments_as_str()))
         }
     }
 }
@@ -57,10 +57,10 @@ pub fn resolve(requested: &ModuleName, search_paths: &[PathBuf]) -> Option<Resol
 
                 let package = if path.ends_with(Dunder::Init.py_file()) {
                     // package
-                    requested.clone()
+                    Some(requested.clone())
                 } else {
                     // regular module
-                    requested.parent().unwrap_or(ModuleName::empty())
+                    requested.parent()
                 };
 
                 return Some(ResolvedModule {

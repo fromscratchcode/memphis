@@ -55,9 +55,9 @@ impl Ast {
     /// This simulations CPython `eval` mode, rather than `exec` mode. We currently assume this WAY
     /// too many places.
     pub fn rewrite_last_expr_to_return(&mut self) {
-        if self.len() == 1 {
-            if let StatementKind::Expression(expr) = &self.statements[0].kind {
-                self.statements[0].kind = StatementKind::Return(vec![expr.clone()]);
+        if let Some(stmt) = self.statements.last_mut() {
+            if let StatementKind::Expression(expr) = &stmt.kind {
+                stmt.kind = StatementKind::Return(vec![expr.clone()]);
             }
         }
     }
@@ -391,7 +391,8 @@ pub struct ExceptHandler {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum HandlerKind {
-    Bare,
+    /// Default handler: `except:` (must be last)
+    Default,
     Typed {
         expr: Expr,
         alias: Option<Identifier>,
@@ -399,9 +400,9 @@ pub enum HandlerKind {
 }
 
 impl ExceptHandler {
-    pub fn bare(block: Ast) -> Self {
+    pub fn default(block: Ast) -> Self {
         ExceptHandler {
-            kind: HandlerKind::Bare,
+            kind: HandlerKind::Default,
             block,
         }
     }
@@ -411,6 +412,10 @@ impl ExceptHandler {
             kind: HandlerKind::Typed { expr, alias },
             block,
         }
+    }
+
+    pub fn is_default(&self) -> bool {
+        matches!(self.kind, HandlerKind::Default)
     }
 }
 

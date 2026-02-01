@@ -493,7 +493,7 @@ impl TreewalkInterpreter {
             let mut matched_handler = None;
             for handler in handlers {
                 let matches = match &handler.kind {
-                    HandlerKind::Bare => true,
+                    HandlerKind::Default => true,
                     HandlerKind::Typed { expr, .. } => {
                         let result = self.evaluate_expr(expr)?;
                         let classes = self.exception_classes(result)?;

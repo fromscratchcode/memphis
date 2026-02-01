@@ -5,6 +5,21 @@ use crate::{
     domain::{FunctionType, ModuleName},
 };
 
+/// Represent a range for handled exceptions to redirect to a given target PC. This is embedded in
+/// the code object at the end of compilation. All labels must be resolved before this point.
+#[derive(Clone, PartialEq)]
+pub struct ExceptionRange {
+    start: usize,
+    end: usize,
+    target: usize,
+}
+
+impl ExceptionRange {
+    pub fn new(start: usize, end: usize, target: usize) -> Self {
+        Self { start, end, target }
+    }
+}
+
 /// Represents the bytecode and associated metadata for a block of Python code. It's a compiled
 /// version of the source code, containing instructions that the VM can execute. This is immutable
 /// and does not know about the context in which it is executed, meaning it doesn't hold references
@@ -26,11 +41,12 @@ pub struct CodeObject {
 
     pub line_map: Vec<(usize, usize)>,
     pub function_type: FunctionType,
+    pub exception_table: Vec<ExceptionRange>,
 }
 
 impl CodeObject {
-    pub fn new(module_name: ModuleName, filename: &str) -> Self {
-        Self::new_function(
+    pub fn new_root(module_name: ModuleName, filename: &str) -> Self {
+        Self::new(
             "<module>",
             module_name,
             filename,
@@ -39,7 +55,7 @@ impl CodeObject {
         )
     }
 
-    pub fn new_function(
+    pub fn new(
         name: &str,
         module_name: ModuleName,
         filename: &str,
@@ -58,6 +74,7 @@ impl CodeObject {
             constants: vec![],
             line_map: vec![],
             function_type,
+            exception_table: vec![],
         }
     }
 
@@ -88,6 +105,13 @@ impl CodeObject {
                 }
             }
         }
+    }
+
+    pub fn target_pc_for(&self, pc: usize) -> Option<usize> {
+        self.exception_table
+            .iter()
+            .find(|entry| pc >= entry.start && pc < entry.end)
+            .map(|i| i.target)
     }
 }
 

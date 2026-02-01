@@ -65,11 +65,11 @@ impl CallStack {
                 frame.function.code_object.name()
             )
         });
-        frame.pc += 1;
+        frame.pc = frame.next_pc();
     }
 
     pub fn jump_to_offset(&mut self, offset: isize) {
-        let frame = self.top_mut();
-        frame.pc = (frame.pc as isize + offset) as usize;
+        let new_offset = self.top().pc_plus_offset(offset);
+        self.top_mut().pc = new_offset;
     }
 }

@@ -15,13 +15,13 @@ use crate::{
 #[derive(Debug, PartialEq, Clone)]
 pub struct Module {
     name: ModuleName,
-    package: ModuleName,
+    package: Option<ModuleName>,
     origin: ModuleOrigin,
     scope: Scope,
 }
 
 impl Module {
-    pub fn new(name: ModuleName, package: ModuleName, origin: ModuleOrigin) -> Self {
+    pub fn new(name: ModuleName, package: Option<ModuleName>, origin: ModuleOrigin) -> Self {
         let scope = init_scope(&name, &package);
 
         Self {
@@ -32,16 +32,16 @@ impl Module {
         }
     }
 
-    pub fn new_file_backed(name: ModuleName, package: ModuleName, path: &Path) -> Self {
+    pub fn new_file_backed(name: ModuleName, package: Option<ModuleName>, path: &Path) -> Self {
         Self::new(name, package, ModuleOrigin::File(path.to_path_buf()))
     }
 
     pub fn new_builtin(name: ModuleName) -> Self {
-        Self::new(name, ModuleName::empty(), ModuleOrigin::Builtin)
+        Self::new(name, None, ModuleOrigin::Builtin)
     }
 
     pub fn new_empty(name: ModuleName) -> Self {
-        Self::new(name, ModuleName::empty(), ModuleOrigin::Synthetic)
+        Self::new(name, None, ModuleOrigin::Synthetic)
     }
 
     pub fn path(&self) -> PathBuf {
@@ -52,7 +52,7 @@ impl Module {
         &self.name
     }
 
-    pub fn package(&self) -> &ModuleName {
+    pub fn package(&self) -> &Option<ModuleName> {
         &self.package
     }
 
@@ -80,17 +80,17 @@ impl Module {
     }
 }
 
-fn init_scope(module: &ModuleName, package: &ModuleName) -> Scope {
+fn init_scope(module: &ModuleName, package: &Option<ModuleName>) -> Scope {
     let mut scope = Scope::default();
     scope.insert(
         &Dunder::Name,
         TreewalkValue::Str(Str::new(&module.as_str())),
     );
 
-    let package_value = if package.is_empty() {
-        TreewalkValue::None
-    } else {
+    let package_value = if let Some(package) = package {
         TreewalkValue::Str(Str::new(&package.as_str()))
+    } else {
+        TreewalkValue::None
     };
     scope.insert(&Dunder::Package, package_value);
 

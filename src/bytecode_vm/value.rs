@@ -5,8 +5,8 @@ use crate::{
         compiler::{CodeObject, Constant},
         runtime::{
             types::{
-                Class, Coroutine, Dict, FunctionObject, Generator, List, ListIter, Method, Module,
-                Object, Range, RangeIter, Tuple, TupleIter,
+                Class, Coroutine, Dict, Exception, FunctionObject, Generator, List, ListIter,
+                Method, Module, Object, Range, RangeIter, Tuple, TupleIter,
             },
             BuiltinFunction, Reference,
         },
@@ -39,6 +39,7 @@ pub enum VmValue {
     ListIter(Container<ListIter>),
     TupleIter(Container<TupleIter>),
     RangeIter(Container<RangeIter>),
+    Exception(Exception),
 }
 
 impl VmValue {
@@ -115,6 +116,7 @@ impl VmValue {
             VmValue::Method(_) => Type::Method,
             VmValue::Code(_) => Type::Code, // TODO is this right??
             VmValue::SleepFuture(_) => todo!(), // TODO this doesn't exist in treewalk, not sure!
+            VmValue::Exception(e) => e.kind.get_type(),
         }
     }
 

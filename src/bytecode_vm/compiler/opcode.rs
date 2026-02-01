@@ -106,6 +106,7 @@ pub enum Opcode {
     /// Conditional jump to an offset based on the value on the top of the stack. This is signed
     /// because you can jump in reverse.
     JumpIfTrue(SignedOffset),
+    PopJumpIfFalse(SignedOffset),
     /// Discard the top value on the stack.
     PopTop,
     /// Duplicate the top value on the stack.
@@ -145,6 +146,13 @@ pub enum Opcode {
     /// Given a module on the top of the stack, load all its members and bind them to their names
     /// in the current module scope.
     ImportAll,
+    PushExcInfo,
+    CheckExcMatch,
+    PopExcept,
+    /// Internal usage only, does NOT correspond to the "raise" keyword.
+    Reraise,
+    /// This represents user usage of the "raise" keyword.
+    RaiseVarargs(usize),
     /// Used internally to the compiler when constructing jump offsets.
     Placeholder,
 }
@@ -231,6 +239,7 @@ impl Display for Opcode {
             Opcode::Jump(i) => write!(f, "JUMP {i}"),
             Opcode::JumpIfFalse(i) => write!(f, "JUMP_IF_FALSE {i}"),
             Opcode::JumpIfTrue(i) => write!(f, "JUMP_IF_TRUE {i}"),
+            Opcode::PopJumpIfFalse(i) => write!(f, "POP_JUMP_IF_FALSE {i}"),
             Opcode::PopTop => write!(f, "POP_TOP"),
             Opcode::DupTop => write!(f, "DUP_TOP"),
             Opcode::RotThree => write!(f, "ROT_THREE"),
@@ -244,6 +253,11 @@ impl Display for Opcode {
             Opcode::ImportAll => write!(f, "IMPORT_ALL"),
             Opcode::ImportName(i) => write!(f, "IMPORT_NAME {i}"),
             Opcode::ImportFrom(i) => write!(f, "IMPORT_FROM {i}"),
+            Opcode::PushExcInfo => write!(f, "PUSH_EXC_INFO"),
+            Opcode::CheckExcMatch => write!(f, "CHECK_EXC_MATCH"),
+            Opcode::PopExcept => write!(f, "POP_EXCEPT"),
+            Opcode::Reraise => write!(f, "RERAISE"),
+            Opcode::RaiseVarargs(i) => write!(f, "RAISE_VARARGS {i}"),
             Opcode::Placeholder => unreachable!(),
         }
     }

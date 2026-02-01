@@ -226,7 +226,7 @@ impl<'a> Parser<'a> {
                 self.consume(&Token::Identifier(ident.clone()))?;
                 Ok(ident)
             }
-            _ => Err(ParserError::SyntaxError),
+            _ => Err(ParserError::syntax_error("invalid identifier")),
         }
     }
 }
@@ -239,8 +239,7 @@ mod tests {
         test_utils::*,
         types::{
             CallArgs, CompoundOperator, ConditionalAst, ExceptHandler, ExprFormat, FStringPart,
-            ForClause, FormatOption, KwargsOperation, LoopIndex, Params, RaiseKind, Statement,
-            StatementKind,
+            ForClause, FormatOption, KwargsOperation, LoopIndex, Params, Statement, StatementKind,
         },
     };
 
@@ -342,7 +341,7 @@ def add(x, y):
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("_f"),
             args: params![],
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
         });
@@ -383,7 +382,7 @@ def __init__(
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("__init__"),
             args: params![param!("self"), param!("indent", none!())],
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
         });
@@ -426,7 +425,7 @@ if (a
         let expected_ast = stmt!(StatementKind::IfElse {
             if_part: ConditionalAst {
                 condition: logic_op!(var!("a"), Or, var!("b")),
-                ast: ast![stmt!(StatementKind::Pass)],
+                ast: ast![stmt_pass!()],
             },
             elif_parts: vec![],
             else_part: None,
@@ -608,7 +607,7 @@ if (a == 1
                     And,
                     var!("c")
                 ),
-                ast: ast![stmt!(StatementKind::Pass)],
+                ast: ast![stmt_pass!()],
             },
             elif_parts: vec![],
             else_part: None,
@@ -676,7 +675,7 @@ class Foo:
             name: ident("Foo"),
             parents: vec![var!("Bar"), var!("Baz")],
             metaclass: None,
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -686,7 +685,7 @@ class Foo:
             name: ident("Foo"),
             parents: vec![member_access!(var!("module"), "Bar")],
             metaclass: None,
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -748,7 +747,7 @@ pass
         let asts = parse_all(input);
         assert_eq!(asts.len(), 2);
         assert_stmt_eq!(asts.get(0).unwrap(), expected_ast);
-        assert_stmt_eq!(asts.get(1).unwrap(), stmt!(StatementKind::Pass));
+        assert_stmt_eq!(asts.get(1).unwrap(), stmt_pass!());
 
         let input = "mypackage.myothermodule.add('1', '1')";
         let expected_ast = func_call_callee!(
@@ -1172,7 +1171,7 @@ class Foo(metaclass=Parent):
             name: ident("Foo"),
             parents: vec![],
             metaclass: Some(ident("Parent")),
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -1185,7 +1184,7 @@ class Foo(Bar, metaclass=Parent):
             name: ident("Foo"),
             parents: vec![var!("Bar")],
             metaclass: Some(ident("Parent")),
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -1198,7 +1197,7 @@ class InterfaceMeta(type):
             name: ident("InterfaceMeta"),
             parents: vec![var!("type")],
             metaclass: None,
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -1238,11 +1237,11 @@ namespace = {
 
         let input = "{ 2, **second }";
         let e = expect_error!(input, Expr);
-        assert_eq!(e, ParserError::SyntaxError);
+        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
 
         let input = "{ 2, **second, }";
         let e = expect_error!(input, Expr);
-        assert_eq!(e, ParserError::SyntaxError);
+        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
     }
 
     #[test]
@@ -1324,7 +1323,10 @@ finally:
 "#;
         let expected_ast = stmt!(StatementKind::TryExcept {
             try_block: ast![stmt_expr!(bin_op!(int!(4), Div, int!(0)))],
-            handlers: vec![ExceptHandler::bare(ast![stmt_assign!(var!("a"), int!(2))])],
+            handlers: vec![ExceptHandler::default(ast![stmt_assign!(
+                var!("a"),
+                int!(2)
+            )])],
             else_block: None,
             finally_block: Some(ast![stmt_assign!(var!("a"), int!(3))]),
         });
@@ -1421,13 +1423,47 @@ except:
 a = 1
 "#;
         let expected_ast = stmt!(StatementKind::TryExcept {
-            try_block: ast![stmt!(StatementKind::Pass)],
-            handlers: vec![ExceptHandler::bare(ast![stmt_return![]])],
+            try_block: ast![stmt_pass!()],
+            handlers: vec![ExceptHandler::default(ast![stmt_return![]])],
             else_block: None,
             finally_block: None,
         });
 
         assert_ast_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn try_except_default_handler_before_typed() {
+        let input = r#"
+try:
+    pass
+except:
+    return
+except ZeroDivisionError:
+    return
+"#;
+        let e = expect_error!(input, Statement);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("default 'except:' must be last".to_string())
+        );
+    }
+
+    #[test]
+    fn try_except_two_default_handlers() {
+        let input = r#"
+try:
+    pass
+except:
+    return
+except:
+    return
+"#;
+        let e = expect_error!(input, Statement);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("default 'except:' must be last".to_string())
+        );
     }
 
     #[test]
@@ -1467,7 +1503,7 @@ def test_args(*args):
                 args_var: Some(ident("args")),
                 kwargs_var: None,
             },
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
         });
@@ -1485,7 +1521,7 @@ def test_args(*args, **kwargs):
                 args_var: Some(ident("args")),
                 kwargs_var: Some(ident("kwargs")),
             },
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
         });
@@ -1514,7 +1550,7 @@ def test_default(file=None):
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_default"),
             args: params![param!("file", none!())],
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
         });
@@ -1661,29 +1697,22 @@ def get_val():
     #[test]
     fn raise() {
         let input = "raise";
-        let expected_ast = stmt!(StatementKind::Raise(RaiseKind::Reraise));
-
+        let expected_ast = stmt_raise!();
         assert_ast_eq!(input, expected_ast);
 
         let input = "raise Exception";
-        let expected_ast = stmt!(StatementKind::Raise(RaiseKind::Raise(var!("Exception"))));
-
+        let expected_ast = stmt_raise!(var!("Exception"));
         assert_ast_eq!(input, expected_ast);
 
         let input = r#"raise Exception("message")"#;
-        let expected_ast = stmt!(StatementKind::Raise(RaiseKind::Raise(func_call!(
-            "Exception",
-            call_args![str!("message")]
-        ))));
-
+        let expected_ast = stmt_raise!(func_call!("Exception", call_args![str!("message")]));
         assert_ast_eq!(input, expected_ast);
 
         let input = r#"raise Exception("message") from None"#;
-        let expected_ast = stmt!(StatementKind::Raise(RaiseKind::RaiseFrom {
-            exception: func_call!("Exception", call_args![str!("message")]),
-            cause: none!()
-        }));
-
+        let expected_ast = stmt_raise!(
+            func_call!("Exception", call_args![str!("message")]),
+            none!()
+        );
         assert_ast_eq!(input, expected_ast);
     }
 
@@ -1696,7 +1725,7 @@ with open('test.txt') as f:
         let expected_ast = stmt!(StatementKind::ContextManager {
             expr: func_call!("open", call_args![str!("test.txt")]),
             variable: Some(ident("f")),
-            block: ast![stmt!(StatementKind::Pass)],
+            block: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -1708,7 +1737,7 @@ with open('test.txt'):
         let expected_ast = stmt!(StatementKind::ContextManager {
             expr: func_call!("open", call_args![str!("test.txt")]),
             variable: None,
-            block: ast![stmt!(StatementKind::Pass)],
+            block: ast![stmt_pass!()],
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -2087,7 +2116,7 @@ else:
             index: LoopIndex::Variable(ident("i")),
             iterable: var!("a"),
             body: ast![stmt!(StatementKind::Break)],
-            else_block: Some(ast![stmt!(StatementKind::Pass)]),
+            else_block: Some(ast![stmt_pass!()]),
         });
 
         assert_ast_eq!(input, expected_ast);
@@ -2291,7 +2320,7 @@ def foo(data=None):
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("foo"),
             args: params![param!("data", none!())],
-            body: ast![stmt!(StatementKind::Pass)],
+            body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
         });
@@ -2363,6 +2392,9 @@ if True:
     fn invalid_identifier() {
         let input = "a.123";
         let e = expect_error!(input, Expr);
-        assert_eq!(e, ParserError::SyntaxError);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("invalid identifier".to_string())
+        );
     }
 }

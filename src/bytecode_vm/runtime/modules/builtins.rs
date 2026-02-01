@@ -3,13 +3,13 @@ use crate::{
         result::Raise,
         runtime::{
             runtime::register_builtin_funcs,
-            types::{Class, Exception, FunctionObject, List, Module, Range, Tuple},
-            BuiltinFn, Frame, Reference,
+            types::{Class, Exception, List, Module, Range, Tuple},
+            BuiltinFn, Reference,
         },
         Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::Container,
-    domain::{Dunder, ModuleName},
+    domain::{Dunder, ModuleName, Type},
 };
 
 static BUILTINS: [(&str, BuiltinFn); 8] = [
@@ -22,10 +22,18 @@ static BUILTINS: [(&str, BuiltinFn); 8] = [
     ("iter", iter),
     ("next", next),
 ];
+static TYPES: [Type; 3] = [Type::ZeroDivisionError, Type::TypeError, Type::NameError];
 
 pub fn init_module(runtime: &mut Runtime) {
     let mut mod_ = Module::new(ModuleName::from_segments(&[Dunder::Builtins]));
     register_builtin_funcs(runtime, &mut mod_, &BUILTINS);
+
+    for type_ in TYPES {
+        let class_ref = runtime
+            .heap
+            .allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
+        mod_.write((&type_).into(), class_ref);
+    }
     runtime.store_module(Container::new(mod_));
 }
 
@@ -34,16 +42,14 @@ pub fn build_class(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Re
     let code_value = vm.deref(args[0]);
     let code = code_value
         .as_code()
-        .ok_or_else(Exception::runtime_error)
+        .ok_or_else(|| {
+            let msg = vm.intern_string("Expected code");
+            Exception::runtime_error(msg)
+        })
         .raise(vm)?;
     let name = code.name().to_string();
 
-    let function = FunctionObject::new(code.clone());
-    let module = vm
-        .read_module(&function.code_object.module_name)
-        .raise(vm)?;
-    let frame = Frame::new(function, vec![], module);
-
+    let frame = vm.frame_for_code(code.clone());
     let frame = vm.call_and_return_frame(frame);
     Ok(vm.heapify(VmValue::Class(Class::new(name, frame.namespace()))))
 }

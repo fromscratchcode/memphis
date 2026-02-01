@@ -1,6 +1,6 @@
 use crate::{
     bytecode_vm::{
-        compiler::{CodeObject, CompilerError, Constant, Opcode},
+        compiler::{CodeGenFrame, CodeObject, Constant, Opcode},
         find_index,
         indices::{ConstantIndex, FreeIndex, Index, LocalIndex, NonlocalIndex},
         CompilerResult,
@@ -10,7 +10,7 @@ use crate::{
     parser::types::Ast,
 };
 
-use super::opcode::{SignedOffset, UnsignedOffset};
+use super::opcode::UnsignedOffset;
 
 mod expr;
 mod stmt;
@@ -24,18 +24,18 @@ pub struct Compiler {
     module_name: ModuleName,
 
     /// We must know the package name for relative imports to work.
-    package: ModuleName,
+    package: Option<ModuleName>,
 
     /// Keep a reference to the code object being constructed so we can associate things with it,
     /// (variable names, constants, etc.).
-    code_stack: Vec<CodeObject>,
+    code_stack: Vec<CodeGenFrame>,
 
     /// The most recent line number seen from the Ast.
     line_number: UnsignedOffset,
 }
 
 impl Compiler {
-    pub fn new(module_name: &ModuleName, package: &ModuleName, filename: &str) -> Self {
+    pub fn new(module_name: &ModuleName, package: &Option<ModuleName>, filename: &str) -> Self {
         Self {
             filename: filename.to_string(),
             module_name: module_name.clone(),
@@ -49,7 +49,7 @@ impl Compiler {
     /// destructive, meaning multiple calls will build upon the same `CodeObject`.
     pub fn compile(&mut self, ast: &Ast) -> CompilerResult<CodeObject> {
         assert!(self.code_stack.is_empty());
-        let code = CodeObject::new(self.module_name.clone(), &self.filename);
+        let code = CodeObject::new_root(self.module_name.clone(), &self.filename);
         let code = self.compile_ast_with_code(ast, code)?;
         assert!(self.code_stack.is_empty());
         Ok(code)
@@ -60,59 +60,32 @@ impl Compiler {
     }
 
     fn compile_ast_with_code(&mut self, ast: &Ast, code: CodeObject) -> CompilerResult<CodeObject> {
-        self.code_stack.push(code);
+        self.code_stack.push(CodeGenFrame::new(code));
         self.compile_ast(ast)?;
-        Ok(self.code_stack.pop().expect("Code stack underflow!"))
+        let code_gen_frame = self.code_stack.pop().expect("Code stack underflow!");
+        log(LogLevel::Debug, || {
+            code_gen_frame.debug_disasm_with_labels()
+        });
+        Ok(code_gen_frame.finalize())
     }
 
-    fn current_offset(&self) -> CompilerResult<UnsignedOffset> {
-        let code = self.ensure_code_object()?;
-        Ok(code.bytecode.len())
-    }
-
-    fn forward_offset_to(&self, to: UnsignedOffset) -> CompilerResult<SignedOffset> {
-        Ok(self.current_offset()? as SignedOffset - to as SignedOffset - 1)
-    }
-
-    // We must mark these as signed because we are doing subtraction which could product a negative
-    // value.
-    fn backward_offset_from(&self, from: UnsignedOffset) -> CompilerResult<SignedOffset> {
-        Ok(from as SignedOffset - self.current_offset()? as SignedOffset - 1)
-    }
-
-    fn emit(&mut self, opcode: Opcode) -> CompilerResult<()> {
+    fn emit(&mut self, opcode: Opcode) {
         let line_number = self.line_number;
-        let offset = self.current_offset()?;
 
-        let code = self.ensure_code_object_mut()?;
+        let code = self.frame_mut().code_mut();
+        let offset = code.bytecode.len();
+
         code.bytecode.push(opcode);
         code.line_map.push((offset, line_number));
-        Ok(())
     }
 
-    fn emit_at(&mut self, offset: UnsignedOffset, opcode: Opcode) -> CompilerResult<()> {
-        let code = self.ensure_code_object_mut()?;
-        code.bytecode[offset] = opcode;
-        Ok(())
-    }
-
-    /// Emit a `Placeholder` op and return its `UnsignedOffset`. This will later need to be updated
-    /// using `emit_at` once the final jump target is known.
-    fn emit_placeholder(&mut self) -> CompilerResult<UnsignedOffset> {
-        let placeholder = self.current_offset()?;
-        self.emit(Opcode::Placeholder)?;
-        Ok(placeholder)
-    }
-
-    fn generate_load(&mut self, name: &Identifier) -> CompilerResult<Opcode> {
+    fn generate_load(&mut self, name: &Identifier) -> Opcode {
         match self.context() {
-            Context::Global => Ok(Opcode::LoadGlobal(
-                self.get_or_set_nonlocal_index(name.as_str())?,
-            )),
+            Context::Global => Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name.as_str())),
             Context::Local => {
                 // Check locals first (top of the stack)
-                if let Some(index) = self.get_local_index(name)? {
-                    return Ok(Opcode::LoadFast(index));
+                if let Some(index) = self.get_local_index(name) {
+                    return Opcode::LoadFast(index);
                 }
 
                 // Now check if this is a free variable, meaning a variable captured from a
@@ -120,67 +93,66 @@ impl Compiler {
                 // We skip the first (top) entry because it's the current code object and the last
                 // (bottom) entry because it's the global scope.
                 let enclosing_scopes = &self.code_stack[1..self.code_stack.len() - 1];
-                for code in enclosing_scopes.iter().rev() {
-                    if self.resolve_local_index_for_code(name, code).is_some() {
+                for code_gen_frame in enclosing_scopes.iter().rev() {
+                    if self
+                        .resolve_local_index_for_code(name, code_gen_frame.code())
+                        .is_some()
+                    {
                         // This would be a local in an enclosing scope, but we need an index
                         // relative to our own code object.
-                        return Ok(Opcode::LoadFree(self.get_or_set_free_var(name)?));
+                        return Opcode::LoadFree(self.get_or_set_free_var(name));
                     }
                 }
 
                 // If it's not local or free, it's global. Put that quote on the wall.
-                Ok(Opcode::LoadGlobal(
-                    self.get_or_set_nonlocal_index(name.as_str())?,
-                ))
+                Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name.as_str()))
             }
         }
     }
 
-    fn generate_store(&mut self, name: &Identifier) -> CompilerResult<Opcode> {
-        let opcode = match self.context() {
-            Context::Global => Opcode::StoreGlobal(self.get_or_set_nonlocal_index(name.as_str())?),
-            Context::Local => Opcode::StoreFast(self.get_or_set_local_index(name)?),
-        };
-        Ok(opcode)
-    }
-
-    fn compile_constant(&mut self, constant: Constant) -> CompilerResult<()> {
-        let index = self.get_or_set_constant_index(constant)?;
-        self.emit(Opcode::LoadConst(index))?;
-        Ok(())
-    }
-
-    fn compile_load(&mut self, name: &Identifier) -> CompilerResult<()> {
-        let load = self.generate_load(name)?;
-        self.emit(load)
-    }
-
-    fn compile_store(&mut self, name: &Identifier) -> CompilerResult<()> {
-        let store = self.generate_store(name)?;
-        self.emit(store)
-    }
-
-    fn get_or_set_local_index(&mut self, name: &Identifier) -> CompilerResult<LocalIndex> {
-        log(LogLevel::Trace, || {
-            format!("Looking for '{name}' in locals")
-        });
-        if let Some(index) = self.get_local_index(name)? {
-            Ok(index)
-        } else {
-            let code = self.ensure_code_object_mut()?;
-            let new_index = code.varnames.len();
-            code.varnames.push(name.to_string());
-            Ok(Index::new(new_index))
+    fn generate_store(&mut self, name: &Identifier) -> Opcode {
+        match self.context() {
+            Context::Global => Opcode::StoreGlobal(self.get_or_set_nonlocal_index(name.as_str())),
+            Context::Local => Opcode::StoreFast(self.get_or_set_local_index(name)),
         }
     }
 
-    fn get_local_index(&self, name: &Identifier) -> CompilerResult<Option<LocalIndex>> {
-        let code = self.ensure_code_object()?;
-        Ok(self.resolve_local_index_for_code(name, code))
+    fn compile_constant(&mut self, constant: Constant) {
+        let index = self.get_or_set_constant_index(constant);
+        self.emit(Opcode::LoadConst(index));
     }
 
-    fn get_or_set_free_var(&mut self, name: &Identifier) -> CompilerResult<FreeIndex> {
-        let code = self.ensure_code_object_mut()?;
+    fn compile_load(&mut self, name: &Identifier) {
+        let load = self.generate_load(name);
+        self.emit(load);
+    }
+
+    fn compile_store(&mut self, name: &Identifier) {
+        let store = self.generate_store(name);
+        self.emit(store);
+    }
+
+    fn get_or_set_local_index(&mut self, name: &Identifier) -> LocalIndex {
+        log(LogLevel::Trace, || {
+            format!("Looking for '{name}' in locals")
+        });
+        if let Some(index) = self.get_local_index(name) {
+            index
+        } else {
+            let code = self.frame_mut().code_mut();
+            let new_index = code.varnames.len();
+            code.varnames.push(name.to_string());
+            Index::new(new_index)
+        }
+    }
+
+    fn get_local_index(&self, name: &Identifier) -> Option<LocalIndex> {
+        let code = self.frame().code();
+        self.resolve_local_index_for_code(name, code)
+    }
+
+    fn get_or_set_free_var(&mut self, name: &Identifier) -> FreeIndex {
+        let code = self.frame_mut().code_mut();
         let index = if let Some(index) = find_index(&code.freevars, name.as_str()) {
             index
         } else {
@@ -188,7 +160,7 @@ impl Compiler {
             code.freevars.push(name.to_string());
             new_index
         };
-        Ok(Index::new(index))
+        Index::new(index)
     }
 
     fn resolve_local_index_for_code(
@@ -201,11 +173,11 @@ impl Compiler {
 
     // We didn't convert this one to use Identifier yet because of how it interacts with
     // ModuleName.
-    fn get_or_set_nonlocal_index(&mut self, name: &str) -> CompilerResult<NonlocalIndex> {
+    fn get_or_set_nonlocal_index(&mut self, name: &str) -> NonlocalIndex {
         log(LogLevel::Trace, || {
             format!("Looking for '{name}' in globals")
         });
-        let code = self.ensure_code_object_mut()?;
+        let code = self.frame_mut().code_mut();
         let index = if let Some(index) = find_index(&code.names, name) {
             index
         } else {
@@ -213,14 +185,14 @@ impl Compiler {
             code.names.push(name.to_string());
             new_index
         };
-        Ok(Index::new(index))
+        Index::new(index)
     }
 
-    fn get_or_set_constant_index(&mut self, value: Constant) -> CompilerResult<ConstantIndex> {
+    fn get_or_set_constant_index(&mut self, value: Constant) -> ConstantIndex {
         log(LogLevel::Trace, || {
             format!("Looking for '{value}' in constants")
         });
-        let code = self.ensure_code_object_mut()?;
+        let code = self.frame_mut().code_mut();
         let index = if let Some(index) = find_index(&code.constants, &value) {
             index
         } else {
@@ -228,7 +200,7 @@ impl Compiler {
             code.constants.push(value);
             next_index
         };
-        Ok(Index::new(index))
+        Index::new(index)
     }
 
     /// Since an instance of this `Compiler` operates on a single module, we can assume
@@ -240,26 +212,25 @@ impl Compiler {
         }
     }
 
-    fn ensure_code_object_mut(&mut self) -> CompilerResult<&mut CodeObject> {
+    fn frame_mut(&mut self) -> &mut CodeGenFrame {
         self.code_stack
             .last_mut()
-            .ok_or_else(|| internal_error("Failed to find current code object."))
+            .expect("Compiler invariant violated: no current CodeGenFrame")
     }
 
-    fn ensure_code_object(&self) -> CompilerResult<&CodeObject> {
+    fn frame(&self) -> &CodeGenFrame {
         self.code_stack
             .last()
-            .ok_or_else(|| internal_error("Failed to find current code object."))
+            .expect("Compiler invariant violated: no current CodeGenFrame")
     }
-}
-
-fn internal_error(msg: &str) -> CompilerError {
-    CompilerError::Internal(msg.to_string())
 }
 
 #[cfg(test)]
 mod tests_compiler {
-    use crate::{bytecode_vm::compiler::test_utils::*, domain::FunctionType};
+    use crate::{
+        bytecode_vm::{compiler::test_utils::*, CompilerError},
+        domain::FunctionType,
+    };
 
     use super::*;
 
@@ -283,6 +254,7 @@ def foo():
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -309,6 +281,7 @@ def foo(a, b):
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -336,6 +309,7 @@ def foo():
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = CodeObject {
@@ -356,6 +330,7 @@ def foo():
             constants: vec![Constant::Code(fn_foo)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
         assert_code_eq!(code, expected);
     }
@@ -382,6 +357,7 @@ def foo():
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = CodeObject {
@@ -404,6 +380,7 @@ def foo():
             constants: vec![Constant::Code(fn_foo)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
         assert_code_eq!(code, expected);
     }
@@ -428,6 +405,7 @@ def foo():
             constants: vec![Constant::Int(1)],
             line_map: vec![],
             function_type: FunctionType::Generator,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -459,6 +437,7 @@ def foo():
             constants: vec![Constant::Int(1), Constant::Int(2)],
             line_map: vec![],
             function_type: FunctionType::Generator,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -485,6 +464,7 @@ async def foo():
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Async,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -513,6 +493,7 @@ def foo(a, b):
             constants: vec![Constant::Int(10)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let fn_foo = CodeObject {
@@ -535,6 +516,7 @@ def foo(a, b):
             constants: vec![Constant::Code(fn_inner)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -571,6 +553,7 @@ def foo():
             constants: vec![Constant::Int(10), Constant::Float(11.1)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -603,6 +586,7 @@ def foo():
             constants: vec![Constant::Int(10)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -640,6 +624,7 @@ world()
             constants: vec![Constant::String("Hello".into())],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let fn_world = CodeObject {
@@ -659,6 +644,7 @@ world()
             constants: vec![Constant::String("World".into())],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = CodeObject {
@@ -677,7 +663,7 @@ world()
                 Opcode::PopTop,
                 Opcode::LoadGlobal(Index::new(1)),
                 Opcode::Call(0),
-                Opcode::PopTop,
+                Opcode::ReturnValue,
             ],
             arg_count: 0,
             varnames: vec![],
@@ -686,6 +672,7 @@ world()
             constants: vec![Constant::Code(fn_hello), Constant::Code(fn_world)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);
@@ -718,6 +705,7 @@ def make_adder(x):
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let fn_make_adder = CodeObject {
@@ -739,6 +727,7 @@ def make_adder(x):
             constants: vec![Constant::Code(fn_inner_adder)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_function(fn_make_adder);
@@ -766,6 +755,7 @@ class Foo:
             constants: vec![Constant::Int(99)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let cls_foo = CodeObject {
@@ -784,6 +774,7 @@ class Foo:
             constants: vec![Constant::Code(fn_bar)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_class("Foo", cls_foo);
@@ -815,6 +806,7 @@ class Foo:
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let cls_foo = CodeObject {
@@ -833,6 +825,7 @@ class Foo:
             constants: vec![Constant::Code(fn_bar)],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         let expected = wrap_top_level_class("Foo", cls_foo);
@@ -862,6 +855,7 @@ f = Foo()
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);
@@ -891,6 +885,7 @@ b = f.bar()
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);
@@ -918,6 +913,7 @@ import a.b.c
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);
@@ -945,6 +941,7 @@ import a.b.c as foo
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);
@@ -991,6 +988,7 @@ from .outer import foo
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);
@@ -1021,6 +1019,7 @@ from .outer.inner import foo
             constants: vec![],
             line_map: vec![],
             function_type: FunctionType::Regular,
+            exception_table: vec![],
         };
 
         assert_code_eq!(code, expected);

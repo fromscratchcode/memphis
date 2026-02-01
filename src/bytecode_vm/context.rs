@@ -14,7 +14,7 @@ use crate::{
 pub struct VmContext {
     lexer: Lexer,
     module_name: ModuleName,
-    package: ModuleName,
+    package: Option<ModuleName>,
     path_str: String,
     vm: VirtualMachine,
 }
@@ -23,19 +23,12 @@ impl VmContext {
     pub fn new(text: Text, origin: ModuleOrigin) -> Self {
         let state = Container::new(MemphisState::init(origin.clone()));
         let runtime = Container::new(Runtime::new());
-        Self::from_state(
-            ModuleName::main(),
-            ModuleName::empty(),
-            text,
-            origin,
-            state,
-            runtime,
-        )
+        Self::from_state(ModuleName::main(), None, text, origin, state, runtime)
     }
 
     pub fn from_state(
         module_name: ModuleName,
-        package: ModuleName,
+        package: Option<ModuleName>,
         text: Text,
         origin: ModuleOrigin,
         state: Container<MemphisState>,
@@ -53,7 +46,8 @@ impl VmContext {
     pub fn run_inner(&mut self) -> VmResult<VmValue> {
         let code = self.compile().map_err(|e| {
             let exc = e.into_exception(&mut self.vm);
-            self.vm.raise(exc)
+            self.vm
+                .init_and_raise(exc, self.module_name.clone(), &self.path_str)
         })?;
         self.vm.execute(code)
     }
@@ -89,7 +83,7 @@ impl VmContext {
 
     #[cfg(test)]
     pub fn set_pkg(&mut self, name: ModuleName) {
-        self.package = name;
+        self.package = Some(name);
     }
 
     #[cfg(any(test, feature = "wasm"))]

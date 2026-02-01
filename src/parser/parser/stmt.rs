@@ -314,13 +314,13 @@ impl Parser<'_> {
         self.consume(&Token::Colon)?;
         let try_block = self.parse_indented_block()?;
 
-        let mut handlers = vec![];
+        let mut handlers: Vec<ExceptHandler> = vec![];
         while self.current_token() == &Token::Except {
             self.consume(&Token::Except)?;
             if self.current_token() == &Token::Colon {
                 self.consume(&Token::Colon)?;
                 let block = self.parse_indented_block()?;
-                handlers.push(ExceptHandler::bare(block));
+                handlers.push(ExceptHandler::default(block));
             } else {
                 let expr = self.parse_simple_expr()?;
                 let alias = self.parse_optional_alias()?;
@@ -328,6 +328,14 @@ impl Parser<'_> {
                 let block = self.parse_indented_block()?;
                 handlers.push(ExceptHandler::typed(expr, alias, block));
             }
+        }
+
+        if handlers
+            .iter()
+            .take(handlers.len() - 1)
+            .any(|h| h.is_default())
+        {
+            return Err(ParserError::syntax_error("default 'except:' must be last"));
         }
 
         let else_block = if self.current_token() == &Token::Else {
@@ -347,7 +355,7 @@ impl Parser<'_> {
         };
 
         if handlers.is_empty() && finally_block.is_none() {
-            return Err(ParserError::SyntaxError);
+            return Err(ParserError::syntax_error("invalid try/except"));
         }
 
         Ok(StatementKind::TryExcept {
@@ -489,7 +497,7 @@ impl Parser<'_> {
         let parent = self.parse_simple_expr()?;
 
         if !matches!(parent, Expr::Variable(_) | Expr::MemberAccess { .. }) {
-            Err(ParserError::SyntaxError)
+            Err(ParserError::syntax_error("invalid parent"))
         } else {
             Ok(parent)
         }

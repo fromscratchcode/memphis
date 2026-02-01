@@ -1,12 +1,12 @@
 use crate::{
     bytecode_vm::{
-        compiler::{opcode::UnsignedOffset, CodeObject, Constant, Opcode},
+        compiler::{CodeObject, Constant, JumpKind, Opcode},
         Compiler, CompilerError, CompilerResult,
     },
     domain::{resolve_import_path, FromImportPath, FunctionType, Identifier},
     parser::types::{
-        Ast, ConditionalAst, Expr, FromImportMode, LoopIndex, Params, RegularImport, Statement,
-        StatementKind,
+        Ast, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex, Params,
+        RaiseKind, RegularImport, Statement, StatementKind,
     },
 };
 
@@ -26,11 +26,12 @@ impl Compiler {
                     _ => {
                         // If an expression is used as a statement, we must tell the VM to discard
                         // the result from the stack.
-                        self.emit(Opcode::PopTop)?;
+                        self.emit(Opcode::PopTop);
                     }
                 }
             }
             StatementKind::Return(expr) => self.compile_return(expr)?,
+            StatementKind::Raise(kind) => self.compile_raise(kind)?,
             StatementKind::Assignment { left, right } => self.compile_assignment(left, right)?,
             StatementKind::WhileLoop(cond_ast) => self.compile_while_loop(cond_ast)?,
             StatementKind::ForInLoop {
@@ -61,6 +62,12 @@ impl Compiler {
             StatementKind::SelectiveImport { import_path, mode } => {
                 self.compile_selective_import(import_path, mode)?
             }
+            StatementKind::TryExcept {
+                try_block,
+                handlers,
+                else_block,
+                finally_block,
+            } => self.compiler_try_except(try_block, handlers, else_block, finally_block)?,
             _ => {
                 return Err(CompilerError::Unsupported(format!(
                     "Statement type: {stmt:?}"
@@ -80,7 +87,19 @@ impl Compiler {
             self.compile_expr(&expr[0])?;
         }
 
-        self.emit(Opcode::ReturnValue)?;
+        self.emit(Opcode::ReturnValue);
+        Ok(())
+    }
+
+    fn compile_raise(&mut self, kind: &RaiseKind) -> CompilerResult<()> {
+        match kind {
+            RaiseKind::Reraise => self.emit(Opcode::RaiseVarargs(0)),
+            _ => {
+                return Err(CompilerError::Unsupported(
+                    "This 'raise' usage not yet supported in the bytecode VM.".to_string(),
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -88,15 +107,15 @@ impl Compiler {
         match left {
             Expr::Variable(name) => {
                 self.compile_expr(right)?;
-                self.compile_store(name)?;
+                self.compile_store(name);
             }
             Expr::MemberAccess { object, field } => {
                 // Push the object onto the stack
                 self.compile_expr(object)?;
                 // Push the value to be assigned onto the stack
                 self.compile_expr(right)?;
-                let attr_index = self.get_or_set_nonlocal_index(field.as_str())?;
-                self.emit(Opcode::SetAttr(attr_index))?;
+                let attr_index = self.get_or_set_nonlocal_index(field.as_str());
+                self.emit(Opcode::SetAttr(attr_index));
             }
             Expr::IndexAccess { .. } => {
                 return Err(CompilerError::Unsupported(
@@ -104,8 +123,8 @@ impl Compiler {
                 ))
             }
             _ => {
-                return Err(CompilerError::SyntaxError(
-                    "cannot assign to that expression type here.".into(),
+                return Err(CompilerError::syntax_error(
+                    "cannot assign to that expression type here",
                 ))
             }
         };
@@ -114,16 +133,23 @@ impl Compiler {
     }
 
     fn compile_while_loop(&mut self, cond_ast: &ConditionalAst) -> CompilerResult<()> {
-        let condition_start = self.current_offset()?;
-        let post_condition_ph = self.compile_conditional_branch(cond_ast)?;
+        let (condition_start, loop_end) = {
+            let frame = self.frame_mut();
+            (frame.new_label(), frame.new_label())
+        };
 
-        // Unconditional jump back to the start of the condition
-        let offset = self.backward_offset_from(condition_start)?;
-        self.emit(Opcode::Jump(offset))?;
+        self.frame_mut().bind_label(condition_start);
 
-        // Update the JUMP_IF_FALSE offset now that we know the length of the loop body
-        let offset = self.forward_offset_to(post_condition_ph)?;
-        self.emit_at(post_condition_ph, Opcode::JumpIfFalse(offset))?;
+        self.compile_expr(&cond_ast.condition)?;
+
+        self.frame_mut()
+            .emit_jump_to(loop_end, JumpKind::JumpIfFalse);
+
+        self.compile_ast(&cond_ast.ast)?;
+
+        self.frame_mut()
+            .emit_jump_to(condition_start, JumpKind::Jump);
+        self.frame_mut().bind_label(loop_end);
 
         Ok(())
     }
@@ -146,24 +172,22 @@ impl Compiler {
             ));
         };
         self.compile_expr(iterable)?;
-        self.emit(Opcode::GetIter)?;
+        self.emit(Opcode::GetIter);
 
-        // where FOR_ITER will live
-        let loop_header = self.current_offset()?;
+        let (loop_start, loop_end) = {
+            let frame = self.frame_mut();
+            (frame.new_label(), frame.new_label())
+        };
 
-        // Emit placeholder FOR_ITER with dummy offset
-        let for_iter_placeholder = self.emit_placeholder()?;
+        self.frame_mut().bind_label(loop_start);
+        self.frame_mut().emit_jump_to(loop_end, JumpKind::ForIter);
 
-        self.compile_store(index)?;
+        self.compile_store(index);
         self.compile_ast(body)?;
 
-        // jump back to loop_header
-        let jump_back_offset = self.backward_offset_from(loop_header)?;
-        self.emit(Opcode::Jump(jump_back_offset))?;
+        self.frame_mut().emit_jump_to(loop_start, JumpKind::Jump);
+        self.frame_mut().bind_label(loop_end);
 
-        // patch FOR_ITER to jump to end_of_loop
-        let for_iter_offset = self.forward_offset_to(for_iter_placeholder)?;
-        self.emit_at(for_iter_placeholder, Opcode::ForIter(for_iter_offset))?;
         Ok(())
     }
 
@@ -173,47 +197,73 @@ impl Compiler {
         elif_parts: &[ConditionalAst],
         else_part: &Option<Ast>,
     ) -> CompilerResult<()> {
-        // This will collect placeholders for unconditional jumps at the end of each true branch
-        let mut end_jump_placeholders = vec![];
+        let (end_label, elif_labels, else_label) = {
+            let frame = self.frame_mut();
 
-        let mut post_condition_ph = self.compile_conditional_branch(if_part)?;
+            let end_label = frame.new_label();
 
+            // One label per condition
+            let mut elif_labels = Vec::new();
+            for _ in elif_parts {
+                elif_labels.push(frame.new_label()); // each elif
+            }
+
+            let else_label = if else_part.is_some() {
+                Some(frame.new_label())
+            } else {
+                None
+            };
+            (end_label, elif_labels, else_label)
+        };
+
+        self.compile_expr(&if_part.condition)?;
+        let false_target = elif_labels
+            .first()
+            .copied()
+            .or(else_label)
+            .unwrap_or(end_label);
+        self.frame_mut()
+            .emit_jump_to(false_target, JumpKind::JumpIfFalse);
+        self.compile_ast(&if_part.ast)?;
+
+        // Jump over any elifs/else if we got this far (meaning the condition was true)
         if !elif_parts.is_empty() {
-            // Jump over any elifs/else if the condition was true
-            end_jump_placeholders.push(self.emit_placeholder()?);
+            self.frame_mut().emit_jump_to(end_label, JumpKind::Jump);
         }
 
         // Compile each `elif`
         for (i, elif) in elif_parts.iter().enumerate() {
-            // Patch the previous jump-if-false
-            let offset = self.forward_offset_to(post_condition_ph)?;
-            self.emit_at(post_condition_ph, Opcode::JumpIfFalse(offset))?;
+            let test_label = elif_labels[i];
+            {
+                let frame = self.frame_mut();
+                frame.bind_label(test_label);
+            }
 
             // Compile this elif condition and block
-            let post_elif_condition_ph = self.compile_conditional_branch(elif)?;
+            self.compile_expr(&elif.condition)?;
+            let false_target = elif_labels
+                .get(i + 1)
+                .copied()
+                .or(else_label)
+                .unwrap_or(end_label);
+            self.frame_mut()
+                .emit_jump_to(false_target, JumpKind::JumpIfFalse);
+            self.compile_ast(&elif.ast)?;
 
             // Only emit a jump if this is not the last elif or else
             if i != elif_parts.len() - 1 || else_part.is_some() {
-                end_jump_placeholders.push(self.emit_placeholder()?);
+                self.frame_mut().emit_jump_to(end_label, JumpKind::Jump);
             }
-
-            // Update for next loop iteration
-            post_condition_ph = post_elif_condition_ph;
         }
-
-        let offset = self.forward_offset_to(post_condition_ph)?;
-        self.emit_at(post_condition_ph, Opcode::JumpIfFalse(offset))?;
 
         // Handle optional `else`
         if let Some(else_part) = else_part {
+            let else_label = else_label.unwrap();
+            self.frame_mut().bind_label(else_label);
             self.compile_ast(else_part)?;
         }
 
-        // Patch all end-of-true-branch jumps
-        for placeholder in end_jump_placeholders {
-            let offset = self.forward_offset_to(placeholder)?;
-            self.emit_at(placeholder, Opcode::Jump(offset))?;
-        }
+        self.frame_mut().bind_label(end_label);
 
         Ok(())
     }
@@ -239,7 +289,7 @@ impl Compiler {
             .iter()
             .map(|p| p.arg.to_string())
             .collect::<Vec<String>>();
-        let code_object = CodeObject::new_function(
+        let code_object = CodeObject::new(
             name.as_str(),
             self.module_name.clone(),
             &self.filename,
@@ -260,11 +310,11 @@ impl Compiler {
         // Apply the decorators - innermost outward
         for _ in decorators {
             // The 1 is for the function we are wrapping
-            self.emit(Opcode::Call(1))?;
+            self.emit(Opcode::Call(1));
         }
 
         // Bind the final decorated function
-        self.compile_store(name)?;
+        self.compile_store(name);
         Ok(())
     }
 
@@ -286,7 +336,7 @@ impl Compiler {
             ));
         }
 
-        let code_object = CodeObject::new_function(
+        let code_object = CodeObject::new(
             name.as_str(),
             self.module_name.clone(),
             &self.filename,
@@ -295,25 +345,25 @@ impl Compiler {
         );
         let code = self.compile_ast_with_code(body, code_object)?;
 
-        self.emit(Opcode::LoadBuildClass)?;
-        self.compile_code(code)?;
+        self.emit(Opcode::LoadBuildClass);
+        self.compile_code(code);
 
         // subtract one to ignore Opcode::LoadBuildClass
         let num_args = 1;
-        self.emit(Opcode::Call(num_args))?;
+        self.emit(Opcode::Call(num_args));
 
-        self.compile_store(name)?;
+        self.compile_store(name);
         Ok(())
     }
 
     fn compile_regular_import(&mut self, items: &[RegularImport]) -> CompilerResult<()> {
         for item in items {
-            let index = self.get_or_set_nonlocal_index(&item.module_path.as_str())?;
+            let index = self.get_or_set_nonlocal_index(&item.module_path.as_str());
 
             if item.alias.is_some() {
-                self.emit(Opcode::ImportFrom(index))?;
+                self.emit(Opcode::ImportFrom(index));
             } else {
-                self.emit(Opcode::ImportName(index))?;
+                self.emit(Opcode::ImportName(index));
             }
 
             let symbol_index = item
@@ -323,8 +373,8 @@ impl Compiler {
                 .unwrap_or_else(|| {
                     let head = item.module_path.head().expect("No head!");
                     self.get_or_set_nonlocal_index(head)
-                })?;
-            self.emit(Opcode::StoreGlobal(symbol_index))?;
+                });
+            self.emit(Opcode::StoreGlobal(symbol_index));
         }
         Ok(())
     }
@@ -337,18 +387,18 @@ impl Compiler {
         let module_name = resolve_import_path(import_path, &self.package)
             .map_err(|e| CompilerError::import_error(e.message()))?;
 
-        let index = self.get_or_set_nonlocal_index(&module_name.as_str())?;
-        self.emit(Opcode::ImportFrom(index))?;
+        let index = self.get_or_set_nonlocal_index(&module_name.as_str());
+        self.emit(Opcode::ImportFrom(index));
 
         match mode {
-            FromImportMode::All => self.emit(Opcode::ImportAll)?,
+            FromImportMode::All => self.emit(Opcode::ImportAll),
             FromImportMode::List(items) => {
                 for item in items {
-                    let attr_index = self.get_or_set_nonlocal_index(item.original().as_str())?;
-                    self.emit(Opcode::LoadAttr(attr_index))?;
+                    let attr_index = self.get_or_set_nonlocal_index(item.original().as_str());
+                    self.emit(Opcode::LoadAttr(attr_index));
 
-                    let alias_index = self.get_or_set_nonlocal_index(item.imported().as_str())?;
-                    self.emit(Opcode::StoreGlobal(alias_index))?;
+                    let alias_index = self.get_or_set_nonlocal_index(item.imported().as_str());
+                    self.emit(Opcode::StoreGlobal(alias_index));
                 }
             }
         }
@@ -356,39 +406,118 @@ impl Compiler {
         Ok(())
     }
 
-    /// Compiles a condition and block, returning the offset of the placeholder
-    /// that should later be patched with a `JumpIfFalse`.
-    fn compile_conditional_branch(
+    fn compiler_try_except(
         &mut self,
-        ast: &ConditionalAst,
-    ) -> CompilerResult<UnsignedOffset> {
-        self.compile_expr(&ast.condition)?;
-        let placeholder = self.emit_placeholder()?;
-        self.compile_ast(&ast.ast)?;
-        Ok(placeholder)
+        try_block: &Ast,
+        handlers: &[ExceptHandler],
+        else_block: &Option<Ast>,
+        finally_block: &Option<Ast>,
+    ) -> CompilerResult<()> {
+        if else_block.is_some() {
+            return Err(CompilerError::Unsupported(
+                "Try/except with 'else' are not yet supported in the bytecode VM.".to_string(),
+            ));
+        }
+        if finally_block.is_some() {
+            return Err(CompilerError::Unsupported(
+                "Try/except with 'finally' are not yet supported in the bytecode VM.".to_string(),
+            ));
+        }
+
+        if handlers
+            .iter()
+            .take(handlers.len() - 1)
+            .any(|h| h.is_default())
+        {
+            return Err(CompilerError::syntax_error(
+                "default 'except:' must be last",
+            ));
+        }
+
+        let (try_start, try_end, handler_labels, reraise_label, end_label) = {
+            let frame = self.frame_mut();
+
+            let try_start = frame.new_label();
+            let try_end = frame.new_label();
+
+            // One label per handler
+            let mut handler_labels = Vec::new();
+            for _ in handlers {
+                handler_labels.push(frame.new_label());
+            }
+
+            (
+                try_start,
+                try_end,
+                handler_labels,
+                frame.new_label(),
+                frame.new_label(),
+            )
+        };
+
+        self.frame_mut().register_range(
+            try_start,
+            try_end,
+            handler_labels.first().copied().unwrap(),
+        );
+        self.frame_mut().bind_label(try_start);
+        self.compile_ast(try_block)?;
+        self.frame_mut().bind_label(try_end);
+
+        self.frame_mut().emit_jump_to(end_label, JumpKind::Jump);
+
+        for (i, handler) in handlers.iter().enumerate() {
+            self.frame_mut()
+                .bind_label(handler_labels.get(i).copied().unwrap());
+            if i == 0 {
+                self.emit(Opcode::PushExcInfo);
+            }
+            match &handler.kind {
+                HandlerKind::Default => {}
+                HandlerKind::Typed { expr, alias } => {
+                    self.compile_expr(expr)?;
+                    self.emit(Opcode::CheckExcMatch);
+                    let false_target = handler_labels.get(i + 1).copied().unwrap_or(reraise_label);
+                    self.frame_mut()
+                        .emit_jump_to(false_target, JumpKind::PopJumpIfFalse);
+                    if let Some(alias) = alias {
+                        self.compile_store(alias);
+                    }
+                }
+            }
+            self.compile_ast(&handler.block)?;
+            self.emit(Opcode::PopExcept);
+            self.frame_mut().emit_jump_to(end_label, JumpKind::Jump);
+        }
+
+        self.frame_mut().bind_label(reraise_label);
+        self.emit(Opcode::Reraise);
+        self.frame_mut().bind_label(end_label);
+
+        Ok(())
     }
 
     /// Load a CodeObject and turn it into a function or closure.
     fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
         let free_vars = code.freevars.clone();
-        self.compile_code(code)?;
+        self.compile_code(code);
 
         if free_vars.is_empty() {
-            self.emit(Opcode::MakeFunction)?;
+            self.emit(Opcode::MakeFunction);
         } else {
             // We push the free vars onto the stack in reverse order so that we will pop
             // them off in order.
             for free_var in free_vars.iter().rev() {
                 // TODO this is a hack, we should either treat these as identifiers or not!
-                self.compile_load(&Identifier::new(free_var).unwrap())?;
+                self.compile_load(&Identifier::new(free_var).unwrap());
             }
-            self.emit(Opcode::MakeClosure(free_vars.len()))?;
+            self.emit(Opcode::MakeClosure(free_vars.len()));
         }
         Ok(())
     }
 
-    fn compile_code(&mut self, code: CodeObject) -> CompilerResult<()> {
-        self.compile_constant(Constant::Code(code))
+    fn compile_code(&mut self, code: CodeObject) {
+        self.compile_constant(Constant::Code(code));
     }
 }
 
@@ -398,7 +527,10 @@ mod tests_bytecode_stmt {
 
     use crate::{
         bytecode_vm::{compiler::test_utils::*, indices::Index},
-        parser::{test_utils::*, types::ast},
+        parser::{
+            test_utils::*,
+            types::{ast, ExceptHandler},
+        },
     };
 
     fn ident(input: &str) -> Identifier {
@@ -760,5 +892,56 @@ mod tests_bytecode_stmt {
                 Opcode::StoreGlobal(Index::new(4)),
             ]
         );
+    }
+
+    #[test]
+    fn try_except_catch_all() {
+        let stmt = stmt!(StatementKind::TryExcept {
+            try_block: ast![stmt_expr!(bin_op!(int!(1), Div, int!(0)))],
+            handlers: vec![ExceptHandler::default(ast![stmt_return![]])],
+            else_block: None,
+            finally_block: None,
+        });
+        let bytecode = compile_stmt(stmt);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::LoadConst(Index::new(1)),
+                Opcode::Div,
+                Opcode::PopTop,
+                Opcode::Jump(5),
+                Opcode::PushExcInfo,
+                Opcode::ReturnValue,
+                Opcode::PopExcept,
+                Opcode::Jump(1),
+                Opcode::Reraise,
+            ]
+        );
+    }
+
+    #[test]
+    fn try_except_default_handler_after_typed() {
+        let stmt = stmt!(StatementKind::TryExcept {
+            try_block: ast![stmt_pass!()],
+            handlers: vec![
+                ExceptHandler::default(ast![stmt_return![]]),
+                ExceptHandler::default(ast![stmt_return![]]),
+            ],
+            else_block: None,
+            finally_block: None,
+        });
+        let e = expect_err(stmt);
+        assert_eq!(
+            e,
+            CompilerError::syntax_error("default 'except:' must be last")
+        );
+    }
+
+    #[test]
+    fn raise() {
+        let stmt = stmt_raise!();
+        let bytecode = compile_stmt(stmt);
+        assert_eq!(bytecode, &[Opcode::RaiseVarargs(0)]);
     }
 }

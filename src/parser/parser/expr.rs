@@ -538,22 +538,24 @@ impl Parser<'_> {
     fn parse_binary_literal(&mut self, literal: String) -> Result<Expr, ParserError> {
         self.consume(&Token::BinaryLiteral(literal.clone()))?;
 
-        let result = i64::from_str_radix(&literal[2..], 2).map_err(|_| ParserError::SyntaxError)?;
+        let result = i64::from_str_radix(&literal[2..], 2)
+            .map_err(|_| ParserError::syntax_error("invalid binary literal"))?;
         Ok(Expr::Integer(result))
     }
 
     fn parse_octal_literal(&mut self, literal: String) -> Result<Expr, ParserError> {
         self.consume(&Token::OctalLiteral(literal.clone()))?;
 
-        let result = i64::from_str_radix(&literal[2..], 8).map_err(|_| ParserError::SyntaxError)?;
+        let result = i64::from_str_radix(&literal[2..], 8)
+            .map_err(|_| ParserError::syntax_error("invalid octal literal"))?;
         Ok(Expr::Integer(result))
     }
 
     fn parse_hex_literal(&mut self, literal: String) -> Result<Expr, ParserError> {
         self.consume(&Token::HexLiteral(literal.clone()))?;
 
-        let result =
-            i64::from_str_radix(&literal[2..], 16).map_err(|_| ParserError::SyntaxError)?;
+        let result = i64::from_str_radix(&literal[2..], 16)
+            .map_err(|_| ParserError::syntax_error("invalid hex literal"))?;
         Ok(Expr::Integer(result))
     }
 
@@ -745,7 +747,8 @@ impl Parser<'_> {
         } else if pairs.is_empty() {
             Ok(Expr::Set(set))
         } else {
-            Err(ParserError::SyntaxError)
+            // Can the user actually get here?
+            Err(ParserError::syntax_error("invalid dict"))
         }
     }
 
@@ -820,8 +823,9 @@ impl Parser<'_> {
                         for op in dict_ops {
                             match op {
                                 DictOperation::Pair(key, value) => {
-                                    let key_name =
-                                        key.as_string().ok_or(ParserError::SyntaxError)?;
+                                    let key_name = key.as_string().ok_or_else(|| {
+                                        ParserError::syntax_error("invalid kwargs key")
+                                    })?;
                                     let ident = Identifier::new(key_name).expect("Invalid key");
                                     kwargs.push(KwargsOperation::Pair(ident, value));
                                 }
@@ -832,7 +836,7 @@ impl Parser<'_> {
                     Expr::Variable(_) | Expr::MemberAccess { .. } => {
                         kwargs.push(KwargsOperation::Unpacking(kwargs_expr));
                     }
-                    _ => return Err(ParserError::SyntaxError),
+                    _ => return Err(ParserError::syntax_error("invalid kwargs")),
                 };
                 self.consume_optional(&Token::Comma);
                 continue;
@@ -868,7 +872,9 @@ impl Parser<'_> {
         match self.current_token() {
             Token::Assign => {
                 self.consume(&Token::Assign)?;
-                let arg = expr.as_variable().ok_or(ParserError::SyntaxError)?;
+                let arg = expr
+                    .as_variable()
+                    .ok_or_else(|| ParserError::syntax_error("invalid assign key"))?;
                 Ok(CallArg::Keyword {
                     arg: arg.clone(),
                     expr: self.parse_simple_expr()?,

@@ -19,5 +19,5 @@ pub use frame::Frame;
 pub use heap::Heap;
 pub use reference::Reference;
 pub use runtime::Runtime;
-pub use step_result::StepResult;
+pub use step_result::{Completion, FrameExit, StepResult, Suspension};
 pub use vm::VirtualMachine;

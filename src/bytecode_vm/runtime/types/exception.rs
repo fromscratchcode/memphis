@@ -5,7 +5,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Exception {
-    kind: ExceptionKind,
+    pub kind: ExceptionKind,
     payload: Vec<Reference>,
 }
 
@@ -27,11 +27,7 @@ impl Exception {
         Self::new(kind, vec![])
     }
 
-    pub fn runtime_error() -> Self {
-        Self::new_empty(ExceptionKind::RuntimeError)
-    }
-
-    pub fn runtime_error_with(msg: Reference) -> Self {
+    pub fn runtime_error(msg: Reference) -> Self {
         Self::new(ExceptionKind::RuntimeError, vec![msg])
     }
 
@@ -57,6 +53,10 @@ impl Exception {
 
     pub fn name_error(name: Reference) -> Self {
         Self::new(ExceptionKind::NameError, vec![name])
+    }
+
+    pub fn div_by_zero_error(msg: Reference) -> Self {
+        Self::new(ExceptionKind::DivisionByZero, vec![msg])
     }
 
     pub fn attribute_error(_object_type: impl Into<String>, _attr: impl Into<String>) -> Self {

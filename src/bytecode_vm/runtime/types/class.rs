@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::bytecode_vm::{runtime::reference::Namespace, runtime::Reference};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -9,6 +11,13 @@ pub struct Class {
 impl Class {
     pub fn new(name: String, namespace: Namespace) -> Self {
         Self { name, namespace }
+    }
+
+    pub fn new_builtin(name: String) -> Self {
+        Self {
+            name,
+            namespace: HashMap::default(),
+        }
     }
 
     pub fn read<S>(&self, name: S) -> Option<Reference>

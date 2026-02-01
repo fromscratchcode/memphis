@@ -99,6 +99,33 @@ macro_rules! stmt_expr {
     };
 }
 
+macro_rules! stmt_raise {
+    () => {
+        $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Raise(
+            $crate::parser::types::RaiseKind::Reraise
+        ))
+    };
+    ($exc:expr) => {
+        $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Raise(
+            $crate::parser::types::RaiseKind::Raise($exc)
+        ))
+    };
+    ($exc:expr, $cause:expr) => {
+        $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Raise(
+            $crate::parser::types::RaiseKind::RaiseFrom {
+                exception: $exc,
+                cause: $cause,
+            }
+        ))
+    };
+}
+
+macro_rules! stmt_pass {
+    () => {
+        $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Pass)
+    };
+}
+
 macro_rules! stmt_return {
     ($($expr:expr),* $(,)?) => {
         $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Return(vec![
@@ -386,6 +413,8 @@ pub(crate) use stmt;
 pub(crate) use stmt_assign;
 pub(crate) use stmt_expr;
 pub(crate) use stmt_from_import;
+pub(crate) use stmt_pass;
+pub(crate) use stmt_raise;
 pub(crate) use stmt_reg_import;
 pub(crate) use stmt_return;
 pub(crate) use str;
