@@ -78,6 +78,36 @@ macro_rules! set {
     };
 }
 
+macro_rules! f_str_list {
+    ($($expr:expr),* $(,)?) => {
+        $crate::parser::types::Expr::FString(vec![
+            $($expr),*
+        ])
+    };
+}
+
+macro_rules! f_str_str {
+    ($val:expr) => {
+        $crate::parser::types::FStringPart::String($val.into())
+    };
+}
+
+macro_rules! f_str_expr {
+    ($val:expr) => {
+        $crate::parser::types::FStringPart::Expr($crate::parser::types::ExprFormat {
+            expr: Box::new($val),
+            format: $crate::parser::types::FormatOption::Str,
+        })
+    };
+
+    ($val:expr, $format:ident) => {
+        $crate::parser::types::FStringPart::Expr($crate::parser::types::ExprFormat {
+            expr: Box::new($val),
+            format: $crate::parser::types::FormatOption::$format,
+        })
+    };
+}
+
 macro_rules! stmt {
     ($variant:expr) => {
         $crate::parser::types::Statement::new(1, $variant)
@@ -157,6 +187,16 @@ macro_rules! bin_op {
             left: Box::new($left),
             op: $crate::parser::types::BinOp::$op,
             right: Box::new($right),
+        }
+    };
+}
+
+macro_rules! ternary_op {
+    ($cond:expr, $if:expr, $else:expr) => {
+        $crate::parser::types::Expr::TernaryOp {
+            condition: Box::new($cond),
+            if_value: Box::new($if),
+            else_value: Box::new($else),
         }
     };
 }
@@ -284,6 +324,15 @@ macro_rules! member_access {
     };
 }
 
+macro_rules! index_access {
+    ($object:expr, $index:expr) => {
+        $crate::parser::types::Expr::IndexAccess {
+            object: Box::new($object),
+            index: Box::new($index),
+        }
+    };
+}
+
 macro_rules! lambda {
     ($args:expr, $expr:expr) => {
         $crate::parser::types::Expr::Lambda {
@@ -390,6 +439,9 @@ pub(crate) use cmp_op;
 pub(crate) use dict;
 pub(crate) use dict_pair;
 pub(crate) use dict_unpack;
+pub(crate) use f_str_expr;
+pub(crate) use f_str_list;
+pub(crate) use f_str_str;
 pub(crate) use float;
 pub(crate) use from_import_all;
 pub(crate) use from_import_item;
@@ -397,6 +449,7 @@ pub(crate) use from_import_list;
 pub(crate) use func_call;
 pub(crate) use func_call_callee;
 pub(crate) use import;
+pub(crate) use index_access;
 pub(crate) use int;
 pub(crate) use lambda;
 pub(crate) use list;
@@ -418,6 +471,7 @@ pub(crate) use stmt_raise;
 pub(crate) use stmt_reg_import;
 pub(crate) use stmt_return;
 pub(crate) use str;
+pub(crate) use ternary_op;
 pub(crate) use tuple;
 pub(crate) use unary_op;
 pub(crate) use var;

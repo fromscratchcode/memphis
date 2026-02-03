@@ -3,21 +3,27 @@ use crate::parser::types::{Statement, StatementKind};
 macro_rules! assert_ast_eq {
     ($input:expr, $expected:expr) => {
         let ast = parse!($input);
-        assert_eq!(ast.len(), 1, "Expected a single Statement!");
-        let stmt = ast.first().unwrap();
-        assert_stmt_eq_inner(&stmt, &$expected);
-    };
-    ($input:expr, $expected:expr, Ast) => {
-        let ast = parse!($input);
         for (a, e) in ast.iter().zip($expected.iter()) {
             assert_stmt_eq_inner(a, e);
         }
     };
-    ($input:expr, $expected:expr, Expr) => {
+}
+
+macro_rules! assert_stmt_eq {
+    ($input:expr, $expected:expr) => {
         let ast = parse!($input);
         assert_eq!(ast.len(), 1, "Expected a single Statement!");
         let stmt = ast.first().unwrap();
-        let StatementKind::Expression(ref expr) = stmt.kind else {
+        assert_stmt_eq_inner(&stmt, &$expected);
+    };
+}
+
+macro_rules! assert_expr_eq {
+    ($input:expr, $expected:expr) => {
+        let ast = parse!($input);
+        assert_eq!(ast.len(), 1, "Expected a single Statement!");
+        let stmt = ast.first().unwrap();
+        let $crate::parser::types::StatementKind::Expression(ref expr) = stmt.kind else {
             panic!("Expected an expression, got {:?}", stmt.kind);
         };
         assert_eq!(expr, &$expected);
@@ -311,3 +317,5 @@ pub fn assert_stmt_eq_inner(actual: &Statement, expected: &Statement) {
 }
 
 pub(crate) use assert_ast_eq;
+pub(crate) use assert_expr_eq;
+pub(crate) use assert_stmt_eq;

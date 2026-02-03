@@ -944,4 +944,885 @@ impl Parser<'_> {
             condition,
         })
     }
+
+    fn parse_type_node(&mut self) -> Result<TypeNode, ParserError> {
+        let mut nodes = vec![];
+
+        loop {
+            let node = match self.current_token() {
+                Token::Identifier(ref ident) => {
+                    let i = ident.clone();
+                    match ident.as_str() {
+                        "int" | "str" | "dict" => {
+                            self.consume(&Token::Identifier(i.clone()))?;
+                            TypeNode::Basic(i.clone())
+                        }
+                        "list" => {
+                            self.consume(&Token::Identifier(i.clone()))?;
+
+                            if self.current_token() == &Token::LBracket {
+                                self.consume(&Token::LBracket)?;
+                                let parameters = self.parse_type_node()?;
+                                self.consume(&Token::RBracket)?;
+
+                                TypeNode::Generic {
+                                    base_type: i.clone(),
+                                    parameters: vec![parameters],
+                                }
+                            } else {
+                                TypeNode::Basic(i.clone())
+                            }
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                Token::Ellipsis => {
+                    self.consume(&Token::Ellipsis)?;
+                    // this is from _collections_abc.py: EllipsisType = type(...)
+                    TypeNode::Ellipsis
+                }
+                _ => unimplemented!(),
+            };
+
+            nodes.push(node);
+
+            if self.current_token() != &Token::BitwiseOr {
+                break;
+            }
+            self.consume(&Token::BitwiseOr)?;
+        }
+
+        if nodes.len() == 1 {
+            Ok(nodes[0].clone())
+        } else {
+            Ok(TypeNode::Union(nodes))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::parser::test_utils::*;
+
+    fn ident(input: &str) -> Identifier {
+        Identifier::new(input).expect("Invalid identifier")
+    }
+
+    #[test]
+    fn expression() {
+        let input = "2 + 3 * (4 - 1)";
+        let expected_ast = bin_op!(
+            int!(2),
+            Add,
+            bin_op!(int!(3), Mul, bin_op!(int!(4), Sub, int!(1)))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 // 3";
+        let expected_ast = bin_op!(int!(2), IntegerDiv, int!(3));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn string_literal() {
+        let input = "\"Hello\"";
+        let expected_ast = str!("Hello");
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "\"\".join([])";
+        let expected_ast = method_call!(str!(""), "join", call_args![list![]]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn function_call() {
+        let input = "print(\"Hello, World!\")";
+        let expected_ast = func_call!("print", call_args![str!("Hello, World!")]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a(*self.args, **self.kwargs)";
+        let expected_ast = func_call!(
+            "a",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![KwargsOperation::Unpacking(member_access!(
+                    var!("self"),
+                    "kwargs"
+                ))],
+                args_var: Some(Box::new(member_access!(var!("self"), "args"))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn function_call_callee() {
+        let input = "mypackage.myothermodule.add('1', '1')";
+        let expected_ast = func_call_callee!(
+            member_access!(member_access!(var!("mypackage"), "myothermodule"), "add"),
+            call_args![str!("1"), str!("1")]
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "cls._abc_registry.add(subclass)";
+        let expected_ast = func_call_callee!(
+            member_access!(member_access!(var!("cls"), "_abc_registry"), "add"),
+            call_args![var!("subclass")]
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_decorator(get_val_undecorated)()";
+        let expected_ast = func_call_callee!(
+            func_call!("test_decorator", call_args![var!("get_val_undecorated")]),
+            call_args![]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn function_call_args_and_kwargs() {
+        let input = "test_kwargs(a=1, b=2)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Pair(ident("a"), int!(1)),
+                    KwargsOperation::Pair(ident("b"), int!(2)),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**{'a':1, 'b':2})";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Pair(ident("a"), int!(1)),
+                    KwargsOperation::Pair(ident("b"), int!(2)),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**{'a':1, 'b':2}, **{'c': 3})";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Pair(ident("a"), int!(1)),
+                    KwargsOperation::Pair(ident("b"), int!(2)),
+                    KwargsOperation::Pair(ident("c"), int!(3)),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**first, **second)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Unpacking(var!("first")),
+                    KwargsOperation::Unpacking(var!("second")),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**kwargs)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![KwargsOperation::Unpacking(var!("kwargs"))],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(*args)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![],
+                args_var: Some(Box::new(var!("args"))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(*args, **kwargs)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![KwargsOperation::Unpacking(var!("kwargs"))],
+                args_var: Some(Box::new(var!("args"))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+deprecated("collections.abc.ByteString",
+)
+"#;
+        let expected_ast = func_call!("deprecated", call_args![str!("collections.abc.ByteString")]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "foo(a, *b[1:])";
+        let expected_ast = func_call!(
+            "foo",
+            CallArgs {
+                args: vec![var!("a")],
+                kwargs: vec![],
+                args_var: Some(Box::new(slice_op!(
+                    var!("b"),
+                    slice!(Some(int!(1)), None, None)
+                ))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn lambda() {
+        let input = "lambda: 4";
+        let expected_ast = lambda!(params![], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda index: 4";
+        let expected_ast = lambda!(params![param!("index")], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda index, val: 4";
+        let expected_ast = lambda!(params![param!("index"), param!("val")], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda: (yield)";
+        let expected_ast = lambda!(params![], yield_expr!());
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(lambda: (yield))()";
+        let expected_ast = func_call_callee!(lambda!(params![], yield_expr!()), call_args![]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn true_false_none() {
+        let input = "True";
+        let expected_ast = bool!(true);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "False";
+        let expected_ast = bool!(false);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "None";
+        let expected_ast = none!();
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn boolean_expressions() {
+        let input = "x and y";
+        let expected_ast = logic_op!(var!("x"), And, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x or y";
+        let expected_ast = logic_op!(var!("x"), Or, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x or not y";
+        let expected_ast = logic_op!(var!("x"), Or, unary_op!(Not, var!("y")));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "not (x or y)";
+        let expected_ast = unary_op!(Not, logic_op!(var!("x"), Or, var!("y")));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn more_operators() {
+        let input = "~a";
+        let expected_ast = unary_op!(BitwiseNot, var!("a"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(*l,)";
+        let expected_ast = tuple![unary_op!(Unpack, var!("l"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a % b";
+        let expected_ast = bin_op!(var!("a"), Mod, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a @ b";
+        let expected_ast = bin_op!(var!("a"), MatMul, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn comparison_operators() {
+        let input = "x == y";
+        let expected_ast = cmp_op!(var!("x"), Equals, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x != y";
+        let expected_ast = cmp_op!(var!("x"), NotEquals, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x < y";
+        let expected_ast = cmp_op!(var!("x"), LessThan, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x > y";
+        let expected_ast = cmp_op!(var!("x"), GreaterThan, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x >= y";
+        let expected_ast = cmp_op!(var!("x"), GreaterThanOrEqual, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x <= y";
+        let expected_ast = cmp_op!(var!("x"), LessThanOrEqual, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x in y";
+        let expected_ast = cmp_op!(var!("x"), In, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x not in y";
+        let expected_ast = cmp_op!(var!("x"), NotIn, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x is None";
+        let expected_ast = cmp_op!(var!("x"), Is, none!());
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x is not None";
+        let expected_ast = cmp_op!(var!("x"), IsNot, none!());
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn class_instantiation() {
+        let input = "Foo()";
+        let expected_ast = func_call!("Foo", call_args![]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn method_invocation() {
+        let input = "foo.bar()";
+        let expected_ast = method_call!(var!("foo"), "bar");
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"Response.text().to_bytes()"#;
+        let expected_ast = method_call!(method_call!(var!("Response"), "text"), "to_bytes");
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn floating_point() {
+        let input = "3.14";
+        let expected_ast = float!(3.14);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2.5e-3";
+        let expected_ast = float!(2.5e-3);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn negative_numbers() {
+        let input = "-3.14";
+        let expected_ast = float!(-3.14);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-3";
+        let expected_ast = int!(-3);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 - 3";
+        let expected_ast = bin_op!(int!(2), Sub, int!(3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-2e-3";
+        let expected_ast = float!(-2e-3);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 + -3";
+        let expected_ast = bin_op!(int!(2), Add, int!(-3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-(3)";
+        let expected_ast = unary_op!(Minus, int!(3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "+(3)";
+        let expected_ast = unary_op!(Plus, int!(3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-(2 + 3)";
+        let expected_ast = unary_op!(Minus, bin_op!(int!(2), Add, int!(3)));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn lists() {
+        let input = "[1,2,3]";
+        let expected_ast = list![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[1, 2, 3]";
+        let expected_ast = list![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+[1,
+    2,
+    3
+]"#;
+        let expected_ast = list![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "list([1, 2, 3])";
+        let expected_ast = func_call!("list", call_args![list![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn sets() {
+        let input = "{1,2,3}";
+        let expected_ast = set![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{1, 2, 3}";
+        let expected_ast = set![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "set({1, 2, 3})";
+        let expected_ast = func_call!("set", call_args![set![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+{
+    1,
+    2,
+    3
+}"#;
+        let expected_ast = set![int!(1), int!(2), int!(3),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+{
+    1,
+    2,
+    3,
+}"#;
+        let expected_ast = set![int!(1), int!(2), int!(3),];
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn tuples() {
+        let input = "(1,2,3)";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(1, 2, 3)";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1, 2, 3";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1,";
+        let expected_ast = tuple![int!(1)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1, 2, 3";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "tuple((1, 2, 3))";
+        let expected_ast = func_call!("tuple", call_args![tuple![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+tuple((1,
+       2,
+       3))
+"#;
+        let expected_ast = func_call!("tuple", call_args![tuple![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn dictionaries() {
+        let input = r#"{ "b": 4, 'c': 5 }"#;
+        let expected_ast = dict![
+            dict_pair!(str!("b"), int!(4)),
+            dict_pair!(str!("c"), int!(5)),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+{
+    '__name__': 4,
+}
+"#;
+        let expected_ast = dict![dict_pair!(str!("__name__"), int!(4))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"{ **first, **second }"#;
+        let expected_ast = dict![dict_unpack!(var!("first")), dict_unpack!(var!("second")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"{ **first, **second, }"#;
+        let expected_ast = dict![dict_unpack!(var!("first")), dict_unpack!(var!("second")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ 2, **second }";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+
+        let input = "{ 2, **second, }";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+    }
+
+    #[test]
+    fn dict_comprehension() {
+        let input = "{ key: val * 2 for key, val in d }";
+        let expected_ast = Expr::DictComprehension {
+            clauses: vec![ForClause {
+                indices: vec![ident("key"), ident("val")],
+                iterable: var!("d"),
+                condition: None,
+            }],
+            key_body: Box::new(var!("key")),
+            value_body: Box::new(bin_op!(var!("val"), Mul, int!(2))),
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ key: val * 2 for (key, val) in d }";
+        let expected_ast = Expr::DictComprehension {
+            clauses: vec![ForClause {
+                indices: vec![ident("key"), ident("val")],
+                iterable: var!("d"),
+                condition: None,
+            }],
+            key_body: Box::new(var!("key")),
+            value_body: Box::new(bin_op!(var!("val"), Mul, int!(2))),
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn index_access() {
+        let input = "a[0]";
+        let expected_ast = index_access!(var!("a"), int!(0));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[0,1][1]";
+        let expected_ast = index_access!(list![int!(0), int!(1)], int!(1));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn more_tokens() {
+        let input = "Ellipsis";
+        let expected_ast = Expr::Ellipsis;
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension() {
+        let input = "[ i * 2 for i in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                indices: vec![ident("i")],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[i*2 for i in a if True]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                indices: vec![ident("i")],
+                iterable: var!("a"),
+                condition: Some(bool!(true)),
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn generator_comprehension() {
+        let input = "(i * 2 for i in b)";
+        let expected_ast = Expr::GeneratorComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                indices: vec![ident("i")],
+                iterable: var!("b"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "foo(i * 2 for i in b)";
+        let expected_ast = func_call!(
+            "foo",
+            call_args![Expr::GeneratorComprehension {
+                body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+                clauses: vec![ForClause {
+                    indices: vec![ident("i")],
+                    iterable: var!("b"),
+                    condition: None,
+                }],
+            }]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn slices() {
+        let input = "a[1:1:1]";
+        let expected_ast = slice_op!(
+            var!("a"),
+            slice!(Some(int!(1)), Some(int!(1)), Some(int!(1)))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[2:5]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), Some(int!(5)), None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[:5]";
+        let expected_ast = slice_op!(var!("a"), slice!(None, Some(int!(5)), None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[3:]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(3)), None, None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[::2]";
+        let expected_ast = slice_op!(var!("a"), slice!(None, None, Some(int!(2))));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[:]";
+        let expected_ast = slice_op!(var!("a"), slice!(None, None, None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "new_bases[i+shift:shift+1]";
+        let expected_ast = slice_op!(
+            var!("new_bases"),
+            slice!(
+                Some(bin_op!(var!("i"), Add, var!("shift"))),
+                Some(bin_op!(var!("shift"), Add, int!(1))),
+                None
+            )
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn binary_literal() {
+        let input = "0b0010";
+        let expected_ast = int!(2);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn octal_literal() {
+        let input = "0o0010";
+        let expected_ast = int!(8);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn hex_literal() {
+        let input = "0x0010";
+        let expected_ast = int!(16);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn f_strings() {
+        let input = r#"f"""#;
+        let expected_ast = f_str_list![];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello {name}.""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Hello "),
+            f_str_expr!(var!("name")),
+            f_str_str!("."),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"{first}{last}""#;
+        let expected_ast = f_str_list![f_str_expr!(var!("first")), f_str_expr!(var!("last")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello""#;
+        let expected_ast = f_str_list![f_str_str!("Hello")];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello {name} goodbye {other}""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Hello "),
+            f_str_expr!(var!("name")),
+            f_str_str!(" goodbye "),
+            f_str_expr!(var!("other")),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Age: {num + 1}""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Age: "),
+            f_str_expr!(bin_op!(var!("num"), Add, int!(1))),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"environ({{{formatted_items}}})""#;
+        let expected_ast = f_str_list![
+            f_str_str!("environ({"),
+            f_str_expr!(var!("formatted_items")),
+            f_str_str!("})"),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello {name!r} goodbye {other}""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Hello "),
+            f_str_expr!(var!("name"), Repr),
+            f_str_str!(" goodbye "),
+            f_str_expr!(var!("other")),
+        ];
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn binary_operators() {
+        let input = "a & b";
+        let expected_ast = bin_op!(var!("a"), BitwiseAnd, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a | b";
+        let expected_ast = bin_op!(var!("a"), BitwiseOr, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a ^ b";
+        let expected_ast = bin_op!(var!("a"), BitwiseXor, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a << b";
+        let expected_ast = bin_op!(var!("a"), LeftShift, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a >> b";
+        let expected_ast = bin_op!(var!("a"), RightShift, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a ** b";
+        let expected_ast = bin_op!(var!("a"), Expo, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 * 3 << 2 + 4 & 205";
+        let expected_ast = bin_op!(
+            bin_op!(
+                bin_op!(int!(2), Mul, int!(3)),
+                LeftShift,
+                bin_op!(int!(2), Add, int!(4))
+            ),
+            BitwiseAnd,
+            int!(205)
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn operator_chaining() {
+        let input = "a == b == c";
+        let expected_ast = cmp_chain!(var!("a"), [(Equals, var!("b")), (Equals, var!("c")),]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a == b < c > d";
+        let expected_ast = cmp_chain!(
+            var!("a"),
+            [
+                (Equals, var!("b")),
+                (LessThan, var!("c")),
+                (GreaterThan, var!("d")),
+            ]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn type_alias() {
+        let input = "list[int]";
+        let expected_ast = Expr::TypeNode(TypeNode::Generic {
+            base_type: ident("list"),
+            parameters: vec![TypeNode::Basic(ident("int"))],
+        });
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "int | str";
+        let expected_ast = Expr::TypeNode(TypeNode::Union(vec![
+            TypeNode::Basic(ident("int")),
+            TypeNode::Basic(ident("str")),
+        ]));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn byte_string() {
+        let input = "b'hello'";
+        let expected_ast = Expr::BytesLiteral("hello".into());
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn yield_and_yield_from() {
+        let input = "yield n";
+        let expected_ast = yield_expr!(var!("n"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "yield from a";
+        let expected_ast = yield_from!(var!("a"));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn ternary_operation() {
+        let input = "4 if True else 5";
+        let expected_ast = ternary_op!(bool!(true), int!(4), int!(5));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "4 + x if b == 6 else 5 << 2";
+        let expected_ast = ternary_op!(
+            cmp_op!(var!("b"), Equals, int!(6)),
+            bin_op!(int!(4), Add, var!("x")),
+            bin_op!(int!(5), LeftShift, int!(2))
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
 }
