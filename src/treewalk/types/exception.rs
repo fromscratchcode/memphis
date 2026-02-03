@@ -55,8 +55,8 @@ impl Exception {
         Self::new_from_str(ExceptionKind::ImportError, msg)
     }
 
-    pub fn syntax_error() -> Self {
-        Self::new_empty(ExceptionKind::SyntaxError)
+    pub fn syntax_error(msg: impl Into<String>) -> Self {
+        Self::new_from_str(ExceptionKind::SyntaxError, msg)
     }
 
     pub fn stop_iteration() -> Self {

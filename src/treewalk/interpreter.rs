@@ -64,19 +64,21 @@ impl TreewalkInterpreter {
     }
 
     pub fn execute(&mut self, parser: &mut Parser) -> Result<TreewalkValue, RaisedException> {
+        parser.consume_newlines();
+
         let mut result = TreewalkValue::None;
         while !parser.is_finished() {
-            let stmt = parser.parse_statement().map_err(|_e| {
-                // TODO use the real syntax error metadata here
-                self.raise_at_boundary(Exception::syntax_error())
-            })?;
+            let stmt = parser
+                .parse_statement()
+                .map_err(|e| self.raise_at_boundary(Exception::syntax_error(e.to_string())))?;
             result = match self.evaluate_statement(&stmt) {
                 Ok(result) => result,
                 Err(TreewalkDisruption::Error(e)) => return Err(e),
                 Err(TreewalkDisruption::Signal(_)) => {
                     return Err(self.raise_at_boundary(Exception::runtime_error()))
                 }
-            }
+            };
+            parser.consume_statement_separators();
         }
 
         Ok(result)
@@ -3971,7 +3973,7 @@ def foo():
 foo()
 "#;
         let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception);
+        assert_syntax_error!(e.exception, "'a' not found in nonlocal environment");
 
         let input = r#"
 def foo():
@@ -3979,13 +3981,13 @@ def foo():
 foo()
 "#;
         let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception);
+        assert_syntax_error!(e.exception, "'a' not found in nonlocal environment");
 
         let input = r#"
 nonlocal a
 "#;
         let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception);
+        assert_syntax_error!(e.exception, "'nonlocal' cannot be used at module level");
     }
 
     #[test]
@@ -5042,7 +5044,7 @@ b = "unsend" in dir(net.Connection)
 a.123 = 4
 "#;
         let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception);
+        assert_syntax_error!(e.exception, "invalid identifier");
 
         // Attribute names are runtime strings, not required to be valid Python identifiers.
         let input = r#"
@@ -5092,5 +5094,17 @@ b = StopIteration()
 
         assert_eval_eq!("StopIteration().value", none!());
         assert_eval_eq!("StopIteration(42).value", int!(42));
+    }
+
+    #[test]
+    fn semicolons() {
+        let input = r#"
+b = 2; c = 3
+"#;
+        let ctx = run(input);
+        assert_read_eq!(ctx, "b", int!(2));
+        assert_read_eq!(ctx, "c", int!(3));
+
+        assert_eval_eq!("a = 10; 4 + a", int!(14));
     }
 }

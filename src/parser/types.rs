@@ -44,6 +44,10 @@ impl Ast {
         self.statements.get(index)
     }
 
+    pub fn first(&self) -> Option<&Statement> {
+        self.statements.first()
+    }
+
     pub fn push(&mut self, stmt: Statement) {
         self.statements.push(stmt);
     }
@@ -610,28 +614,4 @@ pub enum StatementKind {
         variable: Option<Identifier>,
         block: Ast,
     },
-}
-
-#[cfg(test)]
-use crate::parser::{Parser, ParserError};
-
-#[cfg(test)]
-pub trait ParseNode {
-    fn parse_oneshot(parser: Parser) -> Result<Self, ParserError>
-    where
-        Self: Sized;
-}
-
-#[cfg(test)]
-impl ParseNode for Expr {
-    fn parse_oneshot(mut parser: Parser) -> Result<Self, ParserError> {
-        parser.parse_expr()
-    }
-}
-
-#[cfg(test)]
-impl ParseNode for Statement {
-    fn parse_oneshot(mut parser: Parser) -> Result<Self, ParserError> {
-        parser.parse_statement()
-    }
 }

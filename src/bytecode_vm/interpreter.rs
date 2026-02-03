@@ -1537,4 +1537,16 @@ raise
         let e = eval_expect_error(input);
         assert_runtime_error!(e.exception, "No active exception to reraise");
     }
+
+    #[test]
+    fn semicolons() {
+        let input = r#"
+b = 2; c = 3
+"#;
+        let ctx = run(input);
+        assert_read_eq!(ctx, "b", int!(2));
+        assert_read_eq!(ctx, "c", int!(3));
+
+        assert_eval_eq!("a = 10; 4 + a", int!(14));
+    }
 }

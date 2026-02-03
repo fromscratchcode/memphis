@@ -102,6 +102,7 @@ pub enum Token {
     Nonlocal,
     Global,
     Newline,
+    Semicolon,
     Eof,
     InvalidCharacter(char),
 }

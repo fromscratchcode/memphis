@@ -441,6 +441,7 @@ impl Lexer {
                     '}' => Token::RBrace,
                     ',' => Token::Comma,
                     ':' => Token::Colon,
+                    ';' => Token::Semicolon,
                     '@' => Token::AtSign,
                     '&' => Token::BitwiseAnd,
                     '|' => Token::BitwiseOr,
@@ -2751,6 +2752,25 @@ for i in a:
                 Token::Continue,
                 Token::Newline,
                 Token::Dedent,
+            ]
+        );
+    }
+
+    #[test]
+    fn semicolon() {
+        let input = "a = 10; 4 + a";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Identifier(ident("a")),
+                Token::Assign,
+                Token::Integer(10),
+                Token::Semicolon,
+                Token::Integer(4),
+                Token::Plus,
+                Token::Identifier(ident("a")),
+                Token::Newline,
             ]
         );
     }

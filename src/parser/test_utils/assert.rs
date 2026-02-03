@@ -2,18 +2,25 @@ use crate::parser::types::{Statement, StatementKind};
 
 macro_rules! assert_ast_eq {
     ($input:expr, $expected:expr) => {
-        let ast = parse!($input, Statement);
-        assert_stmt_eq!(ast, $expected);
+        let ast = parse!($input);
+        assert_eq!(ast.len(), 1, "Expected a single Statement!");
+        let stmt = ast.first().unwrap();
+        assert_stmt_eq_inner(&stmt, &$expected);
     };
-    ($input:expr, $expected:expr, $pattern:ident) => {
-        let ast = parse!($input, $pattern);
-        assert_eq!(ast, $expected);
+    ($input:expr, $expected:expr, Ast) => {
+        let ast = parse!($input);
+        for (a, e) in ast.iter().zip($expected.iter()) {
+            assert_stmt_eq_inner(a, e);
+        }
     };
-}
-
-macro_rules! assert_stmt_eq {
-    ($actual:expr, $expected:expr) => {
-        assert_stmt_eq_inner(&$actual, &$expected)
+    ($input:expr, $expected:expr, Expr) => {
+        let ast = parse!($input);
+        assert_eq!(ast.len(), 1, "Expected a single Statement!");
+        let stmt = ast.first().unwrap();
+        let StatementKind::Expression(ref expr) = stmt.kind else {
+            panic!("Expected an expression, got {:?}", stmt.kind);
+        };
+        assert_eq!(expr, &$expected);
     };
 }
 
@@ -26,7 +33,7 @@ macro_rules! assert_cond_ast_eq {
             "Ast length mismatch"
         );
         for (a, e) in $actual.ast.iter().zip($expected.ast.iter()) {
-            assert_stmt_eq!(a, e);
+            assert_stmt_eq_inner(a, e);
         }
     };
 }
@@ -304,4 +311,3 @@ pub fn assert_stmt_eq_inner(actual: &Statement, expected: &Statement) {
 }
 
 pub(crate) use assert_ast_eq;
-pub(crate) use assert_stmt_eq;

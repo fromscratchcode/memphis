@@ -76,3 +76,17 @@ else:
     );
     assert_crosscheck_eq!(session, "a", MemphisValue::Str("three".to_string()));
 }
+
+#[test]
+fn semicolons() {
+    let mut session = crosscheck_eval!(
+        r#"
+b = 2; c = 3
+"#
+    );
+    assert_crosscheck_eq!(session, "b", MemphisValue::Integer(2));
+    assert_crosscheck_eq!(session, "c", MemphisValue::Integer(3));
+
+    let input = "a = 10; 4 + a";
+    assert_crosscheck_return!(input, MemphisValue::Integer(14));
+}

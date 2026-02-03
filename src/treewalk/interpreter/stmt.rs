@@ -172,14 +172,19 @@ impl TreewalkInterpreter {
         // We could not find the variable `name` in an enclosing context.
         if let Some(env) = self.state.read_captured_env() {
             if env.borrow().read(name.as_str()).is_none() {
-                return Exception::syntax_error().raise(self);
+                return Exception::syntax_error(format!(
+                    "'{}' not found in nonlocal environment",
+                    name
+                ))
+                .raise(self);
             }
         }
 
         // `nonlocal` cannot be used at the module-level (outside of a function,
         // i.e. captured environment).
         if self.state.read_captured_env().is_none() {
-            return Exception::syntax_error().raise(self);
+            return Exception::syntax_error("'nonlocal' cannot be used at module level")
+                .raise(self);
         }
 
         Ok(())

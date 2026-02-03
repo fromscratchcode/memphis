@@ -1,4 +1,5 @@
 use crate::{
+    core::{log, LogLevel},
     domain::Identifier,
     lexer::Token,
     parser::{
@@ -12,7 +13,8 @@ use crate::{
 
 impl Parser<'_> {
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        self.consume_optional_many(&Token::Newline);
+        log(LogLevel::Trace, || "parse_statement".to_string());
+
         let start_line = self.line_number;
         let stmt = match self.current_token() {
             Token::Del => self.parse_delete(),
@@ -51,7 +53,7 @@ impl Parser<'_> {
                 self.consume(&Token::While)?;
                 let condition = self.parse_simple_expr()?;
                 self.consume(&Token::Colon)?;
-                let block = self.parse_indented_block()?;
+                let block = self.parse_block()?;
                 Ok(StatementKind::WhileLoop(ConditionalAst {
                     condition,
                     ast: block,
@@ -66,7 +68,6 @@ impl Parser<'_> {
             _ => self.parse_statement_without_starting_keyword(),
         }?;
 
-        self.consume_optional_many(&Token::Newline);
         Ok(Statement::new(start_line, stmt))
     }
 
@@ -120,7 +121,7 @@ impl Parser<'_> {
                 Token::ExpoEquals => CompoundOperator::Expo,
                 _ => unreachable!(),
             };
-            self.consume_current()?;
+            self.consume_current();
 
             let value = self.parse_simple_expr()?;
             Ok(StatementKind::CompoundAssignment {
@@ -254,7 +255,7 @@ impl Parser<'_> {
             self.consume(&Token::Colon)?;
             let elif_parts_part = ConditionalAst {
                 condition,
-                ast: self.parse_indented_block()?,
+                ast: self.parse_block()?,
             };
 
             // We must use push because these will be evaluated in order
@@ -264,7 +265,7 @@ impl Parser<'_> {
         let else_part = if self.current_token() == &Token::Else {
             self.consume(&Token::Else)?;
             self.consume(&Token::Colon)?;
-            Some(self.parse_indented_block()?)
+            Some(self.parse_block()?)
         } else {
             None
         };
@@ -291,12 +292,12 @@ impl Parser<'_> {
         self.consume(&Token::In)?;
         let range = self.parse_simple_expr()?;
         self.consume(&Token::Colon)?;
-        let body = self.parse_indented_block()?;
+        let body = self.parse_block()?;
 
         let else_block = if self.current_token() == &Token::Else {
             self.consume(&Token::Else)?;
             self.consume(&Token::Colon)?;
-            Some(self.parse_indented_block()?)
+            Some(self.parse_block()?)
         } else {
             None
         };
@@ -312,20 +313,20 @@ impl Parser<'_> {
     fn parse_try_except(&mut self) -> Result<StatementKind, ParserError> {
         self.consume(&Token::Try)?;
         self.consume(&Token::Colon)?;
-        let try_block = self.parse_indented_block()?;
+        let try_block = self.parse_block()?;
 
         let mut handlers: Vec<ExceptHandler> = vec![];
         while self.current_token() == &Token::Except {
             self.consume(&Token::Except)?;
             if self.current_token() == &Token::Colon {
                 self.consume(&Token::Colon)?;
-                let block = self.parse_indented_block()?;
+                let block = self.parse_block()?;
                 handlers.push(ExceptHandler::default(block));
             } else {
                 let expr = self.parse_simple_expr()?;
                 let alias = self.parse_optional_alias()?;
                 self.consume(&Token::Colon)?;
-                let block = self.parse_indented_block()?;
+                let block = self.parse_block()?;
                 handlers.push(ExceptHandler::typed(expr, alias, block));
             }
         }
@@ -341,7 +342,7 @@ impl Parser<'_> {
         let else_block = if self.current_token() == &Token::Else {
             self.consume(&Token::Else)?;
             self.consume(&Token::Colon)?;
-            Some(self.parse_indented_block()?)
+            Some(self.parse_block()?)
         } else {
             None
         };
@@ -349,7 +350,7 @@ impl Parser<'_> {
         let finally_block = if self.current_token() == &Token::Finally {
             self.consume(&Token::Finally)?;
             self.consume(&Token::Colon)?;
-            Some(self.parse_indented_block()?)
+            Some(self.parse_block()?)
         } else {
             None
         };
@@ -454,7 +455,7 @@ impl Parser<'_> {
             None
         };
         self.consume(&Token::Colon)?;
-        let block = self.parse_indented_block()?;
+        let block = self.parse_block()?;
 
         Ok(StatementKind::ContextManager {
             expr,

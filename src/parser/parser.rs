@@ -31,25 +31,106 @@ impl<'a> Parser<'a> {
 
     /// Return the full AST. This will consume all the tokens.
     pub fn parse(&mut self) -> Result<Ast, ParserError> {
-        let mut stmts = vec![];
-        while !self.is_finished() {
-            let stmt = self.parse_statement()?;
-            stmts.push(stmt);
+        self.consume_newlines();
+
+        let stmts = self.parse_statement_list_until(
+            |tok| matches!(tok, Token::Eof),
+            |tok| matches!(tok, Token::Newline | Token::Semicolon),
+        )?;
+        self.consume(&Token::Eof)?;
+        // TODO is there a way to assert on our TokenBuffer that it's been exhausted? Doing this
+        // right now would be a mutable operation which feels wrong.
+
+        Ok(stmts)
+    }
+
+    fn parse_block(&mut self) -> Result<Ast, ParserError> {
+        if self.current_token() == &Token::Newline {
+            self.consume_current();
+            self.parse_indented_block()
+        } else {
+            self.parse_single_line_block()
+        }
+    }
+
+    fn parse_indented_block(&mut self) -> Result<Ast, ParserError> {
+        self.consume(&Token::Indent)?;
+        self.consume_newlines();
+
+        let stmts = self.parse_statement_list_until(
+            |tok| matches!(tok, Token::Dedent),
+            |tok| matches!(tok, Token::Newline | Token::Semicolon),
+        )?;
+        self.consume(&Token::Dedent)?;
+
+        Ok(stmts)
+    }
+
+    /// Support single-line functions, classes, or any blocks.
+    ///
+    /// Examples:
+    /// def _f() : pass
+    /// def four(): return 4
+    /// class Foo: pass
+    /// def a(): pass; pass
+    fn parse_single_line_block(&mut self) -> Result<Ast, ParserError> {
+        let stmts = self.parse_statement_list_until(
+            |tok| matches!(tok, Token::Newline),
+            |tok| matches!(tok, Token::Semicolon),
+        )?;
+        self.consume(&Token::Newline)?;
+        Ok(stmts)
+    }
+
+    fn parse_statement_list_until<F, G>(
+        &mut self,
+        is_terminator: F,
+        is_separator: G,
+    ) -> Result<Ast, ParserError>
+    where
+        F: Fn(&Token) -> bool,
+        G: Fn(&Token) -> bool,
+    {
+        let mut stmts = ast![];
+
+        while !is_terminator(self.current_token()) {
+            stmts.push(self.parse_statement()?);
+
+            while is_separator(self.current_token()) {
+                self.consume_current();
+            }
         }
 
-        Ok(Ast::new(stmts))
+        Ok(stmts)
+    }
+
+    pub fn consume_statement_separators(&mut self) {
+        while self.is_statement_separator() {
+            self.consume_current();
+        }
+    }
+
+    pub fn consume_newlines(&mut self) {
+        while self.current_token() == &Token::Newline {
+            self.consume_current();
+        }
     }
 
     pub fn is_finished(&mut self) -> bool {
         self.current_token() == &Token::Eof
     }
 
+    // This must be mutable because we must refill the token buffer when empty.
     fn current_token(&mut self) -> &Token {
         self.tokens.peek(0)
     }
 
     fn end_of_statement(&mut self) -> bool {
-        self.is_finished() || self.current_token() == &Token::Newline
+        self.is_finished() || self.is_statement_separator()
+    }
+
+    fn is_statement_separator(&mut self) -> bool {
+        matches!(self.current_token(), Token::Newline | Token::Semicolon)
     }
 
     fn inside_delimiter(&self) -> bool {
@@ -68,9 +149,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_current(&mut self) -> Result<(), ParserError> {
+    fn consume_current(&mut self) {
         let token = self.tokens.peek(0).clone();
         self.consume(&token)
+            .expect("Consuming the current token should not fail.");
     }
 
     fn consume(&mut self, expected: &Token) -> Result<(), ParserError> {
@@ -96,7 +178,7 @@ impl<'a> Parser<'a> {
         self.tokens.consume();
 
         if self.inside_delimiter() {
-            self.consume_optional_many(&Token::Newline);
+            self.consume_newlines();
         }
 
         Ok(())
@@ -106,26 +188,6 @@ impl<'a> Parser<'a> {
         if self.current_token() == expected {
             let _ = self.consume(expected);
         }
-    }
-
-    fn consume_optional_many(&mut self, expected: &Token) {
-        while self.current_token() == expected {
-            let _ = self.consume(expected);
-        }
-    }
-
-    fn parse_indented_block(&mut self) -> Result<Ast, ParserError> {
-        self.consume_optional_many(&Token::Newline);
-        self.consume(&Token::Indent)?;
-
-        let mut statements = Vec::new();
-        while self.current_token() != &Token::Dedent {
-            statements.push(self.parse_statement()?);
-        }
-        self.consume(&Token::Dedent)?;
-        self.consume_optional_many(&Token::Newline);
-
-        Ok(Ast::new(statements))
     }
 
     fn parse_type_node(&mut self) -> Result<TypeNode, ParserError> {
@@ -197,19 +259,6 @@ impl<'a> Parser<'a> {
         Ok(exprs)
     }
 
-    fn parse_block(&mut self) -> Result<Ast, ParserError> {
-        if self.current_token() == &Token::Newline {
-            self.parse_indented_block()
-        } else {
-            // Support single-line functions or classes
-            // Examples:
-            // def _f() : pass
-            // def four(): return 4
-            // class Foo: pass
-            Ok(ast![self.parse_statement()?])
-        }
-    }
-
     fn parse_identifiers(&mut self) -> Result<Vec<Identifier>, ParserError> {
         let mut items = vec![self.parse_identifier()?];
         while self.current_token() == &Token::Comma {
@@ -238,8 +287,9 @@ mod tests {
     use crate::parser::{
         test_utils::*,
         types::{
-            CallArgs, CompoundOperator, ConditionalAst, ExceptHandler, ExprFormat, FStringPart,
-            ForClause, FormatOption, KwargsOperation, LoopIndex, Params, Statement, StatementKind,
+            ast, CallArgs, CompoundOperator, ConditionalAst, ExceptHandler, ExprFormat,
+            FStringPart, ForClause, FormatOption, KwargsOperation, LoopIndex, Params,
+            StatementKind,
         },
     };
 
@@ -739,15 +789,11 @@ def foo():
 import other as b
 pass
 "#;
-        let expected_ast = stmt_reg_import![import!("other", "b")];
-
         // Before we handling Token::As processing, this test would fail, but only once it began
         // parsing the next statement. We needed to parse two statements here to produce the
         // failing test.
-        let asts = parse_all(input);
-        assert_eq!(asts.len(), 2);
-        assert_stmt_eq!(asts.get(0).unwrap(), expected_ast);
-        assert_stmt_eq!(asts.get(1).unwrap(), stmt_pass!());
+        let expected_ast = ast![stmt_reg_import![import!("other", "b")], stmt_pass!()];
+        assert_ast_eq!(input, expected_ast, Ast);
 
         let input = "mypackage.myothermodule.add('1', '1')";
         let expected_ast = func_call_callee!(
@@ -1152,16 +1198,16 @@ def countdown(n):
     fn inheritance() {
         let input = r#"
 class Foo(Parent):
-    def __init__(self):
-        self.x = 0
+    pass
 "#;
-        let ast = parse!(input, Statement);
-        let expected_parent = vec![var!("Parent")];
+        let expected_ast = stmt!(StatementKind::ClassDef {
+            name: ident("Foo"),
+            parents: vec![var!("Parent")],
+            metaclass: None,
+            body: ast![stmt_pass!()],
+        });
 
-        let StatementKind::ClassDef { parents, .. } = ast.kind else {
-            panic!("Expected a class def!")
-        };
-        assert_eq!(parents, expected_parent);
+        assert_ast_eq!(input, expected_ast);
 
         let input = r#"
 class Foo(metaclass=Parent):
@@ -1236,11 +1282,11 @@ namespace = {
         assert_ast_eq!(input, expected_ast, Expr);
 
         let input = "{ 2, **second }";
-        let e = expect_error!(input, Expr);
+        let e = expect_error!(input);
         assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
 
         let input = "{ 2, **second, }";
-        let e = expect_error!(input, Expr);
+        let e = expect_error!(input);
         assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
     }
 
@@ -1422,14 +1468,17 @@ except:
     return
 a = 1
 "#;
-        let expected_ast = stmt!(StatementKind::TryExcept {
-            try_block: ast![stmt_pass!()],
-            handlers: vec![ExceptHandler::default(ast![stmt_return![]])],
-            else_block: None,
-            finally_block: None,
-        });
+        let expected_ast = ast![
+            stmt!(StatementKind::TryExcept {
+                try_block: ast![stmt_pass!()],
+                handlers: vec![ExceptHandler::default(ast![stmt_return![]])],
+                else_block: None,
+                finally_block: None,
+            }),
+            stmt_assign!(var!("a"), int!(1))
+        ];
 
-        assert_ast_eq!(input, expected_ast);
+        assert_ast_eq!(input, expected_ast, Ast);
     }
 
     #[test]
@@ -1442,7 +1491,7 @@ except:
 except ZeroDivisionError:
     return
 "#;
-        let e = expect_error!(input, Statement);
+        let e = expect_error!(input);
         assert_eq!(
             e,
             ParserError::SyntaxError("default 'except:' must be last".to_string())
@@ -1459,7 +1508,7 @@ except:
 except:
     return
 "#;
-        let e = expect_error!(input, Statement);
+        let e = expect_error!(input);
         assert_eq!(
             e,
             ParserError::SyntaxError("default 'except:' must be last".to_string())
@@ -1530,18 +1579,21 @@ def test_args(*args, **kwargs):
 
         let input = r#"
 def test_kwargs(**kwargs):
-    print(kwargs['a'])
+    pass
 "#;
-        let ast = parse!(input, Statement);
-        let expected_args = Params {
-            args: vec![],
-            args_var: None,
-            kwargs_var: Some(ident("kwargs")),
-        };
-        let StatementKind::FunctionDef { args, .. } = ast.kind else {
-            panic!("Expected function def")
-        };
-        assert_eq!(expected_args, args);
+        let expected_ast = stmt!(StatementKind::FunctionDef {
+            name: ident("test_kwargs"),
+            args: Params {
+                args: vec![],
+                args_var: None,
+                kwargs_var: Some(ident("kwargs")),
+            },
+            body: ast![stmt_pass!()],
+            decorators: vec![],
+            is_async: false,
+        });
+
+        assert_ast_eq!(input, expected_ast);
 
         let input = r#"
 def test_default(file=None):
@@ -2126,16 +2178,18 @@ else:
     fn type_hints() {
         let input = "
 def add(x: str, y: str) -> str:
-    return x + y
+    pass
 ";
-        let ast = parse!(input, Statement);
-        let expected_args = params![param!("x"), param!("y")];
+        // For now, we just ensure the type hints are ignored.
+        let expected_ast = stmt!(StatementKind::FunctionDef {
+            name: ident("add"),
+            args: params![param!("x"), param!("y")],
+            body: ast![stmt_pass!()],
+            decorators: vec![],
+            is_async: false,
+        });
 
-        let StatementKind::FunctionDef { args, .. } = ast.kind else {
-            panic!("Expected function def!")
-        };
-
-        assert_eq!(args, expected_args)
+        assert_ast_eq!(input, expected_ast);
     }
 
     #[test]
@@ -2391,10 +2445,91 @@ if True:
     #[test]
     fn invalid_identifier() {
         let input = "a.123";
-        let e = expect_error!(input, Expr);
+        let e = expect_error!(input);
         assert_eq!(
             e,
             ParserError::SyntaxError("invalid identifier".to_string())
         );
+    }
+
+    #[test]
+    fn semicolon() {
+        let input = "a = 10; 4 + a";
+        let expected_ast = ast![
+            stmt_assign!(var!("a"), int!(10)),
+            stmt_expr!(bin_op!(int!(4), Add, var!("a")))
+        ];
+
+        assert_ast_eq!(input, expected_ast, Ast);
+    }
+
+    #[test]
+    fn single_line_blocks() {
+        let input = "
+if True: a = 4
+else: a = 6
+";
+        let expected_ast = stmt!(StatementKind::IfElse {
+            if_part: ConditionalAst {
+                condition: bool!(true),
+                ast: ast![stmt_assign!(var!("a"), int!(4))],
+            },
+            elif_parts: vec![],
+            else_part: Some(ast![stmt_assign!(var!("a"), int!(6))]),
+        });
+        assert_ast_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn single_line_blocks_with_semicolons() {
+        let input = "
+if True: a = 4; b = 8
+else: a = 6; b = 7
+";
+        let expected_ast = stmt!(StatementKind::IfElse {
+            if_part: ConditionalAst {
+                condition: bool!(true),
+                ast: ast![
+                    stmt_assign!(var!("a"), int!(4)),
+                    stmt_assign!(var!("b"), int!(8))
+                ],
+            },
+            elif_parts: vec![],
+            else_part: Some(ast![
+                stmt_assign!(var!("a"), int!(6)),
+                stmt_assign!(var!("b"), int!(7))
+            ]),
+        });
+        assert_ast_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn semicolons_in_indented_block() {
+        let input = "
+if True:
+    a = 4; b = 8
+";
+        let expected_ast = stmt!(StatementKind::IfElse {
+            if_part: ConditionalAst {
+                condition: bool!(true),
+                ast: ast![
+                    stmt_assign!(var!("a"), int!(4)),
+                    stmt_assign!(var!("b"), int!(8))
+                ],
+            },
+            elif_parts: vec![],
+            else_part: None,
+        });
+        assert_ast_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn single_line_block_split_lines() {
+        let input = "
+if True: a = 3
+    b = 8
+";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::UnexpectedToken(Token::Indent));
     }
 }

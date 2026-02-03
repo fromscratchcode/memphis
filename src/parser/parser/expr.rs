@@ -111,7 +111,7 @@ impl Parser<'_> {
             Token::BitwiseAnd | Token::BitwiseOr | Token::BitwiseXor
         ) {
             let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
-            self.consume_current()?;
+            self.consume_current();
             let right = self.parse_bitwise_shift()?;
             left = Expr::BinaryOperation {
                 left: Box::new(left),
@@ -129,7 +129,7 @@ impl Parser<'_> {
 
         while matches!(self.current_token(), Token::Plus | Token::Minus) {
             let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
-            self.consume_current()?;
+            self.consume_current();
             let right = self.parse_logical_term()?;
             left = Expr::BinaryOperation {
                 left: Box::new(left),
@@ -147,7 +147,7 @@ impl Parser<'_> {
 
         while matches!(self.current_token(), Token::LeftShift | Token::RightShift) {
             let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
-            self.consume_current()?;
+            self.consume_current();
             let right = self.parse_add_sub()?;
             left = Expr::BinaryOperation {
                 left: Box::new(left),
@@ -291,7 +291,7 @@ impl Parser<'_> {
 
         while matches!(self.current_token(), Token::And | Token::Or) {
             let op = LogicalOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
-            self.consume_current()?;
+            self.consume_current();
             let right = self.parse_term()?;
             left = Expr::LogicalOperation {
                 left: Box::new(left),
@@ -312,7 +312,7 @@ impl Parser<'_> {
             Token::Asterisk | Token::Slash | Token::DoubleSlash | Token::Modulo | Token::AtSign
         ) {
             let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
-            self.consume_current()?;
+            self.consume_current();
             let right = self.parse_access_operations()?;
             left = Expr::BinaryOperation {
                 left: Box::new(left),
@@ -348,7 +348,7 @@ impl Parser<'_> {
             } else {
                 let op =
                     CompareOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
-                self.consume_current()?;
+                self.consume_current();
                 op
             };
 
