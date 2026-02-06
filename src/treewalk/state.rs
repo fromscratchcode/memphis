@@ -12,7 +12,7 @@ use crate::{
         types::{Class, Dict, Exception, Function, Module},
         utils::EnvironmentFrame,
         DomainResult, ExecutionContextManager, Executor, ModuleStore, RaisedException, Scope,
-        ScopeManager, TreewalkInterpreter, TreewalkValue, TypeRegistry,
+        ScopeManager, TreewalkValue, TypeRegistry,
     },
 };
 
@@ -191,12 +191,12 @@ impl Container<TreewalkState> {
         self.borrow().scope_manager.read_captured_env()
     }
 
-    pub fn read_globals(&self, interpreter: &TreewalkInterpreter) -> Container<Dict> {
+    pub fn read_globals(&self) -> Dict {
         let scope = self.borrow().scope_manager.read_module().borrow().clone();
 
         // This will make another function call to hash the keys so we do this in a separate
         // statement to avoid a mutable borrow error.
-        scope.as_dict(interpreter)
+        scope.as_dict()
     }
 
     pub fn mark_nonlocal(&self, name: &str) {

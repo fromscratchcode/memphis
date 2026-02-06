@@ -2,7 +2,7 @@ use std::{collections::HashMap, slice::Iter};
 
 use crate::treewalk::{
     types::{Dict, Exception, Str},
-    DomainResult, SymbolTable, TreewalkInterpreter, TreewalkValue,
+    DomainResult, SymbolTable, TreewalkValue,
 };
 
 /// Represents the fully resolved parameter state for all positional and keyword arguments.
@@ -16,7 +16,6 @@ pub struct Args {
 }
 
 impl Args {
-    #[allow(clippy::mutable_key_type)]
     pub fn new(args: Vec<TreewalkValue>, kwargs: HashMap<String, TreewalkValue>) -> Self {
         Self {
             bound_val: None,
@@ -78,13 +77,14 @@ impl Args {
         !self.kwargs.is_empty()
     }
 
-    pub fn get_kwargs_dict(&self, interpreter: &TreewalkInterpreter) -> Dict {
-        #[allow(clippy::mutable_key_type)]
-        let mut uptyped_kwargs = HashMap::new();
-        for (key, value) in &self.kwargs {
-            uptyped_kwargs.insert(TreewalkValue::Str(Str::new(key)), value.clone());
-        }
-        Dict::new(interpreter, uptyped_kwargs)
+    pub fn get_kwargs_dict(&self) -> Dict {
+        let items = self
+            .kwargs
+            .iter()
+            .map(|(key, value)| (TreewalkValue::Str(Str::new(key)), value.clone()))
+            .collect();
+
+        Dict::from_items(items).expect("This shouldn't fail, all keys should be hashable here.")
     }
 
     pub fn get_kwargs(&self) -> &SymbolTable {

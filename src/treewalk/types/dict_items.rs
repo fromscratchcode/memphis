@@ -1,25 +1,19 @@
-use std::collections::HashMap;
-
 use crate::treewalk::{
     macros::*,
     type_system::CloneableIterable,
     types::{Dict, DictKeys, DictValues, Exception, Tuple},
-    utils::{Contextual, ContextualPair},
-    DomainResult, TreewalkInterpreter, TreewalkValue,
+    DomainResult, TreewalkValue,
 };
 
 impl_iterable!(DictItemsIter);
 
 #[derive(Default, PartialEq, Clone)]
 pub struct DictItems {
-    items: Vec<ContextualPair>,
+    items: Vec<(TreewalkValue, TreewalkValue)>,
 }
 
 impl DictItems {
-    pub fn from_iterable(
-        iter: Box<dyn CloneableIterable>,
-        interpreter: &TreewalkInterpreter,
-    ) -> DomainResult<Self> {
+    pub fn from_iterable(iter: Box<dyn CloneableIterable>) -> DomainResult<Self> {
         let mut pairs: Vec<(TreewalkValue, TreewalkValue)> = vec![];
         for (index, item) in iter.enumerate() {
             // The item is often a tuple, but can really be any iterable which yields 2 values.
@@ -38,43 +32,23 @@ impl DictItems {
             pairs.push(pair_arr.into());
         }
 
-        Ok(Self::new(interpreter, pairs))
+        Ok(Self::new(pairs))
     }
 
-    pub fn new(
-        interpreter: &TreewalkInterpreter,
-        items: Vec<(TreewalkValue, TreewalkValue)>,
-    ) -> Self {
-        let mut pairs = Vec::new();
-        for (key, value) in items {
-            let new_key = Contextual::new(key, interpreter.clone());
-            pairs.push(ContextualPair::new(new_key, value));
-        }
-
-        Self::new_inner(pairs)
-    }
-
-    pub fn new_inner(items: Vec<ContextualPair>) -> Self {
+    pub fn new(items: Vec<(TreewalkValue, TreewalkValue)>) -> Self {
         Self { items }
     }
 
-    pub fn items(&self) -> Vec<(TreewalkValue, TreewalkValue)> {
-        self.items
-            .iter()
-            .map(|item| (item.first_inner().clone(), item.second().clone()))
-            .collect()
+    pub fn items(&self) -> &[(TreewalkValue, TreewalkValue)] {
+        &self.items
     }
 
     fn keys(&self) -> Vec<TreewalkValue> {
-        self.items
-            .iter()
-            .map(|i| i.first_inner())
-            .cloned()
-            .collect()
+        self.items.iter().map(|i| i.0.clone()).collect()
     }
 
     fn values(&self) -> Vec<TreewalkValue> {
-        self.items.iter().map(|i| i.second()).cloned().collect()
+        self.items.iter().map(|i| i.1.clone()).collect()
     }
 
     pub fn to_keys(&self) -> DictKeys {
@@ -86,13 +60,13 @@ impl DictItems {
     }
 
     pub fn to_dict(&self) -> Dict {
-        #[allow(clippy::mutable_key_type)]
-        let mut items = HashMap::new();
-        for pair in ContextualDictItemsIterator::new(self.clone()) {
-            items.insert(pair.first().clone(), pair.second().clone());
+        let mut items = vec![];
+        for pair in DictItemsIter::new(self.clone()) {
+            let tuple = pair.as_tuple().unwrap();
+            items.push((tuple.first().clone(), tuple.second().clone()));
         }
 
-        Dict::new_inner(items)
+        Dict::from_items(items).unwrap()
     }
 }
 
@@ -122,34 +96,10 @@ impl Iterator for DictItemsIter {
             None
         } else {
             let removed = self.0.items.remove(0);
-            let key = removed.first_inner().clone();
-            let value = removed.second().clone();
+            let key = removed.0.clone();
+            let value = removed.1.clone();
             let tuple = TreewalkValue::Tuple(Tuple::new(vec![key, value]));
             Some(tuple)
-        }
-    }
-}
-
-/// An iterator for `DictItems` when we need to return a `Contextual<TreewalkValue>` instead of an
-/// `TreewalkValue`. This is useful in the conversation between `DictItems` and `Dict`.
-#[derive(Clone)]
-pub struct ContextualDictItemsIterator(DictItems);
-
-impl ContextualDictItemsIterator {
-    pub fn new(dict_items: DictItems) -> Self {
-        ContextualDictItemsIterator(dict_items)
-    }
-}
-
-impl Iterator for ContextualDictItemsIterator {
-    type Item = ContextualPair;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.0.items.is_empty() {
-            None
-        } else {
-            let removed = self.0.items.remove(0);
-            Some(removed)
         }
     }
 }

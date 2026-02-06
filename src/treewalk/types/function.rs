@@ -504,7 +504,7 @@ impl NonDataDescriptor for DictDescriptor {
             Some(i) => i.as_function().raise(interpreter)?.borrow().scope.clone(),
             None => owner.borrow().scope.clone(),
         };
-        Ok(TreewalkValue::Dict(scope.as_dict(interpreter)))
+        Ok(TreewalkValue::Dict(Container::new(scope.as_dict())))
     }
 
     fn name(&self) -> String {

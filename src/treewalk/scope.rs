@@ -1,11 +1,8 @@
 use std::collections::{hash_map::Iter, HashMap, HashSet};
 
-use crate::{
-    core::Container,
-    treewalk::{
-        types::{Dict, Str},
-        TreewalkInterpreter, TreewalkValue,
-    },
+use crate::treewalk::{
+    types::{Dict, Str},
+    TreewalkValue,
 };
 
 /// we could add more validation here eventually
@@ -79,14 +76,14 @@ impl Scope {
         self.nonlocal_vars.contains(name)
     }
 
-    pub fn as_dict(&self, interpreter: &TreewalkInterpreter) -> Container<Dict> {
-        #[allow(clippy::mutable_key_type)]
-        let mut items = HashMap::new();
-        for (key, value) in self.symbol_table.iter() {
-            items.insert(TreewalkValue::Str(Str::new(key)), value.clone());
-        }
+    pub fn as_dict(&self) -> Dict {
+        let items = self
+            .symbol_table
+            .iter()
+            .map(|(key, value)| (TreewalkValue::Str(Str::new(key)), value.clone()))
+            .collect();
 
-        Container::new(Dict::new(interpreter, items))
+        Dict::from_items(items).expect("This shouldn't fail, all keys should be hashable here.")
     }
 }
 

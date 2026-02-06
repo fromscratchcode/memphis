@@ -87,13 +87,12 @@ macro_rules! bytes {
 }
 
 macro_rules! dict {
-    ($interp:expr, { $($key:expr => $value:expr),* $(,)? }) => {
-        crate::treewalk::TreewalkValue::Dict(crate::core::Container::new(crate::treewalk::types::Dict::new(
-            $interp,
+    ({ $($key:expr => $value:expr),* $(,)? }) => {
+        crate::treewalk::TreewalkValue::Dict(crate::core::Container::new(crate::treewalk::types::Dict::from_items(
             vec![
                 $(($key, $value)),*
-            ].into_iter().collect()
-        )))
+            ]
+        ).expect("Failed to create Dict")))
     };
 }
 
@@ -101,10 +100,8 @@ macro_rules! dict_items {
     () => {
         crate::treewalk::TreewalkValue::DictItems(crate::treewalk::types::DictItems::default())
     };
-    ($interp:expr, $expr:expr) => {
-        crate::treewalk::TreewalkValue::DictItems(crate::treewalk::types::DictItems::new(
-            $interp, $expr,
-        ))
+    ($expr:expr) => {
+        crate::treewalk::TreewalkValue::DictItems(crate::treewalk::types::DictItems::new($expr))
     };
 }
 

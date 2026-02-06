@@ -99,7 +99,7 @@ pub fn bind_args(
     }
 
     if let Some(ref kwargs_var) = expected_args.kwargs_var {
-        let kwargs_value = TreewalkValue::Dict(Container::new(args.get_kwargs_dict(interpreter)));
+        let kwargs_value = TreewalkValue::Dict(Container::new(args.get_kwargs_dict()));
         table.insert(kwargs_var.to_string(), kwargs_value);
     }
 
