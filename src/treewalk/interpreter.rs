@@ -1895,20 +1895,30 @@ a = Foo.__mro__
     #[test]
     fn dictionaries() {
         let input = r#"
-a = { "b": 4, 'c': 5 }
+{ "b": 4, 'c': 5 }
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, dict!({ str!("b") => int!(4), str!("c") => int!(5) }));
 
-        assert_read_eq!(
-            ctx,
-            "a",
-            dict!({ str!("b") => int!(4), str!("c") => int!(5) })
+        let input = r#"
+a = { "b": 4, 'c': 5 }
+a.items()
+"#;
+        assert_eval_eq!(
+            input,
+            dict_items!(vec![(str!("b"), int!(4)), (str!("c"), int!(5)),])
         );
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
-b = a.items()
-c = { key: value * 2  for key, value in a.items() }
+{ key: value * 2  for key, value in a.items() }
+"#;
+        assert_eval_eq!(
+            input,
+            dict!({ str!("b") => int!(8), str!("c") => int!(10) })
+        );
+
+        let input = r#"
+a = { "b": 4, 'c': 5 }
 d = dict({ "b": 4, 'c': 5 })
 e = dict([('b', 4), ('c', 5)])
 ee = dict([['a', 1], ['b', 2]])
@@ -1938,21 +1948,6 @@ w = { key for key, value in a.items() }
 "#;
         let ctx = run(input);
 
-        assert_read_eq!(
-            ctx,
-            "a",
-            dict!({ str!("b") => int!(4), str!("c") => int!(5) })
-        );
-        assert_read_eq!(
-            ctx,
-            "b",
-            dict_items!(vec![(str!("b"), int!(4)), (str!("c"), int!(5)),])
-        );
-        assert_read_eq!(
-            ctx,
-            "c",
-            dict!({ str!("b") => int!(8), str!("c") => int!(10) })
-        );
         assert_read_eq!(
             ctx,
             "d",
@@ -2006,15 +2001,9 @@ d = a.get("d", 99)
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
-b = { **a }
+{ **a }
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(
-            ctx,
-            "b",
-            dict!({ str!("b") => int!(4), str!("c") => int!(5) })
-        );
+        assert_eval_eq!(input, dict!({ str!("b") => int!(4), str!("c") => int!(5) }));
 
         let input = r#"
 inner = { 'key': 'inner' }
