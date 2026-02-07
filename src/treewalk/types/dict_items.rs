@@ -1,8 +1,7 @@
 use crate::treewalk::{
     macros::*,
-    type_system::CloneableIterable,
-    types::{Dict, DictKeys, DictValues, Exception, Tuple},
-    DomainResult, TreewalkValue,
+    types::{DictKeys, DictValues, Tuple},
+    TreewalkValue,
 };
 
 impl_iterable!(DictItemsIter);
@@ -13,28 +12,6 @@ pub struct DictItems {
 }
 
 impl DictItems {
-    pub fn from_iterable(iter: Box<dyn CloneableIterable>) -> DomainResult<Self> {
-        let mut pairs: Vec<(TreewalkValue, TreewalkValue)> = vec![];
-        for (index, item) in iter.enumerate() {
-            // The item is often a tuple, but can really be any iterable which yields 2 values.
-            let pair: Vec<_> = item.as_iterator()?.collect();
-
-            // We cannot convert directly from a Vec to a tuple, we must first attempt to convert
-            // to an array of a known and fixed length of 2.
-            let pair_arr: [TreewalkValue; 2] = pair.clone().try_into().map_err(|_| {
-                Exception::value_error(format!(
-                    "dictionary update sequence element #{} has length {}; 2 is required",
-                    index,
-                    pair.len()
-                ))
-            })?;
-
-            pairs.push(pair_arr.into());
-        }
-
-        Ok(Self::new(pairs))
-    }
-
     pub fn new(items: Vec<(TreewalkValue, TreewalkValue)>) -> Self {
         Self { items }
     }
@@ -57,16 +34,6 @@ impl DictItems {
 
     pub fn to_values(&self) -> DictValues {
         DictValues::new(self.values())
-    }
-
-    pub fn to_dict(&self) -> Dict {
-        let mut items = vec![];
-        for pair in DictItemsIter::new(self.clone()) {
-            let tuple = pair.as_tuple().unwrap();
-            items.push((tuple.first().clone(), tuple.second().clone()));
-        }
-
-        Dict::from_items(items).unwrap()
     }
 }
 

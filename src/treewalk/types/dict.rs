@@ -7,6 +7,7 @@ use crate::{
         macros::*,
         protocols::{Callable, IndexRead, IndexWrite, TryEvalFrom},
         result::Raise,
+        type_system::CloneableIterable,
         types::{iterators::DictKeysIter, DictItems, Exception},
         utils::{check_args, Args, HashKey},
         DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
@@ -38,6 +39,28 @@ impl Dict {
             dict.insert(k, v)?;
         }
         Ok(dict)
+    }
+
+    pub fn from_iterable(iter: Box<dyn CloneableIterable>) -> DomainResult<Self> {
+        let mut pairs: Vec<(TreewalkValue, TreewalkValue)> = vec![];
+        for (index, item) in iter.enumerate() {
+            // The item is often a tuple, but can really be any iterable which yields 2 values.
+            let pair: Vec<_> = item.as_iterator()?.collect();
+
+            // We cannot convert directly from a Vec to a tuple, we must first attempt to convert
+            // to an array of a known and fixed length of 2.
+            let pair_arr: [TreewalkValue; 2] = pair.clone().try_into().map_err(|_| {
+                Exception::value_error(format!(
+                    "dictionary update sequence element #{} has length {}; 2 is required",
+                    index,
+                    pair.len()
+                ))
+            })?;
+
+            pairs.push(pair_arr.into());
+        }
+
+        Self::from_items(pairs)
     }
 
     pub fn insert(&mut self, key: TreewalkValue, value: TreewalkValue) -> DomainResult<()> {
@@ -107,8 +130,8 @@ impl TryEvalFrom for Container<Dict> {
             TreewalkValue::Dict(i) => Ok(i.clone()),
             val if val.clone().as_iterable().is_ok() => {
                 let iter = val.as_iterator().raise(interpreter)?;
-                let dict_items = DictItems::from_iterable(iter).raise(interpreter)?;
-                Ok(Container::new(dict_items.to_dict()))
+                let dict = Dict::from_iterable(iter).raise(interpreter)?;
+                Ok(Container::new(dict))
             }
             _ => Exception::type_error("Expected a dict").raise(interpreter),
         }
