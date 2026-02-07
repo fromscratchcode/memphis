@@ -96,10 +96,9 @@ impl Iterator for DictItemsIter {
             None
         } else {
             let removed = self.0.items.remove(0);
-            let key = removed.0.clone();
-            let value = removed.1.clone();
-            let tuple = TreewalkValue::Tuple(Tuple::new(vec![key, value]));
-            Some(tuple)
+            let key = removed.0;
+            let value = removed.1;
+            Some(TreewalkValue::Tuple(Tuple::new(vec![key, value])))
         }
     }
 }
