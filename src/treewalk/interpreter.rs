@@ -1894,19 +1894,13 @@ a = Foo.__mro__
 
     #[test]
     fn dictionaries() {
+        let input = r#"{}"#;
+        assert_eval_eq!(input, dict!({}));
+
         let input = r#"
 { "b": 4, 'c': 5 }
 "#;
         assert_eval_eq!(input, dict!({ str!("b") => int!(4), str!("c") => int!(5) }));
-
-        let input = r#"
-a = { "b": 4, 'c': 5 }
-a.items()
-"#;
-        assert_eval_eq!(
-            input,
-            dict_items!(vec![(str!("b"), int!(4)), (str!("c"), int!(5)),])
-        );
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
@@ -1918,72 +1912,40 @@ a = { "b": 4, 'c': 5 }
         );
 
         let input = r#"
+dict({ "b": 4, 'c': 5 })
+"#;
+        assert_eval_eq!(input, dict!({ str!("b") => int!(4), str!("c") => int!(5) }));
+
+        let input = r#"
+dict([('b', 4), ('c', 5)])
+"#;
+        assert_eval_eq!(input, dict!({ str!("b") => int!(4), str!("c") => int!(5) }));
+
+        let input = r#"
+dict([['a', 1], ['b', 2]])
+"#;
+        assert_eval_eq!(input, dict!({ str!("a") => int!(1), str!("b") => int!(2) }));
+
+        let input = r#"
+dict((k, k*k) for k in range(3))
+"#;
+        assert_eval_eq!(
+            input,
+            dict!({ int!(0) => int!(0), int!(1) => int!(1), int!(2) => int!(4) })
+        );
+
+        let input = r#"
+{ "b": 4, 'c': 5 }["b"]
+"#;
+        assert_eval_eq!(input, int!(4));
+
+        let input = r#"
 a = { "b": 4, 'c': 5 }
-d = dict({ "b": 4, 'c': 5 })
-e = dict([('b', 4), ('c', 5)])
-ee = dict([['a', 1], ['b', 2]])
-eee = dict((k, k*k) for k in range(3))
-f = a["b"]
-g = {}
-h = {}.items()
-
-i = {}.keys()
-j = {"b": 4, 'c': 5}.keys()
-k = iter({}.keys())
-l = type(iter({}.keys()))
-
-m = {}.values()
-n = {"b": 4, 'c': 5}.values()
-o = iter({}.values())
-p = type(iter({}.values()))
-
-q = iter({}.items())
-r = type(iter({}.items()))
-
-s = type({}.keys())
-t = type({}.values())
-u = type({}.items())
 v = [ val for val in a ]
 w = { key for key, value in a.items() }
 "#;
         let ctx = run(input);
 
-        assert_read_eq!(
-            ctx,
-            "d",
-            dict!({ str!("b") => int!(4), str!("c") => int!(5) })
-        );
-        assert_read_eq!(
-            ctx,
-            "e",
-            dict!({ str!("b") => int!(4), str!("c") => int!(5) })
-        );
-        assert_read_eq!(
-            ctx,
-            "ee",
-            dict!({ str!("a") => int!(1), str!("b") => int!(2) })
-        );
-        assert_read_eq!(
-            ctx,
-            "eee",
-            dict!({ int!(0) => int!(0), int!(1) => int!(1), int!(2) => int!(4) })
-        );
-        assert_read_eq!(ctx, "f", int!(4));
-        assert_read_eq!(ctx, "g", dict!({}));
-        assert_read_eq!(ctx, "h", dict_items![]);
-        assert_variant!(ctx, "q", DictItemsIter);
-        assert_type_eq!(ctx, "r", Type::DictItemIter);
-        assert_read_eq!(ctx, "i", dict_keys![]);
-        assert_read_eq!(ctx, "j", dict_keys![str!("b"), str!("c"),]);
-        assert_variant!(ctx, "k", DictKeysIter);
-        assert_type_eq!(ctx, "l", Type::DictKeyIter);
-        assert_read_eq!(ctx, "m", dict_values![]);
-        assert_read_eq!(ctx, "n", dict_values![int!(4), int!(5),]);
-        assert_variant!(ctx, "o", DictValuesIter);
-        assert_type_eq!(ctx, "p", Type::DictValueIter);
-        assert_type_eq!(ctx, "s", Type::DictKeys);
-        assert_type_eq!(ctx, "t", Type::DictValues);
-        assert_type_eq!(ctx, "u", Type::DictItems);
         assert_read_eq!(ctx, "v", list![str!("b"), str!("c"),]);
         assert_read_eq!(ctx, "w", set![str!("b"), str!("c"),]);
 
@@ -2014,6 +1976,64 @@ c = { **inner, 'key': 'outer' }
 
         assert_read_eq!(ctx, "b", dict!({ str!("key") => str!("inner") }));
         assert_read_eq!(ctx, "c", dict!({ str!("key") => str!("outer") }));
+    }
+
+    #[test]
+    fn dict_items() {
+        let input = r#"
+h = {}.items()
+i = {"b": 4, "c": 5}.items()
+u = type({}.items())
+q = iter({}.items())
+r = type(iter({}.items()))
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "h", dict_items![]);
+        assert_read_eq!(
+            ctx,
+            "i",
+            dict_items![(str!("b"), int!(4)), (str!("c"), int!(5))]
+        );
+        assert_type_eq!(ctx, "u", Type::DictItems);
+        assert_variant!(ctx, "q", DictItemsIter);
+        assert_type_eq!(ctx, "r", Type::DictItemIter);
+    }
+
+    #[test]
+    fn dict_keys() {
+        let input = r#"
+i = {}.keys()
+j = {"b": 4, 'c': 5}.keys()
+s = type({}.keys())
+k = iter({}.keys())
+l = type(iter({}.keys()))
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "i", dict_keys![]);
+        assert_read_eq!(ctx, "j", dict_keys![str!("b"), str!("c"),]);
+        assert_type_eq!(ctx, "s", Type::DictKeys);
+        assert_variant!(ctx, "k", DictKeysIter);
+        assert_type_eq!(ctx, "l", Type::DictKeyIter);
+    }
+
+    #[test]
+    fn dict_values() {
+        let input = r#"
+m = {}.values()
+n = {"b": 4, 'c': 5}.values()
+t = type({}.values())
+o = iter({}.values())
+p = type(iter({}.values()))
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "m", dict_values![]);
+        assert_read_eq!(ctx, "n", dict_values![int!(4), int!(5),]);
+        assert_type_eq!(ctx, "t", Type::DictValues);
+        assert_variant!(ctx, "o", DictValuesIter);
+        assert_type_eq!(ctx, "p", Type::DictValueIter);
     }
 
     #[test]

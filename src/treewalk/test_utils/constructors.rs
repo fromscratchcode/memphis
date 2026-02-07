@@ -97,11 +97,10 @@ macro_rules! dict {
 }
 
 macro_rules! dict_items {
-    () => {
-        crate::treewalk::TreewalkValue::DictItems(crate::treewalk::types::DictItems::default())
-    };
-    ($expr:expr) => {
-        crate::treewalk::TreewalkValue::DictItems(crate::treewalk::types::DictItems::new($expr))
+    ($($expr:expr),* $(,)?) => {
+        crate::treewalk::TreewalkValue::DictItems(crate::treewalk::types::DictItems::new(vec![
+            $($expr),*
+        ]))
     };
 }
 
