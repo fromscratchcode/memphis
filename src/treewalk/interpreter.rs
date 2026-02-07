@@ -1979,6 +1979,27 @@ c = { **inner, 'key': 'outer' }
     }
 
     #[test]
+    fn dict_identity() {
+        // This tests that the dict identity is preserved during assignment.
+        let input = r#"
+a = {}
+b = a
+b["x"] = 1
+a["x"] == 1
+"#;
+        assert_eval_eq!(input, bool!(true));
+
+        // This test confirms that dict() is a copy constructor.
+        let input = r#"
+a = {}
+b = dict(a)
+b["x"] = 1
+"x" not in a
+"#;
+        assert_eval_eq!(input, bool!(true));
+    }
+
+    #[test]
     fn dict_items() {
         let input = r#"
 h = {}.items()
