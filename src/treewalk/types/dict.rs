@@ -8,7 +8,7 @@ use crate::{
         protocols::{Callable, IndexRead, IndexWrite, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
-        types::{iterators::DictKeysIter, DictItems, Exception},
+        types::{iterators::DictKeysIter, DictItems, DictKeys, DictValues, Exception},
         utils::{check_args, Args, HashKey},
         DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
@@ -87,7 +87,7 @@ impl Dict {
     /// Convert this to `DictItems`, which can subsequently become `DictKeys` or `DictValues`. This
     /// currently sorts the items before returning the object, which doesn't technically match
     /// Python's implementation, but makes our lives way easier.
-    pub fn to_items(&self) -> DictItems {
+    pub fn items(&self) -> DictItems {
         let mut items = Vec::with_capacity(self.items.len());
 
         for (key, value) in self.items.values() {
@@ -98,12 +98,28 @@ impl Dict {
         DictItems::new(items)
     }
 
+    pub fn keys(&self) -> DictKeys {
+        let mut keys: Vec<_> = self.items.values().map(|(key, _)| key.clone()).collect();
+        keys.sort();
+        DictKeys::new(keys)
+    }
+
+    pub fn values(&self) -> DictValues {
+        let mut values: Vec<_> = self
+            .items
+            .values()
+            .map(|(_, value)| value.clone())
+            .collect();
+        values.sort();
+        DictValues::new(values)
+    }
+
     /// Turn this `Dict` into a `SymbolTable`, which is another key-value store but where the keys
     /// are all confirmed to be valid Python identifiers.
     pub fn to_symbol_table(&self) -> DomainResult<SymbolTable> {
         let mut table = HashMap::new();
 
-        let dict_items = self.to_items();
+        let dict_items = self.items();
         for pair in dict_items {
             let tuple = pair.as_tuple()?;
             let key = tuple.first().as_str()?;
@@ -145,8 +161,8 @@ impl IntoIterator for Container<Dict> {
     type IntoIter = DictKeysIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        let dict_items = self.borrow().to_items();
-        DictKeysIter::new(dict_items.to_keys())
+        let dict_keys = self.borrow().keys();
+        DictKeysIter::new(dict_keys)
     }
 }
 
@@ -208,7 +224,7 @@ impl Callable for DictItemsBuiltin {
             .raise(interpreter)?
             .as_dict()
             .raise(interpreter)?;
-        let dict_items = dict.borrow().to_items();
+        let dict_items = dict.borrow().items();
         Ok(TreewalkValue::DictItems(dict_items))
     }
 
@@ -225,8 +241,8 @@ impl Callable for DictKeysBuiltin {
             .raise(interpreter)?
             .as_dict()
             .raise(interpreter)?;
-        let dict_items = dict.borrow().to_items();
-        Ok(TreewalkValue::DictKeys(dict_items.to_keys()))
+        let dict_keys = dict.borrow().keys();
+        Ok(TreewalkValue::DictKeys(dict_keys))
     }
 
     fn name(&self) -> String {
@@ -242,8 +258,8 @@ impl Callable for DictValuesBuiltin {
             .raise(interpreter)?
             .as_dict()
             .raise(interpreter)?;
-        let dict_items = dict.borrow().to_items();
-        Ok(TreewalkValue::DictValues(dict_items.to_values()))
+        let dict_values = dict.borrow().values();
+        Ok(TreewalkValue::DictValues(dict_values))
     }
 
     fn name(&self) -> String {

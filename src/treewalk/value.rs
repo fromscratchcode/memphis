@@ -579,7 +579,7 @@ impl From<TreewalkValue> for MemphisValue {
             TreewalkValue::Dict(i) => {
                 let items = i
                     .borrow()
-                    .to_items()
+                    .items()
                     .items()
                     .iter()
                     .map(|(key, value)| (key.clone().into(), value.clone().into()))

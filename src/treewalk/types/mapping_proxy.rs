@@ -17,7 +17,7 @@ impl MappingProxy {
     }
 
     pub fn to_items(&self) -> DictItems {
-        self.0.borrow().to_items()
+        self.0.borrow().items()
     }
 }
 

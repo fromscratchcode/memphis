@@ -1,8 +1,4 @@
-use crate::treewalk::{
-    macros::*,
-    types::{DictKeys, DictValues, Tuple},
-    TreewalkValue,
-};
+use crate::treewalk::{macros::*, types::Tuple, TreewalkValue};
 
 impl_iterable!(DictItemsIter);
 
@@ -18,22 +14,6 @@ impl DictItems {
 
     pub fn items(&self) -> &[(TreewalkValue, TreewalkValue)] {
         &self.items
-    }
-
-    fn keys(&self) -> Vec<TreewalkValue> {
-        self.items.iter().map(|i| i.0.clone()).collect()
-    }
-
-    fn values(&self) -> Vec<TreewalkValue> {
-        self.items.iter().map(|i| i.1.clone()).collect()
-    }
-
-    pub fn to_keys(&self) -> DictKeys {
-        DictKeys::new(self.keys())
-    }
-
-    pub fn to_values(&self) -> DictValues {
-        DictValues::new(self.values())
     }
 }
 
