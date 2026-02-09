@@ -30,7 +30,6 @@ impl TreewalkInterpreter {
             positional.extend_from_slice(args.items());
         };
 
-        #[allow(clippy::mutable_key_type)]
         let mut kwargs = HashMap::default();
         for kwarg in call_args.kwargs.iter() {
             match kwarg {

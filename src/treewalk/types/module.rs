@@ -3,7 +3,6 @@ use std::collections::hash_map::Iter;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    core::Container,
     domain::{DebugStackFrame, Dunder, ModuleName, ModuleOrigin, ToDebugStackFrame},
     treewalk::{
         protocols::MemberRead,
@@ -75,8 +74,8 @@ impl Module {
         self.scope.into_iter()
     }
 
-    pub fn as_dict(&self, interpreter: &TreewalkInterpreter) -> Container<Dict> {
-        self.scope.as_dict(interpreter)
+    pub fn as_dict(&self) -> Dict {
+        self.scope.to_runtime_dict()
     }
 }
 

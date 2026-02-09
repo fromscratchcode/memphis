@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::{
     core::Container,
@@ -94,26 +94,28 @@ impl TreewalkInterpreter {
             .map(TreewalkValue::Set)
     }
 
-    fn evaluate_dict(&self, dict_ops: &[DictOperation]) -> TreewalkResult<TreewalkValue> {
-        // TODO we are suppressing this clippy error for now because `TreewalkValue` allows interior
-        // mutability which can lead to issues when used as a key for a `HashMap` or `HashSet`.
-        #[allow(clippy::mutable_key_type)]
-        let mut result = HashMap::new();
-        for op in dict_ops {
+    fn evaluate_dict(&self, ops: &[DictOperation]) -> TreewalkResult<TreewalkValue> {
+        let mut dict = Dict::default();
+
+        for op in ops {
             match op {
                 DictOperation::Pair(key, value) => {
-                    result.insert(self.evaluate_expr(key)?, self.evaluate_expr(value)?);
+                    let key = self.evaluate_expr(key)?;
+                    let value = self.evaluate_expr(value)?;
+                    dict.insert(key, value).raise(self)?;
                 }
                 DictOperation::Unpack(expr) => {
                     let unpacked = self.evaluate_expr(expr)?;
                     for key in unpacked.clone().as_iterable().raise(self)? {
                         let value = self.load_index(&unpacked, &key)?;
-                        result.insert(key, value); // later keys overwrite earlier ones
+                        // later keys overwrite earlier ones
+                        dict.insert(key, value).raise(self)?;
                     }
                 }
             }
         }
-        Ok(TreewalkValue::Dict(Container::new(Dict::new(self, result))))
+
+        Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 
     fn evaluate_tuple(&self, items: &[Expr]) -> TreewalkResult<TreewalkValue> {
@@ -215,10 +217,7 @@ impl TreewalkInterpreter {
             _ => unimplemented!(),
         };
 
-        // TODO we are suppressing this clippy error for now because `TreewalkValue` allows interior
-        // mutability which can lead to issues when used as a key for a `HashMap` or `HashSet`.
-        #[allow(clippy::mutable_key_type)]
-        let mut output = HashMap::new();
+        let mut dict = Dict::default();
         for i in self
             .evaluate_expr(&first_clause.iterable)?
             .as_iterable()
@@ -233,9 +232,9 @@ impl TreewalkInterpreter {
             }
             let key_result = self.evaluate_expr(key_body)?;
             let value_result = self.evaluate_expr(value_body)?;
-            output.insert(key_result, value_result);
+            dict.insert(key_result, value_result).raise(self)?;
         }
-        Ok(TreewalkValue::Dict(Container::new(Dict::new(self, output))))
+        Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 
     fn evaluate_unary_operation(

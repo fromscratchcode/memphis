@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Keys, HashMap};
+use std::collections::HashMap;
 
 use crate::{
     core::Container,
@@ -7,15 +7,16 @@ use crate::{
         macros::*,
         protocols::{Callable, IndexRead, IndexWrite, TryEvalFrom},
         result::Raise,
-        types::{iterators::DictKeysIter, DictItems, Exception},
-        utils::{check_args, Args, Contextual, ContextualPair},
+        type_system::CloneableIterable,
+        types::{iterators::DictKeysIter, DictItems, DictKeys, DictValues, Exception},
+        utils::{check_args, Args, HashKey},
         DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
 #[derive(Default, PartialEq, Clone)]
 pub struct Dict {
-    items: HashMap<Contextual<TreewalkValue>, TreewalkValue>,
+    items: HashMap<HashKey, (TreewalkValue, TreewalkValue)>,
 }
 
 impl_typed!(Dict, Type::Dict);
@@ -32,61 +33,63 @@ impl_method_provider!(
 );
 
 impl Dict {
-    #[allow(clippy::mutable_key_type)]
-    pub fn new_inner(items: HashMap<Contextual<TreewalkValue>, TreewalkValue>) -> Self {
-        Self { items }
-    }
-
-    #[allow(clippy::mutable_key_type)]
-    pub fn new(
-        interpreter: &TreewalkInterpreter,
-        items: HashMap<TreewalkValue, TreewalkValue>,
-    ) -> Self {
-        let mut new_hash = HashMap::default();
-        for (key, value) in items {
-            let new_key = Contextual::new(key, interpreter.clone());
-            new_hash.insert(new_key, value);
+    pub fn from_items(items: Vec<(TreewalkValue, TreewalkValue)>) -> DomainResult<Self> {
+        let mut dict = Dict::default();
+        for (k, v) in items {
+            dict.insert(k, v)?;
         }
-
-        Self::new_inner(new_hash)
+        Ok(dict)
     }
 
-    pub fn keys(&self) -> Keys<'_, Contextual<TreewalkValue>, TreewalkValue> {
-        self.items.keys()
+    pub fn insert(&mut self, key: TreewalkValue, value: TreewalkValue) -> DomainResult<()> {
+        let hashed_key = key.as_hash_key()?;
+        self.items.insert(hashed_key, (key, value));
+        Ok(())
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
-    }
-
-    fn get(
-        &self,
-        interpreter: TreewalkInterpreter,
-        key: TreewalkValue,
-        default: Option<TreewalkValue>,
-    ) -> TreewalkValue {
+    fn get(&self, key: TreewalkValue, default: Option<TreewalkValue>) -> TreewalkValue {
         let default = default.unwrap_or(TreewalkValue::None);
-        let key = Contextual::new(key, interpreter);
-        self.items.get(&key).unwrap_or(&default).clone()
+        let key = key.as_hash_key().expect("Unhashable key");
+        if let Some((_, val)) = self.items.get(&key) {
+            val.clone()
+        } else {
+            default.clone()
+        }
     }
 
-    pub fn has(&self, interpreter: TreewalkInterpreter, key: &TreewalkValue) -> bool {
-        let key = Contextual::new(key.clone(), interpreter);
+    pub fn has(&self, key: &TreewalkValue) -> bool {
+        let key = key.as_hash_key().expect("Unhashable key");
         self.items.contains_key(&key)
     }
 
     /// Convert this to `DictItems`, which can subsequently become `DictKeys` or `DictValues`. This
     /// currently sorts the items before returning the object, which doesn't technically match
     /// Python's implementation, but makes our lives way easier.
-    pub fn to_items(&self) -> DictItems {
+    pub fn items(&self) -> DictItems {
         let mut items = Vec::with_capacity(self.items.len());
 
-        for (ctx_key, value) in &self.items {
-            items.push(ContextualPair::new(ctx_key.clone(), value.clone()));
+        for (key, value) in self.items.values() {
+            items.push((key.clone(), value.clone()));
         }
 
         items.sort();
-        DictItems::new_inner(items)
+        DictItems::new(items)
+    }
+
+    pub fn keys(&self) -> DictKeys {
+        let mut keys: Vec<_> = self.items.values().map(|(key, _)| key.clone()).collect();
+        keys.sort();
+        DictKeys::new(keys)
+    }
+
+    pub fn values(&self) -> DictValues {
+        let mut values: Vec<_> = self
+            .items
+            .values()
+            .map(|(_, value)| value.clone())
+            .collect();
+        values.sort();
+        DictValues::new(values)
     }
 
     /// Turn this `Dict` into a `SymbolTable`, which is another key-value store but where the keys
@@ -94,7 +97,7 @@ impl Dict {
     pub fn to_symbol_table(&self) -> DomainResult<SymbolTable> {
         let mut table = HashMap::new();
 
-        let dict_items = self.to_items();
+        let dict_items = self.items();
         for pair in dict_items {
             let tuple = pair.as_tuple()?;
             let key = tuple.first().as_str()?;
@@ -121,12 +124,37 @@ impl TryEvalFrom for Container<Dict> {
             TreewalkValue::Dict(i) => Ok(i.clone()),
             val if val.clone().as_iterable().is_ok() => {
                 let iter = val.as_iterator().raise(interpreter)?;
-                let dict_items = DictItems::from_iterable(iter, interpreter).raise(interpreter)?;
-                Ok(Container::new(dict_items.to_dict()))
+                let items = build_dict_items_from_iterable(iter).raise(interpreter)?;
+                let dict = Dict::from_items(items).raise(interpreter)?;
+                Ok(Container::new(dict))
             }
             _ => Exception::type_error("Expected a dict").raise(interpreter),
         }
     }
+}
+
+fn build_dict_items_from_iterable(
+    iter: Box<dyn CloneableIterable>,
+) -> DomainResult<Vec<(TreewalkValue, TreewalkValue)>> {
+    let mut pairs: Vec<(TreewalkValue, TreewalkValue)> = vec![];
+    for (index, item) in iter.enumerate() {
+        // The item is often a tuple, but can really be any iterable which yields 2 values.
+        let pair: Vec<_> = item.as_iterator()?.collect();
+
+        // We cannot convert directly from a Vec to a tuple, we must first attempt to convert
+        // to an array of a known and fixed length of 2.
+        let pair_arr: [TreewalkValue; 2] = pair.clone().try_into().map_err(|_| {
+            Exception::value_error(format!(
+                "dictionary update sequence element #{} has length {}; 2 is required",
+                index,
+                pair.len()
+            ))
+        })?;
+
+        pairs.push(pair_arr.into());
+    }
+
+    Ok(pairs)
 }
 
 /// We can reuse `DictKeysIterator` here because an iterator over a `Dict` will just return its
@@ -136,19 +164,19 @@ impl IntoIterator for Container<Dict> {
     type IntoIter = DictKeysIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        let dict_items = self.borrow().to_items();
-        DictKeysIter::new(dict_items.to_keys())
+        let dict_keys = self.borrow().keys();
+        DictKeysIter::new(dict_keys)
     }
 }
 
 impl IndexRead for Container<Dict> {
     fn getitem(
         &self,
-        interpreter: &TreewalkInterpreter,
+        _interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        if self.borrow().has(interpreter.clone(), &index) {
-            Ok(Some(self.borrow().get(interpreter.clone(), index, None)))
+        if self.borrow().has(&index) {
+            Ok(Some(self.borrow().get(index, None)))
         } else {
             Ok(None)
         }
@@ -162,8 +190,8 @@ impl IndexWrite for Container<Dict> {
         index: TreewalkValue,
         value: TreewalkValue,
     ) -> TreewalkResult<()> {
-        let index = Contextual::new(index, interpreter.clone());
-        self.borrow_mut().items.insert(index, value);
+        let key = index.as_hash_key().raise(interpreter)?;
+        self.borrow_mut().items.insert(key, (index, value));
         Ok(())
     }
 
@@ -172,8 +200,8 @@ impl IndexWrite for Container<Dict> {
         interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
     ) -> TreewalkResult<()> {
-        let index = Contextual::new(index, interpreter.clone());
-        self.borrow_mut().items.remove(&index);
+        let key = index.as_hash_key().raise(interpreter)?;
+        self.borrow_mut().items.remove(&key);
         Ok(())
     }
 }
@@ -199,7 +227,7 @@ impl Callable for DictItemsBuiltin {
             .raise(interpreter)?
             .as_dict()
             .raise(interpreter)?;
-        let dict_items = dict.borrow().to_items();
+        let dict_items = dict.borrow().items();
         Ok(TreewalkValue::DictItems(dict_items))
     }
 
@@ -216,8 +244,8 @@ impl Callable for DictKeysBuiltin {
             .raise(interpreter)?
             .as_dict()
             .raise(interpreter)?;
-        let dict_items = dict.borrow().to_items();
-        Ok(TreewalkValue::DictKeys(dict_items.to_keys()))
+        let dict_keys = dict.borrow().keys();
+        Ok(TreewalkValue::DictKeys(dict_keys))
     }
 
     fn name(&self) -> String {
@@ -233,8 +261,8 @@ impl Callable for DictValuesBuiltin {
             .raise(interpreter)?
             .as_dict()
             .raise(interpreter)?;
-        let dict_items = dict.borrow().to_items();
-        Ok(TreewalkValue::DictValues(dict_items.to_values()))
+        let dict_values = dict.borrow().values();
+        Ok(TreewalkValue::DictValues(dict_values))
     }
 
     fn name(&self) -> String {
@@ -272,7 +300,7 @@ impl Callable for InitBuiltin {
         }
 
         if args.has_kwargs() {
-            let kwargs = args.get_kwargs_dict(interpreter);
+            let kwargs = args.kwargs_as_runtime_dict();
             output.borrow_mut().extend(&kwargs);
         }
 
@@ -298,7 +326,7 @@ impl Callable for GetBuiltin {
         let default = args.get_arg_optional(1);
 
         let d = dict.borrow().clone();
-        Ok(d.get(interpreter.clone(), key, default))
+        Ok(d.get(key, default))
     }
 
     fn name(&self) -> String {

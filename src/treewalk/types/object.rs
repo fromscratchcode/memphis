@@ -253,7 +253,7 @@ impl MemberWrite for Container<Object> {
             .as_dict()
             .raise(interpreter)?
             .borrow()
-            .has(interpreter.clone(), &TreewalkValue::Str(Str::new(name)))
+            .has(&TreewalkValue::Str(Str::new(name)))
         {
             return Exception::attribute_error(
                 interpreter.state.class_name_of_value(&result),
@@ -636,7 +636,7 @@ impl NonDataDescriptor for DictDescriptor {
             Some(i) => i.as_object().raise(interpreter)?.borrow().scope.clone(),
             None => owner.borrow().scope.clone(),
         };
-        Ok(TreewalkValue::Dict(scope.as_dict(interpreter)))
+        Ok(TreewalkValue::Dict(Container::new(scope.to_runtime_dict())))
     }
 
     fn name(&self) -> String {

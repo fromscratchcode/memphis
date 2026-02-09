@@ -28,6 +28,7 @@ use crate::{
             Tuple,
         },
         typing::TypeExpr,
+        utils::HashKey,
         DomainResult, SymbolTable,
     },
 };
@@ -173,6 +174,14 @@ impl PartialOrd for TreewalkValue {
 }
 
 impl TreewalkValue {
+    pub fn as_hash_key(&self) -> DomainResult<HashKey> {
+        match self {
+            TreewalkValue::Int(i) => Ok(HashKey::Int(*i)),
+            TreewalkValue::Str(s) => Ok(HashKey::Str(s.to_string())),
+            _ => Err(Exception::type_error("unhashable type")),
+        }
+    }
+
     pub fn hash(&self) -> usize {
         match self {
             TreewalkValue::Object(o) => o.address(),
@@ -570,7 +579,7 @@ impl From<TreewalkValue> for MemphisValue {
             TreewalkValue::Dict(i) => {
                 let items = i
                     .borrow()
-                    .to_items()
+                    .items()
                     .items()
                     .iter()
                     .map(|(key, value)| (key.clone().into(), value.clone().into()))

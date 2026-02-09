@@ -65,7 +65,7 @@ impl TreewalkInterpreter {
                     .cloned()
                     .ok_or_else(|| Exception::type_error("Expected a function"))
                     .raise(self)?;
-                let symbol_table = function.borrow().bind_args(&args, self)?;
+                let symbol_table = function.borrow().bind_args(&args).raise(self)?;
                 let scope = Container::new(Scope::new(symbol_table));
                 let generator_function = Generator::new(scope, function);
                 let generator_iterator = GeneratorIter::new(generator_function, self.clone());
@@ -78,7 +78,7 @@ impl TreewalkInterpreter {
                     .cloned()
                     .ok_or_else(|| Exception::type_error("Expected a function"))
                     .raise(self)?;
-                let symbol_table = function.borrow().bind_args(&args, self)?;
+                let symbol_table = function.borrow().bind_args(&args).raise(self)?;
                 let scope = Container::new(Scope::new(symbol_table));
                 let coroutine = Coroutine::new(scope, function);
                 Ok(TreewalkValue::Coroutine(Container::new(coroutine)))

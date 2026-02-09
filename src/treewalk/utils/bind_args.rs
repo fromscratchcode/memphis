@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use crate::{
     core::Container,
     treewalk::{
-        result::Raise,
         types::{function::RuntimeParams, Exception, Tuple},
         utils::{check_args, Args},
-        SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        DomainResult, SymbolTable, TreewalkValue,
     },
 };
 
@@ -19,8 +18,7 @@ pub fn bind_args(
     callee_name: &str,
     args: &Args,
     expected_args: &RuntimeParams,
-    interpreter: &TreewalkInterpreter,
-) -> TreewalkResult<SymbolTable> {
+) -> DomainResult<SymbolTable> {
     let mut table = HashMap::new();
     let bound_args = args.bound_args();
 
@@ -28,8 +26,7 @@ pub fn bind_args(
     // `args_var` in which to store the rest.
     check_args(args, |_| {
         !(expected_args.args.len() < bound_args.len() && expected_args.args_var.is_none())
-    })
-    .raise(interpreter)?;
+    })?;
 
     let mut missing_args = vec![];
 
@@ -65,10 +62,9 @@ pub fn bind_args(
         if table.contains_key(key) || expected_args.args.iter().any(|a| &a.arg == key) {
             table.insert(key.clone(), value.clone());
         } else if expected_args.kwargs_var.is_none() {
-            return Exception::type_error(format!(
+            return Err(Exception::type_error(format!(
                 "{callee_name}() got an unexpected keyword argument '{key}'"
-            ))
-            .raise(interpreter);
+            )));
         }
     }
 
@@ -85,10 +81,9 @@ pub fn bind_args(
             .map(|a| format!("'{a}'"))
             .collect::<Vec<_>>()
             .join(" and ");
-        return Exception::type_error(format!(
+        return Err(Exception::type_error(format!(
             "{callee_name}() missing {num_missing} required positional {noun}: {arg_names}"
-        ))
-        .raise(interpreter);
+        )));
     }
 
     if let Some(ref args_var) = expected_args.args_var {
@@ -99,7 +94,7 @@ pub fn bind_args(
     }
 
     if let Some(ref kwargs_var) = expected_args.kwargs_var {
-        let kwargs_value = TreewalkValue::Dict(Container::new(args.get_kwargs_dict(interpreter)));
+        let kwargs_value = TreewalkValue::Dict(Container::new(args.kwargs_as_runtime_dict()));
         table.insert(kwargs_var.to_string(), kwargs_value);
     }
 

@@ -10,7 +10,8 @@ use crate::{
         result::Raise,
         types::{Cell, Class, Dict, Module, Str, Tuple},
         utils::{bind_args, Args, EnvironmentFrame},
-        Scope, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkState, TreewalkValue,
+        DomainResult, Scope, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkState,
+        TreewalkValue,
     },
 };
 
@@ -164,12 +165,8 @@ impl Function {
 
     /// Bind the provided `Args` to this `Function` signature, returning a `SymbolTable` which can
     /// be turned into a runtime `Scope`.
-    pub fn bind_args(
-        &self,
-        args: &Args,
-        interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<SymbolTable> {
-        bind_args(self.name(), args, &self.args, interpreter)
+    pub fn bind_args(&self, args: &Args) -> DomainResult<SymbolTable> {
+        bind_args(self.name(), args, &self.args)
     }
 }
 
@@ -230,7 +227,7 @@ impl MemberWrite for Container<Function> {
 
 impl Callable for Container<Function> {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        let symbol_table = self.borrow().bind_args(&args, interpreter)?;
+        let symbol_table = self.borrow().bind_args(&args).raise(interpreter)?;
         let scope = Container::new(Scope::new(symbol_table));
         interpreter.enter_function(self.clone(), scope)
     }
@@ -504,7 +501,7 @@ impl NonDataDescriptor for DictDescriptor {
             Some(i) => i.as_function().raise(interpreter)?.borrow().scope.clone(),
             None => owner.borrow().scope.clone(),
         };
-        Ok(TreewalkValue::Dict(scope.as_dict(interpreter)))
+        Ok(TreewalkValue::Dict(Container::new(scope.to_runtime_dict())))
     }
 
     fn name(&self) -> String {

@@ -1,19 +1,23 @@
 use std::collections::{hash_map::Iter, HashMap, HashSet};
 
-use crate::{
-    core::Container,
-    treewalk::{
-        types::{Dict, Str},
-        TreewalkInterpreter, TreewalkValue,
-    },
+use crate::treewalk::{
+    types::{Dict, Str},
+    TreewalkValue,
 };
 
-/// we could add more validation here eventually
-pub type Identifier = String;
+/// This is similar to our runtime `Dict` object, but where keys must be valid Python runtime
+/// identifiers (basically, strings).
+// TODO make this a real type.
+pub type SymbolTable = HashMap<String, TreewalkValue>;
 
-/// This is similar to our runtime `Dict` object, but where keys must be valid Python
-/// identifiers.
-pub type SymbolTable = HashMap<Identifier, TreewalkValue>;
+pub fn symbol_table_to_runtime_dict(symbol_table: &SymbolTable) -> Dict {
+    let items = symbol_table
+        .iter()
+        .map(|(key, value)| (TreewalkValue::Str(Str::new(key)), value.clone()))
+        .collect();
+
+    Dict::from_items(items).expect("All keys should be hashable strings here.")
+}
 
 /// This represents a symbol table for a given scope.
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -79,14 +83,8 @@ impl Scope {
         self.nonlocal_vars.contains(name)
     }
 
-    pub fn as_dict(&self, interpreter: &TreewalkInterpreter) -> Container<Dict> {
-        #[allow(clippy::mutable_key_type)]
-        let mut items = HashMap::new();
-        for (key, value) in self.symbol_table.iter() {
-            items.insert(TreewalkValue::Str(Str::new(key)), value.clone());
-        }
-
-        Container::new(Dict::new(interpreter, items))
+    pub fn to_runtime_dict(&self) -> Dict {
+        symbol_table_to_runtime_dict(&self.symbol_table)
     }
 }
 

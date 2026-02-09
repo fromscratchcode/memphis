@@ -42,7 +42,7 @@ impl NonDataDescriptor for DictAttribute {
         };
 
         Ok(TreewalkValue::MappingProxy(MappingProxy::new(
-            scope.as_dict(interpreter),
+            Container::new(scope.to_runtime_dict()),
         )))
     }
 

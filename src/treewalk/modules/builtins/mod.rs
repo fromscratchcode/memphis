@@ -162,9 +162,9 @@ impl Callable for SetattrBuiltin {
 impl Callable for GlobalsBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| len == 0).raise(interpreter)?;
-        Ok(TreewalkValue::Dict(
-            interpreter.state.read_globals(interpreter),
-        ))
+        Ok(TreewalkValue::Dict(Container::new(
+            interpreter.state.read_globals(),
+        )))
     }
 
     fn name(&self) -> String {
