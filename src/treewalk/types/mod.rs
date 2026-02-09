@@ -6,8 +6,6 @@ mod class;
 mod classmethod;
 mod complex;
 pub mod coroutine;
-#[cfg(feature = "c_stdlib")]
-pub mod cpython;
 mod dict;
 mod dict_items;
 mod dict_keys;

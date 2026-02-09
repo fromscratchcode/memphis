@@ -141,23 +141,6 @@ impl AsRef<str> for Dunder {
     }
 }
 
-#[cfg(feature = "c_stdlib")]
-mod cpython {
-    use super::*;
-
-    use pyo3::{types::PyString, Bound, IntoPyObject, Python};
-
-    impl<'py> IntoPyObject<'py> for Dunder {
-        type Target = PyString;
-        type Output = Bound<'py, Self::Target>;
-        type Error = std::convert::Infallible;
-
-        fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-            self.value().into_pyobject(py)
-        }
-    }
-}
-
 impl From<Dunder> for String {
     /// Converts a `Dunder` value into its string representation.
     fn from(value: Dunder) -> Self {

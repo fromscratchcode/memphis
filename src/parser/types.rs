@@ -56,7 +56,7 @@ impl Ast {
         self.statements.iter()
     }
 
-    /// This simulations CPython `eval` mode, rather than `exec` mode. We currently assume this WAY
+    /// This simulates CPython `eval` mode, rather than `exec` mode. We currently assume this WAY
     /// too many places.
     pub fn rewrite_last_expr_to_return(&mut self) {
         if let Some(stmt) = self.statements.last_mut() {

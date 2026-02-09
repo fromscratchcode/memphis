@@ -1,5 +1,3 @@
-#[cfg(feature = "c_stdlib")]
-use std::collections::hash_map::Iter;
 use std::path::{Path, PathBuf};
 
 use crate::{
@@ -65,13 +63,6 @@ impl Module {
 
     pub fn delete(&mut self, name: &str) -> Option<TreewalkValue> {
         self.scope.delete(name)
-    }
-
-    // Should this return an actual dict? We chose not to do that right now because a
-    // `Container<Dict>` requires a reference to the interpreter.
-    #[cfg(feature = "c_stdlib")]
-    pub fn dict(&self) -> Iter<'_, String, TreewalkValue> {
-        self.scope.into_iter()
     }
 
     pub fn as_dict(&self) -> Dict {

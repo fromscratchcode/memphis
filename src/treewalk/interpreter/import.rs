@@ -1,5 +1,3 @@
-#[cfg(feature = "c_stdlib")]
-use crate::treewalk::types::cpython::import_from_cpython;
 use crate::{
     core::Container,
     domain::{Identifier, ModuleName, ResolvedModule},
@@ -16,11 +14,6 @@ impl TreewalkInterpreter {
     pub fn load_module(&self, module_name: &ModuleName) -> TreewalkResult<TreewalkValue> {
         if let Some(module) = self.state.fetch_module(module_name) {
             return Ok(TreewalkValue::Module(module));
-        }
-
-        #[cfg(feature = "c_stdlib")]
-        if let Some(result) = import_from_cpython(self, module_name) {
-            return Ok(result);
         }
 
         let module = self.import_module(module_name)?;

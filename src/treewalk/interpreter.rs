@@ -2896,65 +2896,6 @@ raise TypeError('type is no good')
         assert_type_error!(e.exception, "type is no good");
     }
 
-    #[cfg(feature = "c_stdlib")]
-    #[test]
-    fn c_stdlib() {
-        let input = r#"
-import sys
-a = sys.maxsize
-
-import time
-b = time.time()
-c = time.ctime()
-d = time.strftime("%a, %d %b %Y %H:%M:%S +0000")
-
-from _weakref import ref
-
-e = type(sys.implementation)
-f = type(sys)
-
-import itertools
-g = type(itertools)
-
-import _thread
-h = type(_thread)
-
-i = type(sys.builtin_module_names)
-
-import posix
-j = type(posix)
-
-import builtins
-k = type(builtins)
-
-import errno
-l = type(errno)
-
-sys.modules['os.path'] = "os_path"
-m = sys.modules['os.path']
-"#;
-        let ctx = run(input);
-
-        assert_variant!(ctx, "a", Int);
-        assert_variant!(ctx, "b", Float);
-        assert_variant!(ctx, "c", Str);
-        assert_variant!(ctx, "d", Str);
-        assert!(extract!(ctx, "a", Int) > 0);
-        assert!(extract!(ctx, "b", Float) > 1701281981.0);
-        assert!(extract!(ctx, "c", Str).len() > 10);
-        assert!(extract!(ctx, "d", Str).len() > 10);
-        assert_variant!(ctx, "ref", CPythonObject);
-        assert_variant!(ctx, "e", CPythonClass);
-        assert_type_eq!(ctx, "f", Type::Module);
-        assert_type_eq!(ctx, "g", Type::Module);
-        assert_type_eq!(ctx, "h", Type::Module);
-        assert_type_eq!(ctx, "i", Type::Tuple);
-        assert_type_eq!(ctx, "j", Type::Module);
-        assert_type_eq!(ctx, "k", Type::Module);
-        assert_type_eq!(ctx, "l", Type::Module);
-        assert_read_eq!(ctx, "m", str!("os_path"));
-    }
-
     #[test]
     fn context_manager() {
         let input = r#"

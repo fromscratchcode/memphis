@@ -16,9 +16,6 @@ use crate::{
     },
 };
 
-#[cfg(feature = "c_stdlib")]
-use super::types::cpython::{BuiltinModuleCache, CPythonModule};
-
 pub struct TreewalkState {
     memphis_state: Container<MemphisState>,
     module_store: ModuleStore,
@@ -26,8 +23,6 @@ pub struct TreewalkState {
     scope_manager: ScopeManager,
     execution_context: ExecutionContextManager,
     pub executor: UnsafeCell<Executor>,
-    #[cfg(feature = "c_stdlib")]
-    builtin_module_cache: BuiltinModuleCache,
 }
 
 impl Default for TreewalkState {
@@ -54,8 +49,6 @@ impl TreewalkState {
             scope_manager: ScopeManager::new(Container::new(builtins_mod)),
             execution_context: ExecutionContextManager::new(),
             executor: Executor::new().into(),
-            #[cfg(feature = "c_stdlib")]
-            builtin_module_cache: BuiltinModuleCache::new(),
         }
     }
 }
@@ -226,13 +219,6 @@ impl Container<TreewalkState> {
             .map_err(|e| Exception::import_error(e.message()))
     }
 
-    #[cfg(feature = "c_stdlib")]
-    pub fn import_builtin_module(&self, module_name: &ModuleName) -> Container<CPythonModule> {
-        self.borrow_mut()
-            .builtin_module_cache
-            .import_builtin_module(module_name)
-    }
-
     pub fn store_module(&self, module: Container<Module>) {
         self.borrow_mut().module_store.store_module(module)
     }
@@ -252,8 +238,6 @@ impl Container<TreewalkState> {
     pub fn type_of_value(&self, value: &TreewalkValue) -> TreewalkValue {
         match value {
             TreewalkValue::Object(o) => TreewalkValue::Class(o.borrow().class()),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(o) => o.get_type(),
             _ => TreewalkValue::Class(self.class_of_type(&value.get_type())),
         }
     }

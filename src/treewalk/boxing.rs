@@ -21,8 +21,6 @@ impl TreewalkValue {
             TreewalkValue::Cell(i) => Box::new(i.borrow().clone()),
             TreewalkValue::Module(i) => Box::new(i.borrow().clone()),
             TreewalkValue::Super(i) => Box::new(i),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(i) => Box::new(i.borrow().clone()),
             _ => {
                 // We need this fallback case for instances of builtin types.
                 // i.e. [].append
@@ -39,8 +37,6 @@ impl TreewalkValue {
             TreewalkValue::Object(i) => Some(Box::new(i)),
             TreewalkValue::Class(i) => Some(Box::new(i)),
             TreewalkValue::Function(i) => Some(Box::new(i)),
-            // #[cfg(feature = "c_stdlib")]
-            // TreewalkValue::CPythonModule(i) => Some(Box::new(i.borrow().clone())),
             _ => None,
         }
     }
@@ -62,11 +58,6 @@ impl TreewalkValue {
                     return Ok(None);
                 }
             }
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(o) => match o.hasattr(Dunder::GetItem) {
-                true => Box::new(o.clone()),
-                false => return Ok(None),
-            },
             _ => return Ok(None),
         };
 
@@ -87,11 +78,6 @@ impl TreewalkValue {
                     return Ok(None);
                 }
             }
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(o) => match o.hasattr(Dunder::SetItem) {
-                true => Box::new(o.clone()),
-                false => return Ok(None),
-            },
             _ => return Ok(None),
         };
 
@@ -177,8 +163,6 @@ impl TreewalkValue {
             TreewalkValue::BuiltinMethod(i) => i,
             TreewalkValue::BuiltinFunction(i) => i,
             TreewalkValue::Class(i) => Box::new(i),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(i) => Box::new(i),
             _ => return Err(Exception::type_error("Expected a callable")),
         };
 

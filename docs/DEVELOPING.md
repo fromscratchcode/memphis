@@ -12,14 +12,10 @@ The REPL is useful for interactive mode.
 cargo run --features repl
 ```
 ## Feature Flags
-Feature flags are needed to enable C stdlib or REPL support (or the experimental LLVM backend).
+Feature flags are needed to enable stdlib or REPL support (or the experimental LLVM backend).
 ```bash
 # if examples/test.py depends on stdlib features
 cargo run --features stdlib examples/api.py
-# if examples/test.py depends on stdlib features implemented in C
-cargo run --features c_stdlib examples/api.py
-# it's common to use these together to get as much of the stdlib support as we currently offer
-cargo run --features stdlib,c_stdlib examples/api.py
 
 # script to run all combinations of feature flags
 ./test_features.sh

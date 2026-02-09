@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Iter, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use crate::treewalk::{
     types::{Dict, Str},
@@ -85,15 +85,5 @@ impl Scope {
 
     pub fn to_runtime_dict(&self) -> Dict {
         symbol_table_to_runtime_dict(&self.symbol_table)
-    }
-}
-
-/// Implement IntoIterator for &Scope to allow iteration by reference
-impl<'a> IntoIterator for &'a Scope {
-    type Item = (&'a String, &'a TreewalkValue);
-    type IntoIter = Iter<'a, String, TreewalkValue>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.symbol_table.iter()
     }
 }

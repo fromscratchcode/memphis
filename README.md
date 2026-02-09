@@ -14,8 +14,7 @@ A starter Python interpreter written in Rust. This is intended as a learning exe
 See [SUPPORTED.md](docs/SUPPORTED.md) for details on specific features.
 
 ## Design Goals
-- Minimal dependencies. Uses zero dependencies by default, or enable the REPL, Python stdlib, or LLVM backend as needed. This means you can run Python code which does not call the stdlib (limiting, I know) through the treewalk interpreter or bytecode VM using no third-party Rust code. I find this kinda neat and worth preserving.
-  - `pyo3`: Only needed for c_stdlib functionality.
+- Minimal dependencies. Uses zero dependencies by default, or enable the REPL, or LLVM backend as needed. This means you can run Python code which does not call the stdlib (limiting, I know) through the treewalk interpreter or bytecode VM using no third-party Rust code. I find this kinda neat and worth preserving.
   - `crossterm`: Only needed for REPL support.
   - `inkwell`: Only needed if using the LLVM backend.
 - No shortcuts. This is a learning exercise, so try to do things the "right" way, even if it takes a few tries.

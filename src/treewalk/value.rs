@@ -6,8 +6,6 @@ use std::{
     ptr,
 };
 
-#[cfg(feature = "c_stdlib")]
-use crate::treewalk::types::cpython::{CPythonClass, CPythonModule, CPythonObject};
 use crate::{
     core::{floats_equal, Container},
     domain::{MemphisValue, Type},
@@ -89,12 +87,6 @@ pub enum TreewalkValue {
     BytesIter(Vec<u8>),
     ByteArrayIter(Vec<u8>),
     TypeNode(TypeExpr),
-    #[cfg(feature = "c_stdlib")]
-    CPythonModule(Container<CPythonModule>),
-    #[cfg(feature = "c_stdlib")]
-    CPythonObject(CPythonObject),
-    #[cfg(feature = "c_stdlib")]
-    CPythonClass(CPythonClass),
 }
 
 /// Implement PartialEq manually because Py<PyAny> does not implement PartialEq.
@@ -257,12 +249,6 @@ impl TreewalkValue {
             TreewalkValue::Exception(e) => e.get_type(),
             TreewalkValue::Traceback(_) => Type::Traceback,
             TreewalkValue::Frame => Type::Frame,
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(_) => Type::Module,
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonObject(_) => Type::Object,
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonClass(_) => unimplemented!(),
         }
     }
 
@@ -390,8 +376,6 @@ impl TreewalkValue {
     pub fn as_module(&self) -> DomainResult<Box<dyn MemberRead>> {
         match self {
             TreewalkValue::Module(i) => Ok(Box::new(i.borrow().clone())),
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(i) => Ok(Box::new(i.borrow().clone())),
             _ => Err(Exception::type_error("Expected an int")),
         }
     }
@@ -632,10 +616,6 @@ impl From<TreewalkValue> for MemphisValue {
             TreewalkValue::BytesIter(_) => MemphisValue::BytesIter,
             TreewalkValue::ByteArrayIter(_) => MemphisValue::ByteArrayIter,
             TreewalkValue::TypeNode(_) => MemphisValue::TypeNode,
-            #[cfg(feature = "c_stdlib")]
-            TreewalkValue::CPythonModule(_)
-            | TreewalkValue::CPythonObject(_)
-            | TreewalkValue::CPythonClass(_) => unimplemented!(),
         }
     }
 }
