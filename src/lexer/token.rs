@@ -104,7 +104,10 @@ pub enum Token {
     Newline,
     Semicolon,
     Eof,
+    // we saw a character we don't know how to start any valid tokens with
     InvalidCharacter(char),
+    // we started lexing something valid looking, but it turned into something we don't support
+    Invalid(String),
 }
 
 impl TryFrom<&Token> for BinOp {

@@ -7,7 +7,7 @@ use std::{
 use crate::{
     core::{log, LogLevel},
     domain::{Identifier, Text},
-    lexer::{LexerError, LexerResult, MultilineString, Token},
+    lexer::{MultilineString, Token},
 };
 
 #[derive(Default)]
@@ -49,10 +49,7 @@ impl Iterator for Lexer {
 
             // 3. Process the next line into tokens
             let line = self.source_lines.pop_front()?;
-            match self.tokenize(&line) {
-                Ok(()) => continue,
-                Err(err) => self.handle_tokenize_error(err),
-            }
+            self.tokenize(&line);
         }
     }
 }
@@ -82,22 +79,13 @@ impl Lexer {
         }
     }
 
-    fn handle_tokenize_error(&mut self, err: LexerError) {
-        match err {
-            LexerError::UnexpectedCharacter(c) => {
-                self.pending_tokens.push_back(Token::InvalidCharacter(c));
-            }
-            _ => panic!("{}", err),
-        }
-    }
-
     /// Are we inside a multi-line string or a multi-line context (indicated by {}, (), or []). If
     /// so, our rules for checking and emitting Indent and Dedent tokens are different/disabled.
     fn check_in_block(&self) -> bool {
         self.multiline_context == 0 && self.multiline_string.is_none()
     }
 
-    fn tokenize(&mut self, input: &str) -> LexerResult<()> {
+    fn tokenize(&mut self, input: &str) {
         // Each element here indicates the number of spaces at the beginning of the column for this
         // indentation block. Python does not enforce a particular number of spaces, only that for
         // a given indentation, you are consistent with the number of spaces.
@@ -112,18 +100,11 @@ impl Lexer {
             let num_spaces = count_leading_spaces(line);
 
             if self.check_in_block() {
-                if num_spaces
-                    > *indentation_stack
-                        .last()
-                        .ok_or_else(|| internal_error("Invalid indentation stack state"))?
-                {
+                if num_spaces > *indentation_stack.last().expect("Invalid indentation stack") {
                     indentation_stack.push(num_spaces);
                     self.pending_tokens.push_back(Token::Indent);
                 } else {
-                    while num_spaces
-                        < *indentation_stack
-                            .last()
-                            .ok_or_else(|| internal_error("Invalid indentation stack state"))?
+                    while num_spaces < *indentation_stack.last().expect("Invalid indentation stack")
                     {
                         indentation_stack.pop();
                         self.pending_tokens.push_back(Token::Dedent);
@@ -131,7 +112,7 @@ impl Lexer {
                 }
             }
 
-            self.tokenize_line(line.trim_start())?;
+            self.tokenize_line(line.trim_start());
             self.emit_newline();
         }
 
@@ -139,8 +120,6 @@ impl Lexer {
             indentation_stack.pop();
             self.pending_tokens.push_back(Token::Dedent);
         }
-
-        Ok(())
     }
 
     /// While inside of an f-string, we do not know the end of a string literal until we hit
@@ -193,7 +172,7 @@ impl Lexer {
         }
     }
 
-    fn tokenize_line(&mut self, input: &str) -> LexerResult<()> {
+    fn tokenize_line(&mut self, input: &str) {
         let mut chars = input.chars().peekable();
 
         while let Some(&c) = chars.peek() {
@@ -201,7 +180,7 @@ impl Lexer {
             if c == '#' {
                 // Comments cause the rest of the line to be ignored
                 break;
-            } else if let Some(string) = &self.multiline_string {
+            } else if let Some(ref mut string) = self.multiline_string {
                 // When we see three of our end_char, our multiline string is ending
                 let triple = repeat_n(string.end_char, 3).collect::<String>();
                 if starts_with(&chars, &triple) {
@@ -218,13 +197,7 @@ impl Lexer {
                     self.multiline_string = None;
                 } else {
                     chars.next();
-                    if let Some(ref mut s) = self.multiline_string {
-                        s.literal.push(c);
-                    } else {
-                        return Err(internal_error(
-                            "Expected a raw string literal, but found None",
-                        ));
-                    }
+                    string.literal.push(c);
                 }
             } else if starts_with_any(&chars, &["\"\"\"", "'''"]) {
                 self.multiline_string = Some(MultilineString::new(c));
@@ -235,7 +208,7 @@ impl Lexer {
                 let end_char = chars
                     .clone()
                     .nth(1)
-                    .ok_or_else(|| internal_error("Invalid multiline string"))?;
+                    .expect("Raw multiline string pattern invariant violated.");
                 self.multiline_string = Some(MultilineString::new_raw(end_char));
                 chars.next();
                 chars.next();
@@ -355,15 +328,15 @@ impl Lexer {
                 }
 
                 if value.contains('.') || value.contains('e') || value.contains('E') {
-                    let f_value = value
-                        .parse::<f64>()
-                        .map_err(|_| LexerError::InvalidToken(value))?;
-                    self.pending_tokens.push_back(Token::FloatingPoint(f_value));
-                } else {
-                    let i_value = value
-                        .parse::<u64>()
-                        .map_err(|_| LexerError::InvalidToken(value))?;
+                    if let Ok(f_value) = value.parse::<f64>() {
+                        self.pending_tokens.push_back(Token::FloatingPoint(f_value));
+                    } else {
+                        self.pending_tokens.push_back(Token::Invalid(value));
+                    }
+                } else if let Ok(i_value) = value.parse::<u64>() {
                     self.pending_tokens.push_back(Token::Integer(i_value));
+                } else {
+                    self.pending_tokens.push_back(Token::Invalid(value));
                 }
             } else if starts_with_any(
                 &chars,
@@ -415,7 +388,7 @@ impl Lexer {
                     "!" => Token::Exclamation,
                     "<<" => Token::LeftShift,
                     ">>" => Token::RightShift,
-                    _ => return Err(LexerError::UnexpectedCharacter(c)),
+                    _ => Token::Invalid(operator),
                 };
                 self.pending_tokens.push_back(token);
             } else if starts_with(&chars, "**") {
@@ -449,7 +422,7 @@ impl Lexer {
                     '~' => Token::BitwiseNot,
                     '%' => Token::Modulo,
                     '\n' => Token::Newline,
-                    _ => return Err(LexerError::UnexpectedCharacter(c)),
+                    _ => Token::InvalidCharacter(c),
                 };
 
                 // Detect when we are inside multi-line data structures, which should not be
@@ -464,8 +437,6 @@ impl Lexer {
                 chars.next();
             }
         }
-
-        Ok(())
     }
 }
 
@@ -482,10 +453,6 @@ fn starts_with(chars: &Peekable<Chars>, prefix: &str) -> bool {
         }
     }
     true
-}
-
-fn internal_error(msg: &str) -> LexerError {
-    LexerError::InternalError(msg.to_string())
 }
 
 fn count_leading_spaces(line: &str) -> usize {
@@ -698,7 +665,44 @@ def add(x, y):
         let tokens = tokenize(input);
         assert_eq!(
             tokens,
-            vec![Token::Integer(2), Token::Plus, Token::InvalidCharacter('$'),]
+            vec![
+                Token::Integer(2),
+                Token::Plus,
+                Token::InvalidCharacter('$'),
+                Token::Newline
+            ]
+        );
+    }
+
+    #[test]
+    fn stream_continues_after_invalid_character() {
+        let input = "2 + $ * 6";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Integer(2),
+                Token::Plus,
+                Token::InvalidCharacter('$'),
+                Token::Asterisk,
+                Token::Integer(6),
+                Token::Newline,
+            ]
+        );
+    }
+
+    #[test]
+    fn invalid_token() {
+        let input = "2 <<< 4";
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Integer(2),
+                Token::Invalid("<<<".to_string()),
+                Token::Integer(4),
+                Token::Newline
+            ]
         );
     }
 
