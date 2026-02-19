@@ -406,7 +406,7 @@ impl TreewalkInterpreter {
         Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(gen)))
     }
 
-    pub fn evaluate_slice(&self, params: &SliceParams) -> TreewalkResult<Slice> {
+    fn evaluate_slice(&self, params: &SliceParams) -> TreewalkResult<Slice> {
         let evaluate_to_integer = |expr_option: &Option<Expr>| -> TreewalkResult<Option<i64>> {
             match expr_option {
                 Some(expr) => {

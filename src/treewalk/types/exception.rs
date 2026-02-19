@@ -83,6 +83,10 @@ impl Exception {
         Self::key_error(&TreewalkValue::Str(Str::new(key)))
     }
 
+    pub fn index_error(msg: &str) -> Self {
+        Self::new_from_str(ExceptionKind::IndexError, msg)
+    }
+
     pub fn attribute_error(object_type: impl Into<String>, attr: impl Into<String>) -> Self {
         // We could store the real object here in the future, but right now looking up its type
         // name requires a `TreewalkInterpreter` so we do it before this.

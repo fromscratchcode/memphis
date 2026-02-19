@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use crate::{
-    domain::{Dunder, Type},
+    domain::{utils::wrap_negative, Dunder, Type},
     treewalk::{
         macros::*,
         protocols::Callable,
@@ -26,24 +26,8 @@ impl Slice {
         Self { start, stop, step }
     }
 
-    /// Adjusting start and stop according to Python's slicing rules of negative indices
-    /// wrapping around the iterable.
-    fn adjust_params(slice: &Slice, len: i64) -> (i64, i64, i64) {
-        let start = slice.start.unwrap_or(0);
-        let stop = slice.stop.unwrap_or(len);
-        let step = slice.step.unwrap_or(1);
-
-        let start = if start < 0 { len + start } else { start };
-        let stop = if stop < 0 { len + stop } else { stop };
-
-        let start = start.clamp(0, len);
-        let stop = stop.clamp(0, len);
-
-        (start, stop, step)
-    }
-
-    pub fn slice<T>(slice: &Slice, len: i64, fetch: impl Fn(i64) -> Option<T>) -> Vec<T> {
-        let (start, stop, step) = Self::adjust_params(slice, len);
+    pub fn apply<T>(&self, len: i64, fetch: impl Fn(i64) -> Option<T>) -> Vec<T> {
+        let (start, stop, step) = adjust_slice_params(self, len);
 
         let mut result = Vec::new();
         match step.cmp(&0) {
@@ -70,6 +54,19 @@ impl Slice {
 
         result
     }
+}
+
+/// Adjusting start and stop according to Python's slicing rules of negative indices
+/// wrapping around the iterable.
+fn adjust_slice_params(slice: &Slice, len: i64) -> (i64, i64, i64) {
+    let start = slice.start.unwrap_or(0);
+    let stop = slice.stop.unwrap_or(len);
+    let step = slice.step.unwrap_or(1);
+
+    let start = wrap_negative(start, len).clamp(0, len);
+    let stop = wrap_negative(stop, len).clamp(0, len);
+
+    (start, stop, step)
 }
 
 #[derive(Clone)]

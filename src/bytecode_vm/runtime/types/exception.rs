@@ -35,6 +35,10 @@ impl Exception {
         Self::new(ExceptionKind::TypeError, vec![msg])
     }
 
+    pub fn index_error(msg: Reference) -> Self {
+        Self::new(ExceptionKind::IndexError, vec![msg])
+    }
+
     pub fn import_error(msg: Reference) -> Self {
         Self::new(ExceptionKind::ImportError, vec![msg])
     }

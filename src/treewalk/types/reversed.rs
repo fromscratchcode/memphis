@@ -3,7 +3,7 @@ use crate::{
     domain::{Dunder, Type},
     treewalk::{
         macros::*,
-        protocols::{Callable, IndexRead},
+        protocols::Callable,
         result::Raise,
         types::List,
         utils::{check_args, Args},
@@ -13,7 +13,6 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ReversedIter {
-    interpreter: TreewalkInterpreter,
     list_ref: Container<List>,
     current_index: usize,
 }
@@ -23,10 +22,9 @@ impl_method_provider!(ReversedIter, [NewBuiltin]);
 impl_iterable!(ReversedIter);
 
 impl ReversedIter {
-    pub fn new(interpreter: TreewalkInterpreter, list_ref: Container<List>) -> Self {
+    pub fn new(list_ref: Container<List>) -> Self {
         let current_index = list_ref.borrow().len();
         Self {
-            interpreter,
             list_ref,
             current_index,
         }
@@ -41,12 +39,7 @@ impl Iterator for ReversedIter {
             None
         } else {
             self.current_index -= 1;
-            self.list_ref
-                .getitem(
-                    &self.interpreter,
-                    TreewalkValue::Int(self.current_index as i64),
-                )
-                .unwrap()
+            self.list_ref.borrow().get(self.current_index)
         }
     }
 }
@@ -58,10 +51,7 @@ impl Callable for NewBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| len == 2).raise(interpreter)?;
         let list = args.get_arg(1).as_list().raise(interpreter)?;
-        Ok(TreewalkValue::ReversedIter(ReversedIter::new(
-            interpreter.clone(),
-            list.clone(),
-        )))
+        Ok(TreewalkValue::ReversedIter(ReversedIter::new(list.clone())))
     }
 
     fn name(&self) -> String {

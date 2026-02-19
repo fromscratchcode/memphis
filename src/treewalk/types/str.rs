@@ -2,7 +2,7 @@ use std::{ops::Deref, str};
 
 use crate::{
     core::Container,
-    domain::{Dunder, Encoding, Type},
+    domain::{utils::normalize_index, Dunder, Encoding, Type},
     treewalk::{
         macros::*,
         protocols::{Callable, IndexRead},
@@ -58,14 +58,28 @@ impl Str {
         self.0.as_bytes().to_vec()
     }
 
-    pub fn slice(&self, slice: &Slice) -> Self {
-        let len = self.0.chars().count() as i64;
+    fn len(&self) -> usize {
+        self.0.chars().count()
+    }
 
-        let sliced_string = Slice::slice(slice, len, |i| {
-            self.0.chars().nth(i as usize).map(|c| c.to_string())
-        })
-        .join("");
+    fn get(&self, index: usize) -> Option<Self> {
+        self.get_char(index).map(|c| c.to_string()).map(Str::from)
+    }
 
+    fn get_char(&self, index: usize) -> Option<char> {
+        self.0.chars().nth(index)
+    }
+
+    fn get_normalized(&self, index: i64) -> Option<Self> {
+        let len = self.len() as i64;
+        normalize_index(index, len).and_then(|idx| self.get(idx))
+    }
+
+    fn slice(&self, slice: &Slice) -> Self {
+        let len = self.len() as i64;
+        let sliced_string = slice
+            .apply(len, |i| self.get_char(i as usize).map(|c| c.to_string()))
+            .join("");
         Str::from(sliced_string)
     }
 }
@@ -87,20 +101,26 @@ impl Deref for Str {
 impl IndexRead for Str {
     fn getitem(
         &self,
-        _interpreter: &TreewalkInterpreter,
-        key: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
-        Ok(match key {
+        interpreter: &TreewalkInterpreter,
+        index: TreewalkValue,
+    ) -> TreewalkResult<TreewalkValue> {
+        let value = match index {
             TreewalkValue::Int(i) => self
-                .0
-                .chars()
-                .nth(i as usize)
-                .map(|c| c.to_string())
-                .map(Str::from)
-                .map(TreewalkValue::Str),
-            TreewalkValue::Slice(s) => Some(TreewalkValue::Str(self.slice(&s))),
-            _ => None,
-        })
+                .get_normalized(i)
+                .map(TreewalkValue::Str)
+                .ok_or_else(|| Exception::index_error("string index out of range"))
+                .raise(interpreter)?,
+            TreewalkValue::Slice(s) => TreewalkValue::Str(self.slice(&s)),
+            _ => {
+                return Exception::type_error(format!(
+                    "string indices must be integers, not '{}'",
+                    interpreter.state.class_name_of_value(&index)
+                ))
+                .raise(interpreter)
+            }
+        };
+
+        Ok(value)
     }
 }
 

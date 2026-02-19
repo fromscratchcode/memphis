@@ -33,9 +33,7 @@ impl TreewalkInterpreter {
                 ))
             })
             .raise(self)?
-            .getitem(self, index.clone())?
-            .ok_or_else(|| Exception::key_error(index))
-            .raise(self)
+            .getitem(self, index.clone())
     }
 
     pub fn load_member<S>(&self, result: &TreewalkValue, field: S) -> TreewalkResult<TreewalkValue>

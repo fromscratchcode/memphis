@@ -26,7 +26,7 @@ impl IndexRead for MappingProxy {
         &self,
         interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
+    ) -> TreewalkResult<TreewalkValue> {
         self.0.getitem(interpreter, index)
     }
 }

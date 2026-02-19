@@ -117,7 +117,7 @@ pub trait IndexRead {
         &self,
         interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>>;
+    ) -> TreewalkResult<TreewalkValue>;
 }
 
 pub trait IndexWrite {

@@ -73,6 +73,7 @@ pub enum Type {
     ImportError,
     LookupError,
     KeyError,
+    IndexError,
     ValueError,
     NameError,
     AttributeError,
@@ -150,6 +151,7 @@ impl Type {
             Type::ImportError => "ImportError",
             Type::LookupError => "LookupError",
             Type::KeyError => "KeyError",
+            Type::IndexError => "IndexError",
             Type::ValueError => "ValueError",
             Type::NameError => "NameError",
             Type::AttributeError => "AttributeError",
@@ -186,7 +188,7 @@ impl From<&Type> for &str {
     }
 }
 
-static TYPE_PARENTS: [(Type, &[Type]); 14] = [
+static TYPE_PARENTS: [(Type, &[Type]); 15] = [
     (Type::Exception, &[Type::BaseException]),
     (Type::TypeError, &[Type::Exception]),
     (Type::StopIteration, &[Type::Exception]),
@@ -195,6 +197,7 @@ static TYPE_PARENTS: [(Type, &[Type]); 14] = [
     (Type::ImportError, &[Type::Exception]),
     (Type::LookupError, &[Type::Exception]),
     (Type::KeyError, &[Type::Exception]),
+    (Type::IndexError, &[Type::Exception]),
     (Type::ValueError, &[Type::Exception]),
     (Type::NameError, &[Type::Exception]),
     (Type::AttributeError, &[Type::Exception]),

@@ -32,6 +32,8 @@ pub enum Opcode {
     /// Pop the top two values off the stack, compare their semantic equality, invert the result,
     /// and push it onto the stack.
     Ne,
+    /// Pop two values off the stack, perform the subscript operator (index access).
+    BinarySubscr,
     /// Compare two values on the stack and push a boolean result back onto the stack based on
     /// whether the first value is less than the second value.
     LessThan,
@@ -211,6 +213,7 @@ impl Display for Opcode {
             Opcode::Div => write!(f, "DIV"),
             Opcode::Eq => write!(f, "EQ"),
             Opcode::Ne => write!(f, "NE"),
+            Opcode::BinarySubscr => write!(f, "BINARY_SUBSCR"),
             Opcode::LessThan => write!(f, "LESS_THAN"),
             Opcode::LessThanOrEq => write!(f, "LESS_THAN_OR_EQ"),
             Opcode::GreaterThan => write!(f, "GREATER_THAN"),

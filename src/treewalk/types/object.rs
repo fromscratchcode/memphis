@@ -131,14 +131,14 @@ impl IndexRead for Container<Object> {
         &self,
         interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
+    ) -> TreewalkResult<TreewalkValue> {
         let result = interpreter.call_method(
             &TreewalkValue::Object(self.clone()),
             Dunder::GetItem,
             args![index],
         )?;
 
-        Ok(Some(result))
+        Ok(result)
     }
 }
 

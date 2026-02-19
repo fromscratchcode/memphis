@@ -1184,6 +1184,16 @@ b = f.bar(11)
     }
 
     #[test]
+    fn index_access() {
+        let text = r#"[1,2,3][1]"#;
+        assert_eval_eq!(text, int!(2));
+
+        let text = r#"[1,2,3][3]"#;
+        let e = eval_expect_error(text);
+        assert_index_error!(e.exception, "list index out of range");
+    }
+
+    #[test]
     fn class_with_member_access() {
         let text = r#"
 class Foo:

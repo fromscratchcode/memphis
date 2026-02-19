@@ -84,6 +84,21 @@ impl VirtualMachine {
                 let left = self.pop_value();
                 self.push(self.to_heapified_bool(left != right));
             }
+            Opcode::BinarySubscr => {
+                let index = self.pop_value();
+                let obj = self.pop_value();
+                let result = match obj {
+                    VmValue::List(l) => l.getitem(self, index),
+                    VmValue::Tuple(t) => t.getitem(self, index),
+                    _ => {
+                        let msg = self.intern_string("TODO object is not subscriptable");
+                        let exp = Exception::type_error(msg);
+                        return self.raise_step(exp);
+                    }
+                };
+                let value = step_raised!(result);
+                self.push(value);
+            }
             Opcode::Is => {
                 // For referential identity, we compare the Reference objects directly.
                 let right = self.pop();

@@ -42,6 +42,7 @@ impl Compiler {
             Expr::ComparisonChain { left, ops } => self.compile_comparison_chain(left, ops),
             Expr::LogicalOperation { left, op, right } => self.compile_logical_op(left, op, right),
             Expr::MemberAccess { object, field } => self.compile_member_access(object, field),
+            Expr::IndexAccess { object, index } => self.compile_index_access(object, index),
             Expr::FunctionCall { callee, args } => self.compile_function_call(callee, args),
             Expr::Yield(value) => self.compile_yield(value),
             Expr::YieldFrom(value) => self.compile_yield_from(value),
@@ -220,6 +221,13 @@ impl Compiler {
         self.compile_expr(object)?;
         let attr_index = self.get_or_set_nonlocal_index(field.as_str());
         self.emit(Opcode::LoadAttr(attr_index));
+        Ok(())
+    }
+
+    fn compile_index_access(&mut self, object: &Expr, index: &Expr) -> CompilerResult<()> {
+        self.compile_expr(object)?;
+        self.compile_expr(index)?;
+        self.emit(Opcode::BinarySubscr);
         Ok(())
     }
 
@@ -605,7 +613,21 @@ mod tests_bytecode_expr {
             bytecode,
             &[
                 Opcode::LoadGlobal(Index::new(0)),
-                Opcode::LoadAttr(Index::new(1))
+                Opcode::LoadAttr(Index::new(1)),
+            ]
+        );
+    }
+
+    #[test]
+    fn index_access() {
+        let expr = index_access!(var!("foo"), int!(4));
+        let bytecode = compile_expr(expr);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::BinarySubscr,
             ]
         );
     }

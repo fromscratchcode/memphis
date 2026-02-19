@@ -47,13 +47,12 @@ impl Dict {
         Ok(())
     }
 
-    fn get(&self, key: TreewalkValue, default: Option<TreewalkValue>) -> TreewalkValue {
-        let default = default.unwrap_or(TreewalkValue::None);
+    fn get(&self, key: &TreewalkValue) -> Option<TreewalkValue> {
         let key = key.as_hash_key().expect("Unhashable key");
         if let Some((_, val)) = self.items.get(&key) {
-            val.clone()
+            Some(val.clone())
         } else {
-            default.clone()
+            None
         }
     }
 
@@ -172,14 +171,15 @@ impl IntoIterator for Container<Dict> {
 impl IndexRead for Container<Dict> {
     fn getitem(
         &self,
-        _interpreter: &TreewalkInterpreter,
+        interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
-        if self.borrow().has(&index) {
-            Ok(Some(self.borrow().get(index, None)))
-        } else {
-            Ok(None)
-        }
+    ) -> TreewalkResult<TreewalkValue> {
+        let value = self
+            .borrow()
+            .get(&index)
+            .ok_or_else(|| Exception::key_error(&index))
+            .raise(interpreter)?;
+        Ok(value)
     }
 }
 
@@ -323,10 +323,15 @@ impl Callable for GetBuiltin {
             .raise(interpreter)?;
 
         let key = args.get_arg(0);
-        let default = args.get_arg_optional(1);
 
         let d = dict.borrow().clone();
-        Ok(d.get(key, default))
+        let value = if let Some(val) = d.get(&key) {
+            val
+        } else {
+            args.get_arg_optional(1).unwrap_or(TreewalkValue::None)
+        };
+
+        Ok(value)
     }
 
     fn name(&self) -> String {

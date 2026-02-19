@@ -2,13 +2,13 @@ use std::{collections::VecDeque, ops::Add};
 
 use crate::{
     core::Container,
-    domain::{Dunder, Type},
+    domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
         macros::*,
         protocols::{Callable, IndexRead, IndexWrite, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
-        types::Slice,
+        types::{Exception, Slice},
         utils::{check_args, Args},
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
@@ -61,16 +61,18 @@ impl List {
         self.items.is_empty()
     }
 
-    pub fn slice(&self, interpreter: &TreewalkInterpreter, slice: &Slice) -> Self {
+    pub fn get(&self, index: usize) -> Option<TreewalkValue> {
+        self.items.get(index).cloned()
+    }
+
+    fn get_normalized(&self, index: i64) -> Option<TreewalkValue> {
         let len = self.items.len() as i64;
-        let receiver = Container::new(self.clone());
+        normalize_index(index, len).map(|idx| self.items[idx].clone())
+    }
 
-        let sliced_items = Slice::slice(slice, len, |i| {
-            receiver
-                .getitem(interpreter, TreewalkValue::Int(i))
-                .unwrap()
-        });
-
+    fn slice(&self, slice: &Slice) -> Self {
+        let len = self.items.len() as i64;
+        let sliced_items = slice.apply(len, |i| self.get(i as usize));
         List::new(sliced_items)
     }
 }
@@ -79,15 +81,25 @@ impl IndexRead for Container<List> {
     fn getitem(
         &self,
         interpreter: &TreewalkInterpreter,
-        key: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
-        Ok(match key {
-            TreewalkValue::Int(i) => self.borrow().items.get(i as usize).cloned(),
-            TreewalkValue::Slice(s) => Some(TreewalkValue::List(Container::new(
-                self.borrow().slice(interpreter, &s),
-            ))),
-            _ => None,
-        })
+        index: TreewalkValue,
+    ) -> TreewalkResult<TreewalkValue> {
+        let value = match index {
+            TreewalkValue::Int(i) => self
+                .borrow()
+                .get_normalized(i)
+                .ok_or_else(|| Exception::index_error("list index out of range"))
+                .raise(interpreter)?,
+            TreewalkValue::Slice(s) => TreewalkValue::List(Container::new(self.borrow().slice(&s))),
+            _ => {
+                return Exception::type_error(format!(
+                    "list indices must be integers or slices, not {}",
+                    interpreter.state.class_name_of_value(&index)
+                ))
+                .raise(interpreter)
+            }
+        };
+
+        Ok(value)
     }
 }
 

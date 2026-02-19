@@ -31,6 +31,7 @@
 |Ranges|✅|✅|
 |Generator functions|✅|✅|
 |`yield from`|✅|✅|
+|Index access|✅|🔄|
 |Slices|✅||
 |Inheritance|✅||
 |Operator overloading|✅||

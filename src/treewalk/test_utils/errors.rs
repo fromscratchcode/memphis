@@ -417,6 +417,39 @@ macro_rules! assert_key_error {
     }};
 }
 
+macro_rules! assert_index_error {
+    ($exc:expr, $expected_message:expr) => {{
+        match &$exc {
+            $crate::treewalk::types::Exception {
+                kind: $crate::domain::ExceptionKind::IndexError,
+                payload,
+            } => {
+                assert_eq!(
+                    payload.len(),
+                    1,
+                    "Expected IndexError with one argument, got payload: {:?}",
+                    payload
+                );
+
+                match &payload[0] {
+                    $crate::treewalk::TreewalkValue::Str(s) => {
+                        assert_eq!(
+                            s.as_str(),
+                            $expected_message,
+                            "Unexpected IndexError message"
+                        );
+                    }
+                    other => panic!(
+                        "Expected IndexError message to be a string, got: {:?}",
+                        other
+                    ),
+                }
+            }
+            _ => panic!("Expected IndexError, got: {:?}", &$exc),
+        }
+    }};
+}
+
 macro_rules! assert_name_error {
     ($exc:expr, $expected_message:expr) => {{
         match &$exc {
@@ -486,6 +519,7 @@ macro_rules! assert_lookup_error {
 pub(crate) use assert_assertion_error;
 pub(crate) use assert_attribute_error;
 pub(crate) use assert_div_by_zero_error;
+pub(crate) use assert_index_error;
 pub(crate) use assert_key_error;
 pub(crate) use assert_lookup_error;
 pub(crate) use assert_name_error;

@@ -1,9 +1,10 @@
 use crate::{
-    domain::{Dunder, Type},
+    domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
         macros::*,
         protocols::{Callable, IndexRead, TryEvalFrom},
         result::Raise,
+        types::{Exception, Slice},
         utils::{check_args, Args},
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
@@ -35,16 +36,27 @@ impl Tuple {
         self.items.is_empty()
     }
 
-    fn get_item(&self, index: usize) -> Option<TreewalkValue> {
+    fn get(&self, index: usize) -> Option<TreewalkValue> {
         self.items.get(index).cloned()
     }
 
+    fn get_normalized(&self, index: i64) -> Option<TreewalkValue> {
+        let len = self.len() as i64;
+        normalize_index(index, len).map(|idx| self.items[idx].clone())
+    }
+
     pub fn first(&self) -> TreewalkValue {
-        self.get_item(0).expect("No first tuple element!")
+        self.get(0).expect("No first tuple element!")
     }
 
     pub fn second(&self) -> TreewalkValue {
-        self.get_item(1).expect("No second tuple element!")
+        self.get(1).expect("No second tuple element!")
+    }
+
+    fn slice(&self, slice: &Slice) -> Self {
+        let len = self.len() as i64;
+        let sliced_items = slice.apply(len, |i| self.get(i as usize));
+        Self::new(sliced_items)
     }
 }
 
@@ -53,9 +65,23 @@ impl IndexRead for Tuple {
         &self,
         interpreter: &TreewalkInterpreter,
         index: TreewalkValue,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
-        let i = index.as_int().raise(interpreter)?;
-        Ok(self.get_item(i as usize))
+    ) -> TreewalkResult<TreewalkValue> {
+        let value = match index {
+            TreewalkValue::Int(i) => self
+                .get_normalized(i)
+                .ok_or_else(|| Exception::index_error("tuple index out of range"))
+                .raise(interpreter)?,
+            TreewalkValue::Slice(s) => TreewalkValue::Tuple(self.slice(&s)),
+            _ => {
+                return Exception::type_error(format!(
+                    "tuple indices must be integers or slices, not {}",
+                    interpreter.state.class_name_of_value(&index)
+                ))
+                .raise(interpreter)
+            }
+        };
+
+        Ok(value)
     }
 }
 

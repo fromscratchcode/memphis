@@ -9,6 +9,7 @@ pub enum ExceptionKind {
     TypeError,
     LookupError,
     KeyError,
+    IndexError,
     ValueError,
     NameError,
     AttributeError,
@@ -28,6 +29,7 @@ impl ExceptionKind {
             Self::ImportError => Type::ImportError,
             Self::LookupError => Type::LookupError,
             Self::KeyError => Type::KeyError,
+            Self::IndexError => Type::IndexError,
             Self::ValueError => Type::ValueError,
             Self::NameError => Type::NameError,
             Self::AttributeError => Type::AttributeError,
@@ -101,6 +103,13 @@ impl Display for MemphisException {
                     write!(f, "'{}'", key)
                 } else {
                     write!(f, "key is not defined")
+                }
+            }
+            ExceptionKind::IndexError => {
+                if let Some(MemphisValue::Str(msg)) = self.payload.first() {
+                    write!(f, "{}", msg)
+                } else {
+                    write!(f, "index out of range")
                 }
             }
             ExceptionKind::AttributeError => match (&self.payload.first(), &self.payload.get(1)) {

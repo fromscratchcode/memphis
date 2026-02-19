@@ -1121,57 +1121,45 @@ l = {1} <= {2}
 
     #[test]
     fn tuples() {
+        let input = r#"(1,2,3)"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2), int!(3),]);
+
+        let input = r#"(1,2.1)"#;
+        assert_eval_eq!(input, tuple![int!(1), float!(2.1)]);
+
+        let input = r#"tuple()"#;
+        assert_eval_eq!(input, tuple![]);
+
+        let input = r#"tuple([1,2])"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
+
+        let input = r#"tuple({1,2})"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
+
+        let input = r#"tuple((1,2))"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
+
+        let input = r#"tuple(range(2))"#;
+        assert_eval_eq!(input, tuple![int!(0), int!(1)]);
+
+        let input = r#"(4,)"#;
+        assert_eval_eq!(input, tuple![int!(4),]);
+
+        let input = r#"9, 10"#;
+        assert_eval_eq!(input, tuple![int!(9), int!(10),]);
+
         let input = r#"
-a = (1,2,3)
-b = (1,2.1)
-c = tuple([1,2])
-d = tuple({1,2})
-e = tuple((1,2))
-f = tuple(range(2))
 g = iter(())
 h = type(iter(()))
-i = (4,)
-j = 9, 10
-k = tuple()
 "#;
         let ctx = run(input);
 
-        assert_read_eq!(ctx, "a", tuple![int!(1), int!(2), int!(3),]);
-        assert_read_eq!(ctx, "b", tuple![int!(1), float!(2.1)]);
-        assert_read_eq!(ctx, "c", tuple![int!(1), int!(2)]);
-        assert_read_eq!(ctx, "d", tuple![int!(1), int!(2)]);
-        assert_read_eq!(ctx, "e", tuple![int!(1), int!(2)]);
-        assert_read_eq!(ctx, "f", tuple![int!(0), int!(1)]);
         assert_variant!(ctx, "g", TupleIter);
         assert_type_eq!(ctx, "h", Type::TupleIter);
-        assert_read_eq!(ctx, "i", tuple![int!(4),]);
-        assert_read_eq!(ctx, "j", tuple![int!(9), int!(10),]);
-        assert_read_eq!(ctx, "k", tuple![]);
 
         let input = "tuple([1,2,3], [1,2])";
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "Found 3 args");
-    }
-
-    #[test]
-    fn index_access() {
-        let input = r#"
-a = [1,2,3]
-b = a[0]
-c = [1,2,3][1]
-a[0] = 10
-
-d = (1,2,3)
-e = d[0]
-f = (1,2,3)[1]
-"#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![int!(10), int!(2), int!(3),]);
-        assert_read_eq!(ctx, "b", int!(1));
-        assert_read_eq!(ctx, "c", int!(2));
-        assert_read_eq!(ctx, "e", int!(1));
-        assert_read_eq!(ctx, "f", int!(2));
 
         let input = r#"
 d = (1,2,3)
@@ -1189,12 +1177,88 @@ del d[0]
 "#;
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "'tuple' object does not support item deletion");
+    }
+
+    #[test]
+    fn index_access_read() {
+        let input = r#"[1,2,3][1]"#;
+        assert_eval_eq!(input, int!(2));
+
+        let input = r#"[1,2,3][-1]"#;
+        assert_eval_eq!(input, int!(3));
+
+        let input = r#"[1,2,3][3]"#;
+        let e = eval_expect_error(input);
+        assert_index_error!(e.exception, "list index out of range");
+
+        let input = r#"[1,2,3]["a"]"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "list indices must be integers or slices, not str"
+        );
 
         let input = r#"
-4[1]
+class Foo: pass
+[1,2,3][Foo()]
 "#;
         let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "list indices must be integers or slices, not Foo"
+        );
+
+        let input = r#"(1,2,3)[2]"#;
+        assert_eval_eq!(input, int!(3));
+
+        let input = r#"(1,2,3)[-1]"#;
+        assert_eval_eq!(input, int!(3));
+
+        let input = r#"(1,2,3)[3]"#;
+        let e = eval_expect_error(input);
+        assert_index_error!(e.exception, "tuple index out of range");
+
+        let input = r#"(1,2,3)["a"]"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "tuple indices must be integers or slices, not str"
+        );
+
+        let input = r#"{"a": 4}["a"]"#;
+        assert_eval_eq!(input, int!(4));
+
+        let input = r#"{"a": 4}["b"]"#;
+        let e = eval_expect_error(input);
+        assert_key_error!(e.exception, "b");
+
+        let input = r#""abcdef"[2]"#;
+        assert_eval_eq!(input, str!("c"));
+
+        let input = r#""abcdef"[-1]"#;
+        assert_eval_eq!(input, str!("f"));
+
+        let input = r#""abcdef"[8]"#;
+        let e = eval_expect_error(input);
+        assert_index_error!(e.exception, "string index out of range");
+
+        let input = r#""abcdef"["b"]"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "string indices must be integers, not 'str'");
+
+        let input = r#"4[1]"#;
+        let e = eval_expect_error(input);
         assert_type_error!(e.exception, "'int' object is not subscriptable");
+    }
+
+    #[test]
+    fn index_access_write() {
+        let input = r#"
+a = [1,2,3]
+a[0] = 10
+a
+"#;
+        assert_eval_eq!(input, list![int!(10), int!(2), int!(3),]);
     }
 
     #[test]
@@ -4190,59 +4254,94 @@ b = 7 if False else 8
     }
 
     #[test]
-    fn slices() {
+    fn slices_list() {
         let input = r#"
 a = list(range(1,11))
-b = a[:2]
-c = a[7:]
-d = a[::2]
-e = a[::-2]
-f = a[2:4]
-g = a[-1:]
-h = a[:-9]
-i = a[4:2]
+a[:2]
+"#;
+        assert_eval_eq!(input, list![int!(1), int!(2),]);
 
+        let input = r#"
+a = list(range(1,11))
+a[7:]
+"#;
+        assert_eval_eq!(input, list![int!(8), int!(9), int!(10),]);
+
+        let input = r#"
+a = list(range(1,11))
+a[::2]
+"#;
+        assert_eval_eq!(input, list![int!(1), int!(3), int!(5), int!(7), int!(9),]);
+
+        let input = r#"
+a = list(range(1,11))
+a[::-2]
+"#;
+        assert_eval_eq!(input, list![int!(10), int!(8), int!(6), int!(4), int!(2),]);
+
+        let input = r#"
+a = list(range(1,11))
+a[2:4]
+"#;
+        assert_eval_eq!(input, list![int!(3), int!(4),]);
+
+        let input = r#"
+a = list(range(1,11))
+a[-1:]
+"#;
+        assert_eval_eq!(input, list![int!(10),]);
+
+        let input = r#"
+a = list(range(1,11))
+a[:-9]
+"#;
+        assert_eval_eq!(input, list![int!(1),]);
+
+        let input = r#"
+a = list(range(1,11))
+a[4:2]
+"#;
+        assert_eval_eq!(input, list![]);
+
+        let input = r#"[2,4,6][:]"#;
+        assert_eval_eq!(input, list![int!(2), int!(4), int!(6),]);
+    }
+
+    #[test]
+    fn slice_str() {
+        let input = r#""hello"[0]"#;
+        assert_eval_eq!(input, str!("h"));
+
+        let input = r#""hello"[:1]"#;
+        assert_eval_eq!(input, str!("h"));
+
+        let input = r#""hello"[:2]"#;
+        assert_eval_eq!(input, str!("he"));
+    }
+
+    #[test]
+    fn slices_tuple() {
+        let input = r#"
+a = tuple(range(1,11))
+a[:2]
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2),]);
+    }
+
+    #[test]
+    fn slice_builtin() {
+        let input = r#"
 j = slice(5)
 k = slice(5,10)
 l = slice(5,10,2)
 m = type(slice(5))
-
-word = "hello"
-n = word[0]
-o = word[:1]
-p = word[:2]
-#q = word[-1]
-
-r = [2,4,6][:]
 "#;
-
         let ctx = run(input);
 
-        assert_read_eq!(ctx, "b", list![int!(1), int!(2),]);
-        assert_read_eq!(ctx, "c", list![int!(8), int!(9), int!(10),]);
-        assert_read_eq!(
-            ctx,
-            "d",
-            list![int!(1), int!(3), int!(5), int!(7), int!(9),]
-        );
-        assert_read_eq!(
-            ctx,
-            "e",
-            list![int!(10), int!(8), int!(6), int!(4), int!(2),]
-        );
-        assert_read_eq!(ctx, "f", list![int!(3), int!(4),]);
-        assert_read_eq!(ctx, "g", list![int!(10),]);
-        assert_read_eq!(ctx, "h", list![int!(1),]);
-        assert_read_eq!(ctx, "i", list![]);
         assert_variant!(ctx, "j", Slice);
         assert_variant!(ctx, "k", Slice);
         assert_variant!(ctx, "l", Slice);
         assert_type_eq!(ctx, "m", Type::Slice);
-        assert_read_eq!(ctx, "n", str!("h"));
-        assert_read_eq!(ctx, "o", str!("h"));
-        assert_read_eq!(ctx, "p", str!("he"));
-        //assert_read_eq!(ctx, "q", str!("he"));
-        assert_read_eq!(ctx, "r", list![int!(2), int!(4), int!(6),]);
     }
 
     #[test]
@@ -4256,12 +4355,9 @@ class Foo:
     def run(self):
         return 2 * self.val
 
-a = Foo().run
+Foo().run
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(6));
+        assert_eval_eq!(input, int!(6));
     }
 
     #[test]
@@ -4281,12 +4377,9 @@ def foo(cls, /):
         let input = r#"
 a = 4
 b = globals()
-c = b['a']
+b['a']
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "c", int!(4));
+        assert_eval_eq!(input, int!(4));
     }
 
     #[test]
