@@ -40,3 +40,14 @@ fn index_access_read() {
     let e = crosscheck_expect_error!(input);
     assert_index_error!(e.exception, "string index out of range");
 }
+
+#[test]
+#[ignore]
+fn index_access_write() {
+    let input = r#"
+a = [1,2,3]
+a[0] = 10
+a
+"#;
+    assert_crosscheck_return!(input, list![int!(10), int!(2), int!(3),]);
+}

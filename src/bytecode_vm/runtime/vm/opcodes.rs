@@ -103,6 +103,7 @@ impl VirtualMachine {
                 let value = step_raised!(result);
                 self.push(value);
             }
+            Opcode::StoreSubscr => todo!(),
             Opcode::Is => {
                 // For referential identity, we compare the Reference objects directly.
                 let right = self.pop();
