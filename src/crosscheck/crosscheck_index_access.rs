@@ -29,4 +29,14 @@ fn index_access_read() {
     let input = r#"{"a": 4}["b"]"#;
     let e = crosscheck_expect_error!(input);
     assert_key_error!(e.exception, "b");
+
+    let input = r#""abcdef"[2]"#;
+    assert_crosscheck_return!(input, str!("c"));
+
+    let input = r#""abcdef"[-1]"#;
+    assert_crosscheck_return!(input, str!("f"));
+
+    let input = r#""abcdef"[8]"#;
+    let e = crosscheck_expect_error!(input);
+    assert_index_error!(e.exception, "string index out of range");
 }

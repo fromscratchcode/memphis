@@ -5,7 +5,8 @@ use crate::{
             import_utils::build_module_chain,
             modules::builtins,
             types::{
-                Coroutine, Dict, Exception, FunctionObject, Generator, List, Method, Object, Tuple,
+                str_getitem, Coroutine, Dict, Exception, FunctionObject, Generator, List, Method,
+                Object, Tuple,
             },
             BuiltinFunction, Completion, FrameExit, Reference, StepResult, Suspension,
         },
@@ -89,6 +90,7 @@ impl VirtualMachine {
                 let index = self.deref(index_ref);
                 let obj = self.pop_value();
                 let result = match obj {
+                    VmValue::Str(s) => str_getitem(&s, self, index),
                     VmValue::List(l) => l.getitem(self, index),
                     VmValue::Tuple(t) => t.getitem(self, index),
                     VmValue::Dict(d) => d.getitem(self, index_ref),

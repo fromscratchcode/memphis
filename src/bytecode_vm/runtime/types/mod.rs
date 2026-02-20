@@ -9,6 +9,7 @@ mod method;
 mod module;
 mod object;
 mod range;
+mod str;
 mod tuple;
 
 pub use class::Class;
@@ -22,4 +23,5 @@ pub use method::Method;
 pub use module::Module;
 pub use object::Object;
 pub use range::{Range, RangeIter};
+pub use str::str_getitem;
 pub use tuple::{Tuple, TupleIter};
