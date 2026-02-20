@@ -51,11 +51,6 @@ impl Tuple {
 
         Ok(value)
     }
-
-    #[cfg(test)]
-    pub fn resolved_items(&self, vm: &VirtualMachine) -> Vec<VmValue> {
-        self.items.iter().map(|r| vm.deref(*r)).collect()
-    }
 }
 
 #[derive(Clone, Debug)]

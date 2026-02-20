@@ -1,4 +1,4 @@
-use crate::domain::MemphisValue;
+use crate::domain::test_utils::*;
 
 use super::macros::*;
 
@@ -14,7 +14,7 @@ f = Foo()
 b = f.bar()
 "#
     );
-    assert_crosscheck_eq!(session, "b", MemphisValue::Integer(4));
+    assert_crosscheck_eq!(session, "b", int!(4));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -29,5 +29,5 @@ f = Foo(10)
 b = f.bar()
 "#
     );
-    assert_crosscheck_eq!(session, "b", MemphisValue::Integer(10));
+    assert_crosscheck_eq!(session, "b", int!(10));
 }

@@ -1,4 +1,4 @@
-use crate::domain::{test_utils::*, MemphisValue};
+use crate::domain::test_utils::*;
 
 use super::macros::*;
 
@@ -12,7 +12,7 @@ def foo(a, b):
 a = foo(2, 9)
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(11));
+    assert_crosscheck_eq!(session, "a", int!(11));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -23,7 +23,7 @@ def foo(a, b):
 a = foo(2, 9)
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(20));
+    assert_crosscheck_eq!(session, "a", int!(20));
 
     let e = crosscheck_expect_error!(
         r#"

@@ -298,10 +298,10 @@ impl VirtualMachine {
     pub fn normalize_vm_value(&self, value: VmValue) -> MemphisValue {
         match value {
             VmValue::None => MemphisValue::None,
-            VmValue::Int(i) => MemphisValue::Integer(i),
+            VmValue::Int(i) => MemphisValue::Int(i),
             VmValue::Float(f) => MemphisValue::Float(f),
             VmValue::String(s) => MemphisValue::Str(s),
-            VmValue::Bool(b) => MemphisValue::Boolean(b),
+            VmValue::Bool(b) => MemphisValue::Bool(b),
             VmValue::List(i) => {
                 let items = i.items.iter().map(|r| self.normalize_vm_ref(*r)).collect();
                 MemphisValue::List(items)
@@ -335,7 +335,10 @@ impl VirtualMachine {
             VmValue::TupleIter(_) => MemphisValue::TupleIter,
             VmValue::BuiltinFunction(f) => MemphisValue::BuiltinFunction(f.name().to_string()),
             VmValue::SleepFuture(_) => todo!(),
-            VmValue::Exception(_) => MemphisValue::Exception,
+            VmValue::Exception(e) => {
+                let me = e.normalize(self);
+                MemphisValue::Exception(me)
+            }
         }
     }
 
@@ -348,6 +351,10 @@ impl VirtualMachine {
         } else if let Some(module) = value.as_module() {
             module
                 .borrow()
+                .read(name)
+                .ok_or_else(|| Exception::attribute_error(&value.get_type(), name))
+        } else if let Some(class) = value.as_class() {
+            class
                 .read(name)
                 .ok_or_else(|| Exception::attribute_error(&value.get_type(), name))
         } else {

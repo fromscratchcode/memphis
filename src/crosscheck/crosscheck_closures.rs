@@ -1,4 +1,4 @@
-use crate::domain::MemphisValue;
+use crate::domain::test_utils::*;
 
 use super::macros::*;
 
@@ -15,5 +15,5 @@ adder = make_adder(10)
 a = adder(5)
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(15));
+    assert_crosscheck_eq!(session, "a", int!(15));
 }

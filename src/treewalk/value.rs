@@ -501,10 +501,10 @@ impl From<TreewalkValue> for MemphisValue {
     fn from(value: TreewalkValue) -> Self {
         match value {
             TreewalkValue::None => MemphisValue::None,
-            TreewalkValue::Int(i) => MemphisValue::Integer(i),
+            TreewalkValue::Int(i) => MemphisValue::Int(i),
             TreewalkValue::Float(i) => MemphisValue::Float(i),
             TreewalkValue::Str(s) => MemphisValue::Str(s.as_str().to_string()),
-            TreewalkValue::Bool(val) => MemphisValue::Boolean(val),
+            TreewalkValue::Bool(val) => MemphisValue::Bool(val),
             TreewalkValue::List(i) => {
                 let items = i
                     .into_iter()
@@ -601,7 +601,7 @@ impl From<TreewalkValue> for MemphisValue {
                     .collect();
                 MemphisValue::MappingProxy(items)
             }
-            TreewalkValue::Exception(_) => MemphisValue::Exception,
+            TreewalkValue::Exception(e) => MemphisValue::Exception(e.into()),
             TreewalkValue::Traceback(_) => MemphisValue::Traceback,
             TreewalkValue::Frame => MemphisValue::Frame,
             TreewalkValue::ListIter(_) => MemphisValue::ListIter,

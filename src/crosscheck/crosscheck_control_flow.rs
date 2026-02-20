@@ -1,4 +1,4 @@
-use crate::domain::MemphisValue;
+use crate::domain::test_utils::*;
 
 use super::macros::*;
 
@@ -12,7 +12,7 @@ while i < n:
     i = i + 1
 "#
     );
-    assert_crosscheck_eq!(session, "i", MemphisValue::Integer(4));
+    assert_crosscheck_eq!(session, "i", int!(4));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -21,7 +21,7 @@ if i < 10:
     a = -1
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(-1));
+    assert_crosscheck_eq!(session, "a", int!(-1));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -32,7 +32,7 @@ else:
     a = 3
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(3));
+    assert_crosscheck_eq!(session, "a", int!(3));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -45,7 +45,7 @@ else:
     a = 3
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(-2));
+    assert_crosscheck_eq!(session, "a", int!(-2));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -57,7 +57,7 @@ elif x < 6:
     result = "mid"
 "#
     );
-    assert_crosscheck_eq!(session, "result", MemphisValue::Str("none".to_string()));
+    assert_crosscheck_eq!(session, "result", str!("none"));
 
     let mut session = crosscheck_eval!(
         r#"
@@ -74,7 +74,7 @@ else:
     a = "other"
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Str("three".to_string()));
+    assert_crosscheck_eq!(session, "a", str!("three"));
 }
 
 #[test]
@@ -84,9 +84,9 @@ fn semicolons() {
 b = 2; c = 3
 "#
     );
-    assert_crosscheck_eq!(session, "b", MemphisValue::Integer(2));
-    assert_crosscheck_eq!(session, "c", MemphisValue::Integer(3));
+    assert_crosscheck_eq!(session, "b", int!(2));
+    assert_crosscheck_eq!(session, "c", int!(3));
 
     let input = "a = 10; 4 + a";
-    assert_crosscheck_return!(input, MemphisValue::Integer(14));
+    assert_crosscheck_return!(input, int!(14));
 }

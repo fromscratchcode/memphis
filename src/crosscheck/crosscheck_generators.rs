@@ -1,4 +1,4 @@
-use crate::domain::{test_utils::*, MemphisValue};
+use crate::domain::test_utils::*;
 
 use super::macros::*;
 
@@ -15,8 +15,8 @@ a = next(g)
 b = next(g)
 "#
     );
-    assert_crosscheck_eq!(session, "a", MemphisValue::Integer(1));
-    assert_crosscheck_eq!(session, "b", MemphisValue::Integer(2));
+    assert_crosscheck_eq!(session, "a", int!(1));
+    assert_crosscheck_eq!(session, "b", int!(2));
 }
 
 #[test]
@@ -32,8 +32,8 @@ for i in gen():
     s = s + i
 "#
     );
-    assert_crosscheck_eq!(session, "i", MemphisValue::Integer(2));
-    assert_crosscheck_eq!(session, "s", MemphisValue::Integer(14));
+    assert_crosscheck_eq!(session, "i", int!(2));
+    assert_crosscheck_eq!(session, "s", int!(14));
 }
 
 #[test]
@@ -63,15 +63,7 @@ a = list(gen())
 "#
     );
 
-    assert_crosscheck_eq!(
-        session,
-        "a",
-        MemphisValue::List(vec![
-            MemphisValue::Integer(1),
-            MemphisValue::Integer(2),
-            MemphisValue::Integer(3)
-        ])
-    );
+    assert_crosscheck_eq!(session, "a", list![int!(1), int!(2), int!(3)]);
 }
 
 #[test]
@@ -90,13 +82,5 @@ a = list(gen())
 "#
     );
 
-    assert_crosscheck_eq!(
-        session,
-        "a",
-        MemphisValue::List(vec![
-            MemphisValue::Integer(1),
-            MemphisValue::Integer(2),
-            MemphisValue::Integer(4)
-        ])
-    );
+    assert_crosscheck_eq!(session, "a", list![int!(1), int!(2), int!(4)]);
 }

@@ -1,6 +1,12 @@
 use std::fmt::{Display, Formatter, Result};
 
-use crate::domain::utils::{format_bytes, format_comma_separated, format_comma_separated_with};
+use crate::{
+    core::floats_equal,
+    domain::{
+        utils::{format_bytes, format_comma_separated, format_comma_separated_with},
+        MemphisException,
+    },
+};
 
 /// A common implementation to represent the return value of a Python expression for use in tests,
 /// REPL, or other read-only contexts. This frees each engine up to implement their return values
@@ -8,11 +14,11 @@ use crate::domain::utils::{format_bytes, format_comma_separated, format_comma_se
 #[derive(Clone, Debug)]
 pub enum MemphisValue {
     None,
-    Integer(i64),
+    Int(i64),
     Float(f64),
     Complex(f64, f64),
     Str(String),
-    Boolean(bool),
+    Bool(bool),
     List(Vec<MemphisValue>),
     Tuple(Vec<MemphisValue>),
     Set(Vec<MemphisValue>),
@@ -49,7 +55,7 @@ pub enum MemphisValue {
     Zip,
     Code,
     Cell,
-    Exception,
+    Exception(MemphisException),
     Traceback,
     Frame,
     Generator,
@@ -66,6 +72,13 @@ pub enum MemphisValue {
 impl MemphisValue {
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
+    }
+
+    pub fn as_exception(&self) -> Option<&MemphisException> {
+        match self {
+            Self::Exception(e) => Some(e),
+            _ => None,
+        }
     }
 }
 
@@ -93,12 +106,13 @@ impl PartialEq for MemphisValue {
 
         match (self, other) {
             (None, None) => true,
-            (Boolean(a), Boolean(b)) => a == b,
-            (Integer(a), Integer(b)) => a == b,
-            (Float(a), Float(b)) => a == b,
+            (Bool(a), Bool(b)) => a == b,
+            (Int(a), Int(b)) => a == b,
+            (Float(a), Float(b)) => floats_equal(*a, *b),
             (Complex(ar, ai), Complex(br, bi)) => ar == br && ai == bi,
             (Str(a), Str(b)) => a == b,
             (List(a), List(b)) => a == b,
+            (Dict(a), Dict(b)) => a == b,
             (Tuple(a), Tuple(b)) => a == b,
             (Set(a), Set(b)) => a == b,
             (Range(a1, a2, a3), Range(b1, b2, b3)) => a1 == b1 && a2 == b2 && a3 == b3,
@@ -115,7 +129,7 @@ impl Display for MemphisValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             MemphisValue::None => write!(f, "None"),
-            MemphisValue::Integer(i) => write!(f, "{i}"),
+            MemphisValue::Int(i) => write!(f, "{i}"),
             MemphisValue::Float(i) => {
                 let f_val = if i.fract() == 0.0 {
                     // integer-like float, force ".0"
@@ -132,8 +146,10 @@ impl Display for MemphisValue {
                     write!(f, "({}+{}j)", re, im)
                 }
             }
+            // TODO this should be wrapped by '' in REPL mode but not for f-strings and the
+            // print builtin. we'll need a way to differentiate those contexts
             MemphisValue::Str(s) => write!(f, "{s}"),
-            MemphisValue::Boolean(b) => match b {
+            MemphisValue::Bool(b) => match b {
                 true => write!(f, "True"),
                 false => write!(f, "False"),
             },
@@ -217,7 +233,9 @@ impl Display for MemphisValue {
             MemphisValue::Zip => write!(f, "<zip>"),
             MemphisValue::Code => write!(f, "<code object>"),
             MemphisValue::Cell => write!(f, "<cell>"),
-            MemphisValue::Exception => write!(f, "<exception>"),
+            MemphisValue::Exception(e) => {
+                write!(f, "{:?}({})", e.kind, format_comma_separated(&e.payload))
+            }
             MemphisValue::Traceback => write!(f, "<traceback>"),
             MemphisValue::Frame => write!(f, "<frame>"),
             MemphisValue::Generator => write!(f, "<generator object>"),

@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
 use crate::bytecode_vm::runtime::Reference;
-#[cfg(test)]
-use crate::bytecode_vm::{VirtualMachine, VmValue};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Dict {
@@ -17,13 +15,5 @@ impl Dict {
             dict.insert(k, v);
         }
         Self { items: dict }
-    }
-
-    #[cfg(test)]
-    pub fn resolved_items(&self, vm: &VirtualMachine) -> Vec<(VmValue, VmValue)> {
-        self.items
-            .iter()
-            .map(|(k, v)| (vm.deref(*k), vm.deref(*v)))
-            .collect()
     }
 }

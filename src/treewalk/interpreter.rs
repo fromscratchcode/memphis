@@ -3389,11 +3389,9 @@ for i in iter([1,2,3]):
     fn f_strings() {
         let input = r#"
 name = "John"
-a = f"Hello {name}"
+f"Hello {name}"
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", str!("Hello John"));
+        assert_eval_eq!(input, str!("Hello John"));
     }
 
     #[test]
