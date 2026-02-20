@@ -22,4 +22,11 @@ fn index_access_read() {
     let input = r#"(1,2,3)[3]"#;
     let e = crosscheck_expect_error!(input);
     assert_index_error!(e.exception, "tuple index out of range");
+
+    let input = r#"{"a": 4}["a"]"#;
+    assert_crosscheck_return!(input, int!(4));
+
+    let input = r#"{"a": 4}["b"]"#;
+    let e = crosscheck_expect_error!(input);
+    assert_key_error!(e.exception, "b");
 }

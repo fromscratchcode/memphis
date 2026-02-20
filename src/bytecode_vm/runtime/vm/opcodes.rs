@@ -85,11 +85,13 @@ impl VirtualMachine {
                 self.push(self.to_heapified_bool(left != right));
             }
             Opcode::BinarySubscr => {
-                let index = self.pop_value();
+                let index_ref = self.pop();
+                let index = self.deref(index_ref);
                 let obj = self.pop_value();
                 let result = match obj {
                     VmValue::List(l) => l.getitem(self, index),
                     VmValue::Tuple(t) => t.getitem(self, index),
+                    VmValue::Dict(d) => d.getitem(self, index_ref),
                     _ => {
                         let msg = self.intern_string("TODO object is not subscriptable");
                         let exp = Exception::type_error(msg);
@@ -241,7 +243,8 @@ impl VirtualMachine {
                 for _ in 0..n {
                     let value = self.pop();
                     let key = self.pop();
-                    items.push((key, value));
+                    let hash_key = self.deref(key).as_hash_key().expect("Unhashable key");
+                    items.push((hash_key, (key, value)));
                 }
                 items.reverse(); // to preserve left-to-right source order
                 self.push_value(VmValue::Dict(Dict::new(items)));

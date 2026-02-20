@@ -94,6 +94,32 @@ macro_rules! assert_index_error {
     }};
 }
 
+macro_rules! assert_key_error {
+    ($exc:expr, $expected_message:expr) => {{
+        match &$exc {
+            $crate::domain::MemphisException {
+                kind: $crate::domain::ExceptionKind::KeyError,
+                payload,
+            } => {
+                assert_eq!(
+                    payload.len(),
+                    1,
+                    "Expected KeyError with one argument, got payload: {:?}",
+                    payload
+                );
+
+                match &payload[0] {
+                    $crate::domain::MemphisValue::Str(s) => {
+                        assert_eq!(s.as_str(), $expected_message, "Unexpected KeyError message");
+                    }
+                    other => panic!("Expected KeyError message to be a string, got: {:?}", other),
+                }
+            }
+            _ => panic!("Expected KeyError, got: {:?}", &$exc),
+        }
+    }};
+}
+
 macro_rules! assert_name_error {
     ($exc:expr, $expected_message:expr) => {{
         match &$exc {
@@ -325,6 +351,7 @@ macro_rules! assert_runtime_error {
 pub(crate) use assert_div_by_zero_error;
 pub(crate) use assert_import_error;
 pub(crate) use assert_index_error;
+pub(crate) use assert_key_error;
 pub(crate) use assert_name_error;
 pub(crate) use assert_runtime_error;
 pub(crate) use assert_stop_iteration;

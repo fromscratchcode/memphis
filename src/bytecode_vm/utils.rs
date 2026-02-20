@@ -7,3 +7,9 @@ where
         .enumerate()
         .find_map(|(index, value)| if value == query { Some(index) } else { None })
 }
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
+pub enum HashKey {
+    Int(i64),
+    Str(String),
+}
