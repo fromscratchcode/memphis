@@ -26,7 +26,7 @@ impl Slice {
         Self { start, stop, step }
     }
 
-    pub fn apply<T>(&self, len: i64, fetch: impl Fn(i64) -> Option<T>) -> Vec<T> {
+    pub fn apply<T>(&self, len: usize, fetch: impl Fn(i64) -> Option<T>) -> Vec<T> {
         let (start, stop, step) = adjust_slice_params(self, len);
 
         let mut result = Vec::new();
@@ -58,13 +58,13 @@ impl Slice {
 
 /// Adjusting start and stop according to Python's slicing rules of negative indices
 /// wrapping around the iterable.
-fn adjust_slice_params(slice: &Slice, len: i64) -> (i64, i64, i64) {
+fn adjust_slice_params(slice: &Slice, len: usize) -> (i64, i64, i64) {
     let start = slice.start.unwrap_or(0);
-    let stop = slice.stop.unwrap_or(len);
+    let stop = slice.stop.unwrap_or(len as i64);
     let step = slice.step.unwrap_or(1);
 
-    let start = wrap_negative(start, len).clamp(0, len);
-    let stop = wrap_negative(stop, len).clamp(0, len);
+    let start = wrap_negative(start, len).clamp(0, len as i64);
+    let stop = wrap_negative(stop, len).clamp(0, len as i64);
 
     (start, stop, step)
 }

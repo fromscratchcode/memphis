@@ -71,14 +71,14 @@ impl Str {
     }
 
     fn get_normalized(&self, index: i64) -> Option<Self> {
-        let len = self.len() as i64;
-        normalize_index(index, len).and_then(|idx| self.get(idx))
+        normalize_index(index, self.len()).and_then(|idx| self.get(idx))
     }
 
     fn slice(&self, slice: &Slice) -> Self {
-        let len = self.len() as i64;
         let sliced_string = slice
-            .apply(len, |i| self.get_char(i as usize).map(|c| c.to_string()))
+            .apply(self.len(), |i| {
+                self.get_char(i as usize).map(|c| c.to_string())
+            })
             .join("");
         Str::from(sliced_string)
     }

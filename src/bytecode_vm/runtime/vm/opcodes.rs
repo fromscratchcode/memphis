@@ -5,7 +5,8 @@ use crate::{
             import_utils::build_module_chain,
             modules::builtins,
             types::{
-                Coroutine, Dict, Exception, FunctionObject, Generator, List, Method, Object, Tuple,
+                str_getitem, Coroutine, Dict, Exception, FunctionObject, Generator, List, Method,
+                Object, Tuple,
             },
             BuiltinFunction, Completion, FrameExit, Reference, StepResult, Suspension,
         },
@@ -85,11 +86,14 @@ impl VirtualMachine {
                 self.push(self.to_heapified_bool(left != right));
             }
             Opcode::BinarySubscr => {
-                let index = self.pop_value();
+                let index_ref = self.pop();
+                let index = self.deref(index_ref);
                 let obj = self.pop_value();
                 let result = match obj {
-                    VmValue::List(l) => l.getitem(self, index),
+                    VmValue::Str(s) => str_getitem(&s, self, index),
+                    VmValue::List(l) => l.borrow().getitem(self, index),
                     VmValue::Tuple(t) => t.getitem(self, index),
+                    VmValue::Dict(d) => d.getitem(self, index_ref),
                     _ => {
                         let msg = self.intern_string("TODO object is not subscriptable");
                         let exp = Exception::type_error(msg);
@@ -98,6 +102,20 @@ impl VirtualMachine {
                 };
                 let value = step_raised!(result);
                 self.push(value);
+            }
+            Opcode::StoreSubscr => {
+                let index = self.pop();
+                let obj = self.pop_value();
+                let val = self.pop();
+                let result = match obj {
+                    VmValue::List(l) => l.borrow_mut().setitem(self, index, val),
+                    _ => {
+                        let msg = self.intern_string("TODO object is not subscriptable");
+                        let exp = Exception::type_error(msg);
+                        return self.raise_step(exp);
+                    }
+                };
+                step_raised!(result);
             }
             Opcode::Is => {
                 // For referential identity, we compare the Reference objects directly.
@@ -230,7 +248,7 @@ impl VirtualMachine {
             }
             Opcode::BuildList(n) => {
                 let items = self.collect_n(n);
-                self.push_value(VmValue::List(List::new(items)));
+                self.push_value(VmValue::List(Container::new(List::new(items))));
             }
             Opcode::BuildTuple(n) => {
                 let items = self.collect_n(n);
@@ -241,7 +259,8 @@ impl VirtualMachine {
                 for _ in 0..n {
                     let value = self.pop();
                     let key = self.pop();
-                    items.push((key, value));
+                    let hash_key = self.deref(key).as_hash_key().expect("Unhashable key");
+                    items.push((hash_key, (key, value)));
                 }
                 items.reverse(); // to preserve left-to-right source order
                 self.push_value(VmValue::Dict(Dict::new(items)));

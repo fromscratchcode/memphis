@@ -10,6 +10,7 @@ use crate::{
             },
             BuiltinFunction, Reference,
         },
+        utils::HashKey,
     },
     core::{floats_equal, Container},
     domain::Type,
@@ -20,7 +21,7 @@ pub enum VmValue {
     None,
     Int(i64),
     Float(f64),
-    String(String),
+    Str(String),
     Bool(bool),
     Class(Class),
     Object(Object),
@@ -32,7 +33,7 @@ pub enum VmValue {
     Method(Method),
     Module(Container<Module>),
     BuiltinFunction(BuiltinFunction),
-    List(List),
+    List(Container<List>),
     Tuple(Tuple),
     Dict(Dict),
     Range(Range),
@@ -50,6 +51,14 @@ impl VmValue {
             _ => unimplemented!("Conversion to reference not supported for {:?}", self),
         }
     }
+
+    pub fn as_hash_key(&self) -> Option<HashKey> {
+        match self {
+            VmValue::Int(i) => Some(HashKey::Int(*i)),
+            VmValue::Str(s) => Some(HashKey::Str(s.to_string())),
+            _ => None,
+        }
+    }
 }
 
 impl PartialEq for VmValue {
@@ -60,7 +69,7 @@ impl PartialEq for VmValue {
             (VmValue::Float(a), VmValue::Float(b)) => floats_equal(*a, *b),
             (VmValue::Int(a), VmValue::Float(b)) => floats_equal(*a as f64, *b),
             (VmValue::Float(a), VmValue::Int(b)) => floats_equal(*a, *b as f64),
-            (VmValue::String(a), VmValue::String(b)) => a == b,
+            (VmValue::Str(a), VmValue::Str(b)) => a == b,
             (VmValue::Bool(a), VmValue::Bool(b)) => a == b,
             (VmValue::List(a), VmValue::List(b)) => a == b,
             (VmValue::Tuple(a), VmValue::Tuple(b)) => a == b,
@@ -79,7 +88,7 @@ impl From<&Constant> for VmValue {
             Constant::Boolean(i) => VmValue::Bool(*i),
             Constant::Int(i) => VmValue::Int(*i),
             Constant::Float(i) => VmValue::Float(*i),
-            Constant::String(i) => VmValue::String(i.to_string()),
+            Constant::String(i) => VmValue::Str(i.to_string()),
             Constant::Code(i) => VmValue::Code(i.clone()),
         }
     }
@@ -97,7 +106,7 @@ impl VmValue {
             VmValue::None => Type::None,
             VmValue::Int(_) => Type::Int,
             VmValue::Float(_) => Type::Float,
-            VmValue::String(_) => Type::Str,
+            VmValue::Str(_) => Type::Str,
             VmValue::Bool(_) => Type::Bool,
             VmValue::List(_) => Type::List,
             VmValue::Tuple(_) => Type::Tuple,
@@ -140,8 +149,8 @@ impl VmValue {
             VmValue::Bool(i) => *i,
             VmValue::Int(i) => *i != 0,
             VmValue::Float(i) => *i != 0.0,
-            VmValue::String(i) => !i.is_empty(),
-            VmValue::List(i) => !i.is_empty(),
+            VmValue::Str(i) => !i.is_empty(),
+            VmValue::List(i) => !i.borrow().is_empty(),
             VmValue::Tuple(i) => !i.is_empty(),
             // Most values in Python are truthy
             _ => true,

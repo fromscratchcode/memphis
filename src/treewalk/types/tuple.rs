@@ -41,8 +41,7 @@ impl Tuple {
     }
 
     fn get_normalized(&self, index: i64) -> Option<TreewalkValue> {
-        let len = self.len() as i64;
-        normalize_index(index, len).map(|idx| self.items[idx].clone())
+        normalize_index(index, self.len()).map(|idx| self.items[idx].clone())
     }
 
     pub fn first(&self) -> TreewalkValue {
@@ -54,8 +53,7 @@ impl Tuple {
     }
 
     fn slice(&self, slice: &Slice) -> Self {
-        let len = self.len() as i64;
-        let sliced_items = slice.apply(len, |i| self.get(i as usize));
+        let sliced_items = slice.apply(self.len(), |i| self.get(i as usize));
         Self::new(sliced_items)
     }
 }

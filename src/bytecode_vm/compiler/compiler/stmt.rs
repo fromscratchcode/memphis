@@ -110,17 +110,16 @@ impl Compiler {
                 self.compile_store(name);
             }
             Expr::MemberAccess { object, field } => {
-                // Push the object onto the stack
                 self.compile_expr(object)?;
-                // Push the value to be assigned onto the stack
                 self.compile_expr(right)?;
                 let attr_index = self.get_or_set_nonlocal_index(field.as_str());
                 self.emit(Opcode::SetAttr(attr_index));
             }
-            Expr::IndexAccess { .. } => {
-                return Err(CompilerError::Unsupported(
-                    "Index access assignment not yet supported in bytecode VM.".to_string(),
-                ))
+            Expr::IndexAccess { object, index } => {
+                self.compile_expr(right)?;
+                self.compile_expr(object)?;
+                self.compile_expr(index)?;
+                self.emit(Opcode::StoreSubscr);
             }
             _ => {
                 return Err(CompilerError::syntax_error(
@@ -568,6 +567,18 @@ mod tests_bytecode_stmt {
             &[
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(0)),
+            ]
+        );
+
+        let s = stmt_assign!(index_access!(var!("var"), int!(0)), Expr::None);
+        let bytecode = compile_stmt(s);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::LoadConst(Index::new(1)),
+                Opcode::StoreSubscr,
             ]
         );
     }

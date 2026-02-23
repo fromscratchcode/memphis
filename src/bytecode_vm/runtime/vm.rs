@@ -82,7 +82,7 @@ impl VirtualMachine {
     }
 
     pub fn intern_string(&mut self, val: &str) -> Reference {
-        let s = VmValue::String(val.to_string());
+        let s = VmValue::Str(val.to_string());
         self.heapify(s)
     }
 
@@ -300,10 +300,10 @@ impl VirtualMachine {
             VmValue::None => MemphisValue::None,
             VmValue::Int(i) => MemphisValue::Int(i),
             VmValue::Float(f) => MemphisValue::Float(f),
-            VmValue::String(s) => MemphisValue::Str(s),
+            VmValue::Str(s) => MemphisValue::Str(s),
             VmValue::Bool(b) => MemphisValue::Bool(b),
             VmValue::List(i) => {
-                let items = i.items.iter().map(|r| self.normalize_vm_ref(*r)).collect();
+                let items = i.into_iter().map(|r| self.normalize_vm_ref(r)).collect();
                 MemphisValue::List(items)
             }
             VmValue::Tuple(i) => {
@@ -314,7 +314,7 @@ impl VirtualMachine {
                 let items = i
                     .items
                     .iter()
-                    .map(|(k, v)| (self.normalize_vm_ref(*k), self.normalize_vm_ref(*v)))
+                    .map(|(_, (k, v))| (self.normalize_vm_ref(*k), self.normalize_vm_ref(*v)))
                     .collect();
                 MemphisValue::Dict(items)
             }
@@ -382,7 +382,7 @@ impl VirtualMachine {
     pub fn coerce_to_int(&mut self, value: &VmValue) -> DomainResult<i64> {
         match value {
             VmValue::Int(i) => Ok(*i),
-            VmValue::String(s) => s.parse::<i64>().map_err(|_| {
+            VmValue::Str(s) => s.parse::<i64>().map_err(|_| {
                 let msg = self.intern_string("Invalid int literal");
                 Exception::value_error(msg)
             }),
@@ -455,13 +455,13 @@ impl VirtualMachine {
 
     fn try_string_multiplication(a: &VmValue, b: &VmValue) -> Option<VmValue> {
         match (a, b) {
-            (VmValue::String(s), VmValue::Int(n)) | (VmValue::Int(n), VmValue::String(s)) => {
+            (VmValue::Str(s), VmValue::Int(n)) | (VmValue::Int(n), VmValue::Str(s)) => {
                 let result = if *n < 0 {
                     "".to_string()
                 } else {
                     s.repeat(*n as usize)
                 };
-                Some(VmValue::String(result))
+                Some(VmValue::Str(result))
             }
             _ => None,
         }

@@ -20,6 +20,10 @@ impl Tuple {
         self.items.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
     pub fn iter(self) -> TupleIter {
         TupleIter {
             inner: self.items.into_iter(),
@@ -27,8 +31,7 @@ impl Tuple {
     }
 
     fn get_normalized(&self, index: i64) -> Option<Reference> {
-        let len = self.items.len() as i64;
-        normalize_index(index, len).map(|idx| self.items[idx])
+        normalize_index(index, self.len()).map(|idx| self.items[idx])
     }
 
     pub fn getitem(&self, vm: &mut VirtualMachine, index: VmValue) -> VmResult<Reference> {

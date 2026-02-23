@@ -65,14 +65,16 @@ impl List {
         self.items.get(index).cloned()
     }
 
+    pub fn set(&mut self, index: usize, value: TreewalkValue) {
+        self.items[index] = value;
+    }
+
     fn get_normalized(&self, index: i64) -> Option<TreewalkValue> {
-        let len = self.items.len() as i64;
-        normalize_index(index, len).map(|idx| self.items[idx].clone())
+        normalize_index(index, self.len()).and_then(|idx| self.get(idx).clone())
     }
 
     fn slice(&self, slice: &Slice) -> Self {
-        let len = self.items.len() as i64;
-        let sliced_items = slice.apply(len, |i| self.get(i as usize));
+        let sliced_items = slice.apply(self.len(), |i| self.get(i as usize));
         List::new(sliced_items)
     }
 }
@@ -111,7 +113,10 @@ impl IndexWrite for Container<List> {
         value: TreewalkValue,
     ) -> TreewalkResult<()> {
         let i = index.as_int().raise(interpreter)?;
-        self.borrow_mut().items[i as usize] = value;
+        let i = normalize_index(i, self.borrow().len())
+            .ok_or_else(|| Exception::index_error("list assignment index out of range"))
+            .raise(interpreter)?;
+        self.borrow_mut().set(i as usize, value);
         Ok(())
     }
 

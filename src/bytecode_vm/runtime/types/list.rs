@@ -3,14 +3,13 @@ use crate::{
         runtime::{types::Exception, Reference},
         VirtualMachine, VmResult, VmValue,
     },
+    core::Container,
     domain::utils::normalize_index,
 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct List {
-    // TODO this is currently public because we need it in some tests to call deference on the
-    // elements. We'll eventually make this a slice accessor or an iterator or something.
-    pub items: Vec<Reference>,
+    items: Vec<Reference>,
 }
 
 impl List {
@@ -22,19 +21,20 @@ impl List {
         self.items.is_empty()
     }
 
-    pub fn iter(self) -> ListIter {
-        ListIter {
-            inner: self.items.into_iter(),
-        }
+    pub fn len(&self) -> usize {
+        self.items.len()
     }
 
-    pub fn _get(&self, index: usize) -> Option<Reference> {
+    pub fn get(&self, index: usize) -> Option<Reference> {
         self.items.get(index).cloned()
     }
 
+    pub fn set(&mut self, index: usize, value: Reference) {
+        self.items[index] = value;
+    }
+
     fn get_normalized(&self, index: i64) -> Option<Reference> {
-        let len = self.items.len() as i64;
-        normalize_index(index, len).map(|idx| self.items[idx])
+        normalize_index(index, self.len()).map(|idx| self.items[idx])
     }
 
     pub fn getitem(&self, vm: &mut VirtualMachine, index: VmValue) -> VmResult<Reference> {
@@ -57,17 +57,68 @@ impl List {
 
         Ok(value)
     }
+
+    pub fn setitem(
+        &mut self,
+        vm: &mut VirtualMachine,
+        index: Reference,
+        value: Reference,
+    ) -> VmResult<()> {
+        let index = vm.deref(index);
+        match index {
+            VmValue::Int(i) => {
+                if let Some(i) = normalize_index(i, self.len()) {
+                    self.set(i, value);
+                } else {
+                    let msg = vm.intern_string("list assignment index out of range");
+                    let exp = Exception::index_error(msg);
+                    return Err(vm.raise(exp));
+                }
+            }
+            _ => {
+                let msg = vm.intern_string("list indices must be integers or slices, not TODO");
+                let exp = Exception::type_error(msg);
+                return Err(vm.raise(exp));
+            }
+        }
+        Ok(())
+    }
 }
 
-#[derive(Clone, Debug)]
+impl IntoIterator for Container<List> {
+    type Item = Reference;
+    type IntoIter = ListIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ListIter::new(self)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ListIter {
-    inner: std::vec::IntoIter<Reference>,
+    list_ref: Container<List>,
+    current_index: usize,
+}
+
+impl ListIter {
+    pub fn new(list_ref: Container<List>) -> Self {
+        Self {
+            list_ref,
+            current_index: 0,
+        }
+    }
 }
 
 impl Iterator for ListIter {
     type Item = Reference;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        let list = self.list_ref.borrow();
+        if self.current_index == list.len() {
+            None
+        } else {
+            self.current_index += 1;
+            list.get(self.current_index - 1)
+        }
     }
 }

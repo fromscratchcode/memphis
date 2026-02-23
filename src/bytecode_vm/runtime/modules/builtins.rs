@@ -80,7 +80,7 @@ fn list(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         }
     };
 
-    Ok(vm.heapify(VmValue::List(List::new(items))))
+    Ok(vm.heapify(VmValue::List(Container::new(List::new(items)))))
 }
 
 fn tuple(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
@@ -182,7 +182,7 @@ fn expect_integer_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult
 pub fn iter_internal(vm: &mut VirtualMachine, obj: VmValue) -> VmResult<Reference> {
     let iterator = match obj {
         VmValue::Generator(_) => obj,
-        VmValue::List(list) => VmValue::ListIter(Container::new(list.iter())),
+        VmValue::List(list) => VmValue::ListIter(Container::new(list.into_iter())),
         VmValue::Tuple(tuple) => VmValue::TupleIter(Container::new(tuple.iter())),
         VmValue::Range(range) => VmValue::RangeIter(Container::new(range.iter())),
         _ => {
