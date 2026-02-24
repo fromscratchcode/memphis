@@ -180,14 +180,14 @@ impl Container<Class> {
     }
 
     pub fn get_from_class(&self, name: &str) -> Option<TreewalkValue> {
-        log(LogLevel::Debug, || {
+        log(LogLevel::Trace, || {
             format!("Searching for: {self:?}::{name}")
         });
         search(&self.mro(), name)
     }
 
     pub fn get_from_metaclass(&self, name: &str) -> Option<TreewalkValue> {
-        log(LogLevel::Debug, || {
+        log(LogLevel::Trace, || {
             format!("Searching for: {:?}::{}", self.borrow().metaclass(), name)
         });
         search(&self.borrow().metaclass().mro(), name)
@@ -217,7 +217,7 @@ impl MemberRead for Container<Class> {
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
         if let Some(attr) = self.get_from_class(name) {
-            log(LogLevel::Debug, || {
+            log(LogLevel::Trace, || {
                 format!("Found: {self:?}::{name} on class [from class]")
             });
             return Ok(Some(interpreter.resolve_descriptor(
@@ -228,7 +228,7 @@ impl MemberRead for Container<Class> {
         }
 
         if let Some(attr) = self.get_from_metaclass(name) {
-            log(LogLevel::Debug, || {
+            log(LogLevel::Trace, || {
                 format!("Found: {self:?}::{name} on metaclass")
             });
             return Ok(Some(interpreter.resolve_descriptor(
@@ -273,6 +273,14 @@ impl MemberWrite for Container<Class> {
 
 impl Callable for Container<Class> {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        // Calling type() with 1 arg does inspection, not creation.
+        // type() with 3 args uses the normal flow and is handled by type.__new__
+        if self.borrow().is_type(&Type::Type) && args.len() == 1 {
+            return Ok(TreewalkValue::Class(
+                interpreter.state.type_of(&args.get_arg(0)),
+            ));
+        }
+
         interpreter.create_object(self.clone(), args)
     }
 

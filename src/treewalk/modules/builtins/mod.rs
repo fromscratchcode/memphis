@@ -120,7 +120,7 @@ impl Callable for GetattrBuiltin {
             if args.len() == 3 {
                 Ok(args.get_arg(2))
             } else {
-                Exception::attribute_error(interpreter.state.class_name_of_value(&object), field)
+                Exception::attribute_error(interpreter.state.class_name(&object), field)
                     .raise(interpreter)
             }
         }
@@ -143,10 +143,7 @@ impl Callable for SetattrBuiltin {
             .clone()
             .into_member_writer()
             .ok_or_else(|| {
-                Exception::attribute_error(
-                    interpreter.state.class_name_of_value(&object),
-                    field.as_str(),
-                )
+                Exception::attribute_error(interpreter.state.class_name(&object), field.as_str())
             })
             .raise(interpreter)?
             .set_member(interpreter, field.as_str(), value)?;
@@ -201,7 +198,7 @@ impl Callable for IsinstanceBuiltin {
         check_args(&args, |len| len == 2).raise(interpreter)?;
         let message = "isinstance() arg 2 must be a type, a tuple of types, or a union";
 
-        let instance_class = interpreter.state.class_of_value(&args.get_arg(0));
+        let instance_class = interpreter.state.class_of(&args.get_arg(0));
 
         let reference_class = match args.get_arg(1) {
             TreewalkValue::Class(class) => vec![class],

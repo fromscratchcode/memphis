@@ -74,7 +74,7 @@ impl Callable for NewBuiltin {
                         .map_err(|_| {
                             Exception::type_error(format!(
                                 "complex() first argument must be a string or a number, not '{}'",
-                                args.get_arg(1).get_type()
+                                interpreter.state.type_name(&args.get_arg(1))
                             ))
                         })
                         .raise(interpreter)?;

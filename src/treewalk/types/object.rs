@@ -150,19 +150,19 @@ impl MemberRead for Container<Object> {
         interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        log(LogLevel::Debug, || {
+        log(LogLevel::Trace, || {
             format!("Searching for: {self:?}.{name}")
         });
 
         if let Some(attr) = self.borrow().scope.get(name) {
-            log(LogLevel::Debug, || {
+            log(LogLevel::Trace, || {
                 format!("Found: {self:?}.{name} on instance")
             });
             return Ok(Some(attr));
         }
 
         if let Some(attr) = self.borrow().class.get_from_class(name) {
-            log(LogLevel::Debug, || {
+            log(LogLevel::Trace, || {
                 format!(
                     "Found: {:?}::{} on class [from object]",
                     self.borrow().class,
@@ -170,7 +170,7 @@ impl MemberRead for Container<Object> {
                 )
             });
             let instance = TreewalkValue::Object(self.clone());
-            let owner = interpreter.state.class_of_value(&instance);
+            let owner = interpreter.state.class_of(&instance);
             return Ok(Some(interpreter.resolve_descriptor(
                 &attr,
                 Some(instance),
@@ -245,7 +245,7 @@ impl MemberWrite for Container<Object> {
             .get_member(interpreter, &Dunder::Dict)?
             .ok_or_else(|| {
                 Exception::attribute_error(
-                    interpreter.state.class_name_of_value(&result),
+                    interpreter.state.class_name(&result),
                     Dunder::Dict.as_ref(),
                 )
             })
@@ -255,11 +255,8 @@ impl MemberWrite for Container<Object> {
             .borrow()
             .has(&TreewalkValue::Str(Str::new(name)))
         {
-            return Exception::attribute_error(
-                interpreter.state.class_name_of_value(&result),
-                name,
-            )
-            .raise(interpreter);
+            return Exception::attribute_error(interpreter.state.class_name(&result), name)
+                .raise(interpreter);
         }
 
         log(LogLevel::Debug, || {

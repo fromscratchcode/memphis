@@ -114,7 +114,7 @@ impl IndexRead for Str {
             _ => {
                 return Exception::type_error(format!(
                     "string indices must be integers, not '{}'",
-                    interpreter.state.class_name_of_value(&index)
+                    interpreter.state.type_name(&index)
                 ))
                 .raise(interpreter)
             }

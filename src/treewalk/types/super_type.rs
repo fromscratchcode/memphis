@@ -34,7 +34,7 @@ impl MemberRead for Super {
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
         let instance = self.receiver();
-        let class = interpreter.state.class_of_value(&instance);
+        let class = interpreter.state.class_of(&instance);
 
         // Retrieve the MRO for the class, excluding the class itself
         let super_mro = class.super_mro();

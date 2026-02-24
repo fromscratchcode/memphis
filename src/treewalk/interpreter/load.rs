@@ -48,7 +48,7 @@ impl TreewalkInterpreter {
             .into_member_reader(self)
             .get_member(self, field.as_ref())?
             .ok_or_else(|| {
-                Exception::attribute_error(self.state.class_name_of_value(result), field.as_ref())
+                Exception::attribute_error(self.state.class_name(result), field.as_ref())
             })
             .raise(self)
     }

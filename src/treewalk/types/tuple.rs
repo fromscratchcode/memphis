@@ -73,7 +73,7 @@ impl IndexRead for Tuple {
             _ => {
                 return Exception::type_error(format!(
                     "tuple indices must be integers or slices, not {}",
-                    interpreter.state.class_name_of_value(&index)
+                    interpreter.state.type_name(&index)
                 ))
                 .raise(interpreter)
             }

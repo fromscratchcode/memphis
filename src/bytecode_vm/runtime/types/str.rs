@@ -35,7 +35,11 @@ pub fn str_getitem(the_str: &str, vm: &mut VirtualMachine, index: VmValue) -> Vm
             }
         }
         _ => {
-            let msg = vm.intern_string("string indices must be integers or slices, not TODO");
+            let type_name = vm.type_name(&index);
+            let msg = vm.intern_string(&format!(
+                "string indices must be integers, not '{}'",
+                type_name
+            ));
             let exp = Exception::type_error(msg);
             return Err(vm.raise(exp));
         }

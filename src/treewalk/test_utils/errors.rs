@@ -417,6 +417,7 @@ macro_rules! assert_key_error {
     }};
 }
 
+#[allow(unused_macros)]
 macro_rules! assert_index_error {
     ($exc:expr, $expected_message:expr) => {{
         match &$exc {
@@ -519,6 +520,7 @@ macro_rules! assert_lookup_error {
 pub(crate) use assert_assertion_error;
 pub(crate) use assert_attribute_error;
 pub(crate) use assert_div_by_zero_error;
+#[allow(unused_imports)]
 pub(crate) use assert_index_error;
 pub(crate) use assert_key_error;
 pub(crate) use assert_lookup_error;

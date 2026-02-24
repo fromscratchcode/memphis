@@ -290,6 +290,20 @@ impl VirtualMachine {
         }
     }
 
+    pub fn type_name(&self, obj: &VmValue) -> String {
+        match obj {
+            VmValue::Object(o) => {
+                let class = self.deref(o.class);
+                class
+                    .as_class()
+                    .expect("Invalid class reference")
+                    .name()
+                    .to_string()
+            }
+            _ => obj.get_type().to_string(),
+        }
+    }
+
     pub fn normalize_vm_ref(&self, r: Reference) -> MemphisValue {
         let value = self.deref(r);
         self.normalize_vm_value(value)

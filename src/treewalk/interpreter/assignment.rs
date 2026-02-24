@@ -34,10 +34,7 @@ impl TreewalkInterpreter {
                     .clone()
                     .into_member_writer()
                     .ok_or_else(|| {
-                        Exception::attribute_error(
-                            self.state.class_name_of_value(&result),
-                            field.as_str(),
-                        )
+                        Exception::attribute_error(self.state.class_name(&result), field.as_str())
                     })
                     .raise(self)?
                     .set_member(self, field.as_str(), value)?;

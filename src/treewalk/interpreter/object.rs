@@ -1,6 +1,6 @@
 use crate::{
     core::Container,
-    domain::{Dunder, Type},
+    domain::Dunder,
     treewalk::{
         types::{Class, Method},
         utils::Args,
@@ -14,15 +14,6 @@ impl TreewalkInterpreter {
         class: Container<Class>,
         args: Args,
     ) -> TreewalkResult<TreewalkValue> {
-        // We have to handle calls to `type()` with only one parameter as a special case because
-        // this doesn't actually call the `Type::Type` `Dunder::New` method, which expects more
-        // arguments and would return a new class. Overloading the `Dunder::Init` method
-        // here on `Type::Type` would also create unintended behaviors.
-        if class.borrow().is_type(&Type::Type) {
-            assert_eq!(args.len(), 1);
-            return Ok(self.state.type_of_value(&args.get_arg(0)));
-        };
-
         // The [`Class`] must be explicitly passed to the [`Dunder::New`] method as this method is
         // never bound.
         // We clone here because these args will be consumed by the `Dunder::New` method call and

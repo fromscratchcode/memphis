@@ -95,7 +95,7 @@ impl IndexRead for Container<List> {
             _ => {
                 return Exception::type_error(format!(
                     "list indices must be integers or slices, not {}",
-                    interpreter.state.class_name_of_value(&index)
+                    interpreter.state.type_name(&index)
                 ))
                 .raise(interpreter)
             }
@@ -112,11 +112,21 @@ impl IndexWrite for Container<List> {
         index: TreewalkValue,
         value: TreewalkValue,
     ) -> TreewalkResult<()> {
-        let i = index.as_int().raise(interpreter)?;
-        let i = normalize_index(i, self.borrow().len())
-            .ok_or_else(|| Exception::index_error("list assignment index out of range"))
-            .raise(interpreter)?;
-        self.borrow_mut().set(i as usize, value);
+        match index {
+            TreewalkValue::Int(i) => {
+                let i = normalize_index(i, self.borrow().len())
+                    .ok_or_else(|| Exception::index_error("list assignment index out of range"))
+                    .raise(interpreter)?;
+                self.borrow_mut().set(i as usize, value);
+            }
+            _ => {
+                return Exception::type_error(format!(
+                    "list indices must be integers or slices, not {}",
+                    interpreter.state.type_name(&index)
+                ))
+                .raise(interpreter)
+            }
+        }
         Ok(())
     }
 

@@ -11,7 +11,10 @@ macro_rules! crosscheck_expect_error {
         let (tw_err, vm_err) =
             $crate::crosscheck::CrosscheckSession::new($crate::domain::Text::new($src))
                 .run_expect_error();
-        assert_eq!(tw_err, vm_err, "Engines did not return the same error");
+        assert_eq!(
+            tw_err, vm_err,
+            "Engines did not return the same error (trewalk, VM)"
+        );
         tw_err
     }};
 }

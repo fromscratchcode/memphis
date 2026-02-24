@@ -235,23 +235,27 @@ impl Container<TreewalkState> {
 
     // TODO we should clarify the difference between this and class_of_value below.
     // They behave differently for TreewalkValue::Class, which has a Type of Type.
-    pub fn type_of_value(&self, value: &TreewalkValue) -> TreewalkValue {
+    pub fn type_of(&self, value: &TreewalkValue) -> Container<Class> {
         match value {
-            TreewalkValue::Object(o) => TreewalkValue::Class(o.borrow().class()),
-            _ => TreewalkValue::Class(self.class_of_type(&value.get_type())),
+            TreewalkValue::Object(o) => o.borrow().class(),
+            _ => self.class_of_type(&value.get_type()),
         }
     }
 
-    pub fn class_of_value(&self, value: &TreewalkValue) -> Container<Class> {
+    pub fn class_of(&self, value: &TreewalkValue) -> Container<Class> {
         match value {
             TreewalkValue::Object(o) => o.borrow().class(),
             TreewalkValue::Class(o) => o.clone(),
-            TreewalkValue::Super(s) => self.class_of_value(&s.receiver()),
+            TreewalkValue::Super(s) => self.class_of(&s.receiver()),
             _ => self.class_of_type(&value.get_type()).clone(),
         }
     }
 
-    pub fn class_name_of_value(&self, value: &TreewalkValue) -> String {
-        self.class_of_value(value).borrow().name().to_string()
+    pub fn type_name(&self, value: &TreewalkValue) -> String {
+        self.type_of(value).borrow().name().to_string()
+    }
+
+    pub fn class_name(&self, value: &TreewalkValue) -> String {
+        self.class_of(value).borrow().name().to_string()
     }
 }

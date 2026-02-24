@@ -153,7 +153,7 @@ impl TreewalkInterpreter {
                         .into_member_writer()
                         .ok_or_else(|| {
                             Exception::attribute_error(
-                                self.state.class_name_of_value(&result),
+                                self.state.class_name(&result),
                                 field.as_str(),
                             )
                         })
@@ -598,7 +598,7 @@ impl TreewalkInterpreter {
         {
             return Exception::type_error(format!(
                 "\'{}\' object does not support the context manager protocol",
-                self.state.class_name_of_value(&expr_result)
+                self.state.class_name(&expr_result)
             ))
             .raise(self);
         }

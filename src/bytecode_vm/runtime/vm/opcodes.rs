@@ -95,7 +95,10 @@ impl VirtualMachine {
                     VmValue::Tuple(t) => t.getitem(self, index),
                     VmValue::Dict(d) => d.getitem(self, index_ref),
                     _ => {
-                        let msg = self.intern_string("TODO object is not subscriptable");
+                        let msg = self.intern_string(&format!(
+                            "'{}' object is not subscriptable",
+                            obj.get_type()
+                        ));
                         let exp = Exception::type_error(msg);
                         return self.raise_step(exp);
                     }
@@ -110,7 +113,10 @@ impl VirtualMachine {
                 let result = match obj {
                     VmValue::List(l) => l.borrow_mut().setitem(self, index, val),
                     _ => {
-                        let msg = self.intern_string("TODO object is not subscriptable");
+                        let msg = self.intern_string(&format!(
+                            "'{}' object does not support item assignment",
+                            obj.get_type()
+                        ));
                         let exp = Exception::type_error(msg);
                         return self.raise_step(exp);
                     }

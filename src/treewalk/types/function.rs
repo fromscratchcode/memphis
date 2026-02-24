@@ -178,21 +178,21 @@ impl MemberRead for Container<Function> {
         interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        log(LogLevel::Debug, || {
+        log(LogLevel::Trace, || {
             format!("Searching for: {self:?}.{name}")
         });
 
         if let Some(attr) = self.borrow().scope.get(name) {
-            log(LogLevel::Debug, || format!("Found: {self:?}.{name}"));
+            log(LogLevel::Trace, || format!("Found: {self:?}.{name}"));
             return Ok(Some(attr));
         }
 
         let class = interpreter.state.class_of_type(&Type::Function);
 
         if let Some(attr) = class.get_from_class(name) {
-            log(LogLevel::Debug, || format!("Found: {class:?}::{name}"));
+            log(LogLevel::Trace, || format!("Found: {class:?}::{name}"));
             let instance = TreewalkValue::Function(self.clone());
-            let owner = interpreter.state.class_of_value(&instance);
+            let owner = interpreter.state.class_of(&instance);
             return Ok(Some(interpreter.resolve_descriptor(
                 &attr,
                 Some(instance),

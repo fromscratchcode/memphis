@@ -49,7 +49,11 @@ impl List {
                 }
             }
             _ => {
-                let msg = vm.intern_string("list indices must be integers or slices, not TODO");
+                let type_name = vm.type_name(&index);
+                let msg = vm.intern_string(&format!(
+                    "list indices must be integers or slices, not {}",
+                    type_name
+                ));
                 let exp = Exception::type_error(msg);
                 return Err(vm.raise(exp));
             }
@@ -76,7 +80,11 @@ impl List {
                 }
             }
             _ => {
-                let msg = vm.intern_string("list indices must be integers or slices, not TODO");
+                let type_name = vm.type_name(&index);
+                let msg = vm.intern_string(&format!(
+                    "list indices must be integers or slices, not {}",
+                    type_name
+                ));
                 let exp = Exception::type_error(msg);
                 return Err(vm.raise(exp));
             }

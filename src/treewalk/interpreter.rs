@@ -1180,88 +1180,6 @@ del d[0]
     }
 
     #[test]
-    fn index_access_read() {
-        let input = r#"[1,2,3][1]"#;
-        assert_eval_eq!(input, int!(2));
-
-        let input = r#"[1,2,3][-1]"#;
-        assert_eval_eq!(input, int!(3));
-
-        let input = r#"[1,2,3][3]"#;
-        let e = eval_expect_error(input);
-        assert_index_error!(e.exception, "list index out of range");
-
-        let input = r#"[1,2,3]["a"]"#;
-        let e = eval_expect_error(input);
-        assert_type_error!(
-            e.exception,
-            "list indices must be integers or slices, not str"
-        );
-
-        let input = r#"
-class Foo: pass
-[1,2,3][Foo()]
-"#;
-        let e = eval_expect_error(input);
-        assert_type_error!(
-            e.exception,
-            "list indices must be integers or slices, not Foo"
-        );
-
-        let input = r#"(1,2,3)[2]"#;
-        assert_eval_eq!(input, int!(3));
-
-        let input = r#"(1,2,3)[-1]"#;
-        assert_eval_eq!(input, int!(3));
-
-        let input = r#"(1,2,3)[3]"#;
-        let e = eval_expect_error(input);
-        assert_index_error!(e.exception, "tuple index out of range");
-
-        let input = r#"(1,2,3)["a"]"#;
-        let e = eval_expect_error(input);
-        assert_type_error!(
-            e.exception,
-            "tuple indices must be integers or slices, not str"
-        );
-
-        let input = r#"{"a": 4}["a"]"#;
-        assert_eval_eq!(input, int!(4));
-
-        let input = r#"{"a": 4}["b"]"#;
-        let e = eval_expect_error(input);
-        assert_key_error!(e.exception, "b");
-
-        let input = r#""abcdef"[2]"#;
-        assert_eval_eq!(input, str!("c"));
-
-        let input = r#""abcdef"[-1]"#;
-        assert_eval_eq!(input, str!("f"));
-
-        let input = r#""abcdef"[8]"#;
-        let e = eval_expect_error(input);
-        assert_index_error!(e.exception, "string index out of range");
-
-        let input = r#""abcdef"["b"]"#;
-        let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "string indices must be integers, not 'str'");
-
-        let input = r#"4[1]"#;
-        let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "'int' object is not subscriptable");
-    }
-
-    #[test]
-    fn index_access_write() {
-        let input = r#"
-a = [1,2,3]
-a[0] = 10
-a
-"#;
-        assert_eval_eq!(input, list![int!(10), int!(2), int!(3),]);
-    }
-
-    #[test]
     fn for_in_loop() {
         let input = r#"
 a = [2,4,6,8]
@@ -4877,9 +4795,7 @@ f = obj.my_attr
         assert_read_eq!(ctx, "b", str!("new value"));
         assert_read_eq!(ctx, "c", str!("default value"));
         assert_eq!(
-            ctx.interpreter()
-                .state
-                .class_name_of_value(&read(&ctx, "d")),
+            ctx.interpreter().state.class_name(&read(&ctx, "d")),
             "Descriptor"
         );
         assert_read_eq!(ctx, "e", str!("custom value"));

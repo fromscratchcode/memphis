@@ -26,13 +26,13 @@ pub fn eval_expect_error(text: &str) -> RaisedException {
 
 pub fn run(text: &str) -> TreewalkContext {
     let mut context = init(text);
-    context.run_inner().expect("Treewalk evaluation failed!");
+    context.run_inner().expect("Treewalk evaluation failed");
     context
 }
 
 pub fn run_path(path: &str) -> TreewalkContext {
     let mut context = init_path(path);
-    context.run_inner().expect("Treewalk evaluation failed!");
+    context.run_inner().expect("Treewalk evaluation failed");
     context
 }
 
