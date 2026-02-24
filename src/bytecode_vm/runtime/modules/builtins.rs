@@ -22,19 +22,38 @@ static BUILTINS: [(&str, BuiltinFn); 8] = [
     ("iter", iter),
     ("next", next),
 ];
-static TYPES: [Type; 3] = [Type::ZeroDivisionError, Type::TypeError, Type::NameError];
 
-pub fn init_module(runtime: &mut Runtime) {
-    let mut mod_ = Module::new(ModuleName::from_segments(&[Dunder::Builtins]));
-    register_builtin_funcs(runtime, &mut mod_, &BUILTINS);
-
-    for type_ in TYPES {
+// TODO we're kinda mixing two things here:
+// - builtin class creation
+// - registration to the builtin scope
+// We'll separate those out shortly
+fn register_builtin_types(runtime: &mut Runtime, module: &mut Module) {
+    for type_ in Type::all()
+        .iter()
+        // we need to handle these separately
+        .filter(|t| !matches!(t, Type::Type | Type::Object))
+        // TODO this is a hack, we can delete this once we stop treating these as builtin fns
+        .filter(|t| {
+            !matches!(
+                t,
+                Type::Bool | Type::Int | Type::List | Type::Tuple | Type::Range
+            )
+        })
+    {
         let class_ref = runtime
             .heap
             .allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
-        mod_.write((&type_).into(), class_ref);
+        module.write(&type_.to_string(), class_ref);
     }
-    runtime.store_module(Container::new(mod_));
+}
+
+pub fn init_module(runtime: &mut Runtime) {
+    let mut module = Module::new(ModuleName::from_segments(&[Dunder::Builtins]));
+
+    register_builtin_funcs(runtime, &mut module, &BUILTINS);
+    register_builtin_types(runtime, &mut module);
+
+    runtime.store_module(Container::new(module));
 }
 
 /// This is intended to be functionally equivalent to `__build_class__` in CPython.

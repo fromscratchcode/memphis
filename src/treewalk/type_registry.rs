@@ -94,78 +94,6 @@ fn descriptors() -> HashMap<Type, Vec<Box<dyn CloneableNonDataDescriptor>>> {
     methods
 }
 
-/// A list of all the variants of [`Type`] which should have a type class created.
-static ALL_TYPES: [Type; 68] = [
-    Type::Type,
-    Type::Object,
-    Type::Super,
-    Type::GetSetDescriptor,
-    Type::MemberDescriptor,
-    Type::Method,
-    Type::Function,
-    Type::BuiltinFunction,
-    Type::BuiltinMethod,
-    Type::Generator,
-    Type::Coroutine,
-    Type::None,
-    Type::Ellipsis,
-    Type::NotImplemented,
-    Type::Bool,
-    Type::Int,
-    Type::Float,
-    Type::Str,
-    Type::List,
-    Type::Set,
-    Type::FrozenSet,
-    Type::Zip,
-    Type::Tuple,
-    Type::Range,
-    Type::Slice,
-    Type::Complex,
-    Type::Bytes,
-    Type::ByteArray,
-    Type::Memoryview,
-    Type::Dict,
-    Type::DictItems,
-    Type::DictKeys,
-    Type::DictValues,
-    Type::MappingProxy,
-    Type::DictItemIter,
-    Type::DictKeyIter,
-    Type::DictValueIter,
-    Type::BytesIter,
-    Type::ByteArrayIter,
-    Type::RangeIter,
-    Type::StrIter,
-    Type::ListIter,
-    Type::ReversedIter,
-    Type::SetIter,
-    Type::TupleIter,
-    Type::Traceback,
-    Type::Frame,
-    Type::Module,
-    Type::Cell,
-    Type::Code,
-    Type::Classmethod,
-    Type::Staticmethod,
-    Type::Property,
-    Type::BaseException,
-    Type::Exception,
-    Type::StopIteration,
-    Type::TypeError,
-    Type::ZeroDivisionError,
-    Type::RuntimeError,
-    Type::ImportError,
-    Type::LookupError,
-    Type::KeyError,
-    Type::ValueError,
-    Type::NameError,
-    Type::AttributeError,
-    Type::AssertionError,
-    Type::SyntaxError,
-    Type::IOError,
-];
-
 /// Create the [`Type::Type`] class which is the metaclass to all classes, including itself.
 ///
 /// For the hierarchy to work, we give it a parent class of [`Type::ObjectMeta`], which contains
@@ -241,7 +169,7 @@ fn init_type_classes() -> HashMap<Type, Container<Class>> {
     let mut attributes = descriptors();
 
     // Exclude Type and Object because they are initialized separately above.
-    for type_ in ALL_TYPES
+    for type_ in Type::all()
         .iter()
         .filter(|t| !matches!(t, Type::Type | Type::Object))
     {
@@ -296,7 +224,7 @@ impl TypeRegistry {
     /// We need a way to expose the builtin types so they can be stored in the builtin scope inside
     /// the `ScopeManager`.
     pub fn builtin_exported_classes(&self) -> Vec<Container<Class>> {
-        ALL_TYPES
+        Type::all()
             .iter()
             .filter(|t| t.exported_in_builtins())
             .map(|callable_type| self.type_class(callable_type))
