@@ -52,9 +52,3 @@ impl Heap {
         self.storage.iter()
     }
 }
-
-impl Default for Heap {
-    fn default() -> Self {
-        Self::new()
-    }
-}

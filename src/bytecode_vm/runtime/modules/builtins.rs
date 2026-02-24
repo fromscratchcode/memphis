@@ -4,9 +4,9 @@ use crate::{
         runtime::{
             runtime::register_builtin_funcs,
             types::{Class, Exception, List, Module, Range, Tuple},
-            BuiltinFn, Reference,
+            BuiltinFn, Heap, Reference,
         },
-        Runtime, VirtualMachine, VmResult, VmValue,
+        VirtualMachine, VmResult, VmValue,
     },
     core::Container,
     domain::{Dunder, ModuleName, Type},
@@ -27,7 +27,7 @@ static BUILTINS: [(&str, BuiltinFn); 8] = [
 // - builtin class creation
 // - registration to the builtin scope
 // We'll separate those out shortly
-fn register_builtin_types(runtime: &mut Runtime, module: &mut Module) {
+fn register_builtin_types(heap: &mut Heap, module: &mut Module) {
     for type_ in Type::all()
         .iter()
         // we need to handle these separately
@@ -40,20 +40,18 @@ fn register_builtin_types(runtime: &mut Runtime, module: &mut Module) {
             )
         })
     {
-        let class_ref = runtime
-            .heap
-            .allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
+        let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
         module.write(&type_.to_string(), class_ref);
     }
 }
 
-pub fn init_module(runtime: &mut Runtime) {
+pub fn init_module(heap: &mut Heap) -> Module {
     let mut module = Module::new(ModuleName::from_segments(&[Dunder::Builtins]));
 
-    register_builtin_funcs(runtime, &mut module, &BUILTINS);
-    register_builtin_types(runtime, &mut module);
+    register_builtin_funcs(heap, &mut module, &BUILTINS);
+    register_builtin_types(heap, &mut module);
 
-    runtime.store_module(Container::new(module));
+    module
 }
 
 /// This is intended to be functionally equivalent to `__build_class__` in CPython.
@@ -273,15 +271,15 @@ fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 
 #[cfg(test)]
 mod tests {
-    use crate::bytecode_vm::runtime::runtime::register_builtin_funcs;
+    use crate::bytecode_vm::{runtime::runtime::register_builtin_funcs, Runtime};
 
     use super::*;
 
     #[test]
     fn register_builtins_inserts_list() {
-        let mut runtime = Runtime::default();
+        let mut runtime = Runtime::new();
         let mut module = Module::new(ModuleName::from_segments(&["test_module"]));
-        register_builtin_funcs(&mut runtime, &mut module, &BUILTINS);
+        register_builtin_funcs(&mut runtime.heap, &mut module, &BUILTINS);
         assert!(module.global_store().contains_key("list"));
         assert!(!module.global_store().contains_key("dict"));
     }

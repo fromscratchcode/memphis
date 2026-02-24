@@ -13,13 +13,7 @@ use crate::{
     domain::ModuleName,
 };
 
-#[derive(Default)]
 pub struct Runtime {
-    /// This is kind of similar to the heap. When an object is created, it will live here and a
-    /// reference to it will be placed on the stack. Objects here can be from any function context.
-    /// This store retains ownership of the Rust objects throughout the runtime. When non-primitive
-    /// objects are pushed onto the stack, a reference is used so as to not take ownership of the
-    /// objects.
     pub heap: Heap,
 
     module_store: HashMap<ModuleName, Container<Module>>,
@@ -27,12 +21,19 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new() -> Self {
-        let mut runtime = Self::default();
+        let mut heap = Heap::new();
+
+        let builtin_mod = builtins::init_module(&mut heap);
+        let async_mod = asyncio::init_module(&mut heap);
+
+        let mut runtime = Self {
+            heap,
+            module_store: HashMap::new(),
+        };
 
         let _ = runtime.create_module(&ModuleName::main());
-
-        builtins::init_module(&mut runtime);
-        asyncio::init_module(&mut runtime);
+        runtime.store_module(Container::new(builtin_mod));
+        runtime.store_module(Container::new(async_mod));
 
         runtime
     }
@@ -55,14 +56,12 @@ impl Runtime {
 }
 
 pub fn register_builtin_funcs(
-    runtime: &mut Runtime,
+    heap: &mut Heap,
     module: &mut Module,
     builtins: &[(&str, BuiltinFn)],
 ) {
     for (name, func) in builtins {
-        let func_ref = runtime
-            .heap
-            .allocate(VmValue::BuiltinFunction(BuiltinFunction::new(name, *func)));
+        let func_ref = heap.allocate(VmValue::BuiltinFunction(BuiltinFunction::new(name, *func)));
         module.write(name, func_ref);
     }
 }
