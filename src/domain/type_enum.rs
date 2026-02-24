@@ -31,7 +31,7 @@ pub enum Type {
     List,
     Set,
     FrozenSet,
-    Zip,
+    Zip, // this refers to the iterator itself
     Tuple,
     Range,
     Slice,
@@ -167,6 +167,50 @@ impl Type {
             .find(|(t, _)| t == self)
             .map(|(_, parents)| *parents)
             .unwrap_or(&[Type::Object])
+    }
+
+    pub fn exported_in_builtins(&self) -> bool {
+        matches!(
+            self,
+            Type::Type
+                | Type::Object
+                | Type::Super
+                | Type::Bool
+                | Type::Int
+                | Type::Str
+                | Type::List
+                | Type::Dict
+                | Type::Set
+                | Type::FrozenSet
+                | Type::Tuple
+                | Type::Range
+                | Type::Slice
+                | Type::Complex
+                | Type::Float
+                | Type::Bytes
+                | Type::ByteArray
+                | Type::Memoryview
+                | Type::Zip
+                | Type::ReversedIter
+                | Type::Classmethod
+                | Type::Staticmethod
+                | Type::Property
+                | Type::BaseException
+                | Type::Exception
+                | Type::StopIteration
+                | Type::TypeError
+                | Type::ZeroDivisionError
+                | Type::RuntimeError
+                | Type::ImportError
+                | Type::LookupError
+                | Type::KeyError
+                | Type::ValueError
+                | Type::NameError
+                | Type::AttributeError
+                | Type::AssertionError
+                | Type::SyntaxError
+                | Type::IOError
+        )
     }
 }
 

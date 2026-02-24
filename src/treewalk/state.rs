@@ -202,7 +202,7 @@ impl Container<TreewalkState> {
 
     /// Return a singleton `Class` for builtin types such as list, set, tuple, dict, etc.
     pub fn class_of_type(&self, type_: &Type) -> Container<Class> {
-        self.borrow().type_registry.get_type_class(type_)
+        self.borrow().type_registry.type_class(type_)
     }
 
     pub fn get_environment_frame(&self) -> Container<EnvironmentFrame> {

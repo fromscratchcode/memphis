@@ -11,7 +11,7 @@ use crate::{
     },
 };
 
-fn get_builtins() -> Vec<Box<dyn CloneableCallable>> {
+fn builtins() -> Vec<Box<dyn CloneableCallable>> {
     vec![
         Box::new(CallableBuiltin),
         Box::new(DirBuiltin),
@@ -30,14 +30,14 @@ fn get_builtins() -> Vec<Box<dyn CloneableCallable>> {
 
 pub fn init(registry: &TypeRegistry) -> Module {
     let mut mod_ = Module::new_builtin(ModuleName::from_segments(&[Dunder::Builtins]));
-    for builtin in get_builtins() {
+    for builtin in builtins() {
         mod_.insert(&builtin.name(), TreewalkValue::BuiltinFunction(builtin));
     }
 
     // This is to insert `list()`, `set()`, etc into the builtin scope. We must do it here instead
     // of in `init_builtin_scope()` because we want to use the singleton instances owned by
     // `TypeRegistry`.
-    for builtin_class in registry.get_callable_builtin_types() {
+    for builtin_class in registry.builtin_exported_classes() {
         mod_.insert(
             builtin_class.borrow().name(),
             TreewalkValue::Class(builtin_class.clone()),

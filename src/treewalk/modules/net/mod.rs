@@ -93,8 +93,8 @@ fn register_native_class<T: MethodProvider>(
     name: &str,
     type_registry: &TypeRegistry,
 ) {
-    let object_class = type_registry.get_type_class(&Type::Object);
-    let type_class = type_registry.get_type_class(&Type::Type);
+    let object_class = type_registry.type_class(&Type::Object);
+    let type_class = type_registry.type_class(&Type::Type);
 
     let mut class = Class::new_direct(name, Some(type_class.clone()), vec![object_class.clone()]);
 
