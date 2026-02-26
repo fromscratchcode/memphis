@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     bytecode_vm::{
         result::Raise,
@@ -28,10 +30,26 @@ static BUILTINS: [(&str, BuiltinFn); 8] = [
 // - registration to the builtin scope
 // We'll separate those out shortly
 fn register_builtin_types(heap: &mut Heap, module: &mut Module) {
+    let mut type_map = HashMap::new();
+
+    let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(Type::Type.to_string())));
+    type_map.insert(Type::Type, class_ref);
+
+    let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(Type::Object.to_string())));
+    type_map.insert(Type::Object, class_ref);
+
     for type_ in Type::all()
         .iter()
-        // we need to handle these separately
+        // these are handled separately
         .filter(|t| !matches!(t, Type::Type | Type::Object))
+    {
+        let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
+        type_map.insert(*type_, class_ref);
+    }
+
+    for type_ in Type::all()
+        .iter()
+        .filter(|t| t.exported_in_builtins())
         // TODO this is a hack, we can delete this once we stop treating these as builtin fns
         .filter(|t| {
             !matches!(
@@ -40,8 +58,10 @@ fn register_builtin_types(heap: &mut Heap, module: &mut Module) {
             )
         })
     {
-        let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
-        module.write(&type_.to_string(), class_ref);
+        let class_ref = type_map
+            .get(type_)
+            .expect(&format!("Boot failed: builtin {:?} not found", type_));
+        module.write(&type_.to_string(), *class_ref);
     }
 }
 
