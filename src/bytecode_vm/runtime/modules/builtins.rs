@@ -25,28 +25,7 @@ static BUILTINS: [(&str, BuiltinFn); 8] = [
     ("next", next),
 ];
 
-// TODO we're kinda mixing two things here:
-// - builtin class creation
-// - registration to the builtin scope
-// We'll separate those out shortly
-fn register_builtin_types(heap: &mut Heap, module: &mut Module) {
-    let mut type_map = HashMap::new();
-
-    let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(Type::Type.to_string())));
-    type_map.insert(Type::Type, class_ref);
-
-    let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(Type::Object.to_string())));
-    type_map.insert(Type::Object, class_ref);
-
-    for type_ in Type::all()
-        .iter()
-        // these are handled separately
-        .filter(|t| !matches!(t, Type::Type | Type::Object))
-    {
-        let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
-        type_map.insert(*type_, class_ref);
-    }
-
+fn register_builtin_types(type_map: &HashMap<Type, Reference>, module: &mut Module) {
     for type_ in Type::all()
         .iter()
         .filter(|t| t.exported_in_builtins())
@@ -65,11 +44,11 @@ fn register_builtin_types(heap: &mut Heap, module: &mut Module) {
     }
 }
 
-pub fn init_module(heap: &mut Heap) -> Module {
+pub fn init_module(heap: &mut Heap, type_map: &HashMap<Type, Reference>) -> Module {
     let mut module = Module::new(ModuleName::from_segments(&[Dunder::Builtins]));
 
     register_builtin_funcs(heap, &mut module, &BUILTINS);
-    register_builtin_types(heap, &mut module);
+    register_builtin_types(type_map, &mut module);
 
     module
 }

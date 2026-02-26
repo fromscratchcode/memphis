@@ -4,30 +4,75 @@ use crate::{
     bytecode_vm::{
         runtime::{
             modules::{asyncio, builtins},
-            types::Module,
-            BuiltinFn, BuiltinFunction, Heap,
+            types::{Class, Module},
+            BuiltinFn, BuiltinFunction, Heap, Reference,
         },
         VmValue,
     },
     core::Container,
-    domain::ModuleName,
+    domain::{ModuleName, Type},
 };
+
+struct BuiltinTypes {
+    int: Reference,
+    bool: Reference,
+    list: Reference,
+}
+
+impl BuiltinTypes {
+    fn from_map(mut type_map: HashMap<Type, Reference>) -> BuiltinTypes {
+        BuiltinTypes {
+            int: type_map.remove(&Type::Int).unwrap(),
+            bool: type_map.remove(&Type::Bool).unwrap(),
+            list: type_map.remove(&Type::List).unwrap(),
+        }
+    }
+}
+
+fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
+    let mut type_map = HashMap::new();
+
+    let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(Type::Type.to_string())));
+    type_map.insert(Type::Type, class_ref);
+
+    let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(Type::Object.to_string())));
+    type_map.insert(Type::Object, class_ref);
+
+    for type_ in Type::all()
+        .iter()
+        // these are handled separately
+        .filter(|t| !matches!(t, Type::Type | Type::Object))
+    {
+        let class_ref = heap.allocate(VmValue::Class(Class::new_builtin(type_.to_string())));
+        type_map.insert(*type_, class_ref);
+    }
+
+    type_map
+}
 
 pub struct Runtime {
     pub heap: Heap,
 
     module_store: HashMap<ModuleName, Container<Module>>,
+
+    builtin_types: BuiltinTypes,
 }
 
 impl Runtime {
     pub fn new() -> Self {
         let mut heap = Heap::new();
 
-        let builtin_mod = builtins::init_module(&mut heap);
+        // The type_map is a bootstrap-only registry to help us construct BuiltinType and
+        // initialize the global scope in the builtins module.
+        let type_map = init_type_classes(&mut heap);
+        let builtin_mod = builtins::init_module(&mut heap, &type_map);
+        let builtin_types = BuiltinTypes::from_map(type_map);
+
         let async_mod = asyncio::init_module(&mut heap);
 
         let mut runtime = Self {
             heap,
+            builtin_types,
             module_store: HashMap::new(),
         };
 
