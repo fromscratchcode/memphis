@@ -8,7 +8,7 @@ use crate::{
                 str_getitem, Coroutine, Dict, Exception, FunctionObject, Generator, List, Method,
                 Object, Tuple,
             },
-            BuiltinFunction, Completion, FrameExit, Reference, StepResult, Suspension,
+            BuiltinFunction, Completion, FrameExit, HeapObject, Reference, StepResult, Suspension,
         },
         VirtualMachine, VmValue,
     },
@@ -168,23 +168,23 @@ impl VirtualMachine {
                 }
             }
             Opcode::In => {
-                let haystack = self.pop_value();
+                let haystack_ref = self.pop();
                 let needle = self.pop_value();
 
-                let in_result = step_raised!(self.value_in_iter(needle, haystack));
+                let in_result = step_raised!(self.value_in_iter(needle, haystack_ref));
                 self.push(self.to_heapified_bool(in_result));
             }
             Opcode::NotIn => {
-                let haystack = self.pop_value();
+                let haystack_ref = self.pop();
                 let needle = self.pop_value();
 
-                let in_result = !step_raised!(self.value_in_iter(needle, haystack));
+                let in_result = !step_raised!(self.value_in_iter(needle, haystack_ref));
                 self.push(self.to_heapified_bool(in_result));
             }
             Opcode::UnaryNegative => {
                 let value = self.pop_value();
-                let result = step!(self, self.dynamic_negate(&value));
-                self.push_value(result);
+                let reference = step!(self, self.dynamic_negate(&value));
+                self.push(reference);
             }
             Opcode::UnaryNot => {
                 let right = self.pop_value().to_boolean();
@@ -204,8 +204,8 @@ impl VirtualMachine {
             Opcode::LoadConst(index) => {
                 // After loading a constant for the first time, it becomes an object managed by
                 // the heap like any other object.
-                let value = self.read_constant(index);
-                self.push_value(value);
+                let reference = self.load_constant(index);
+                self.push(reference);
             }
             Opcode::StoreFast(index) => {
                 let reference = self.pop();
@@ -240,25 +240,37 @@ impl VirtualMachine {
 
                 let name = self.resolve_name(index).to_owned();
                 self.update_fn(obj_ref, |object_value| {
-                    let VmValue::Object(object) = object_value else {
+                    let VmValue::Object(object) = &mut object_value.payload else {
                         todo!()
                     };
                     object.write(&name, value);
                 });
             }
             Opcode::LoadBuildClass => {
-                self.push_value(VmValue::BuiltinFunction(BuiltinFunction::new(
-                    "load_build_class",
-                    builtins::build_class,
-                )));
+                let obj = HeapObject::new(
+                    self.runtime.borrow().builtin_types.builtin_function,
+                    VmValue::BuiltinFunction(BuiltinFunction::new(
+                        "load_build_class",
+                        builtins::build_class,
+                    )),
+                );
+                self.push_value(obj);
             }
             Opcode::BuildList(n) => {
                 let items = self.collect_n(n);
-                self.push_value(VmValue::List(Container::new(List::new(items))));
+                let list = HeapObject::new(
+                    self.runtime.borrow().builtin_types.list,
+                    VmValue::List(Container::new(List::new(items))),
+                );
+                self.push_value(list);
             }
             Opcode::BuildTuple(n) => {
                 let items = self.collect_n(n);
-                self.push_value(VmValue::Tuple(Tuple::new(items)));
+                let tuple = HeapObject::new(
+                    self.runtime.borrow().builtin_types.tuple,
+                    VmValue::Tuple(Tuple::new(items)),
+                );
+                self.push_value(tuple);
             }
             Opcode::BuildMap(n) => {
                 let mut items = Vec::with_capacity(n);
@@ -269,11 +281,15 @@ impl VirtualMachine {
                     items.push((hash_key, (key, value)));
                 }
                 items.reverse(); // to preserve left-to-right source order
-                self.push_value(VmValue::Dict(Dict::new(items)));
+                let dict = HeapObject::new(
+                    self.runtime.borrow().builtin_types.dict,
+                    VmValue::Dict(Dict::new(items)),
+                );
+                self.push_value(dict);
             }
             Opcode::GetIter => {
-                let obj = self.pop_value();
-                let iterator_ref = step_raised!(builtins::iter_internal(self, obj));
+                let obj_ref = self.pop();
+                let iterator_ref = step_raised!(builtins::iter_internal(self, obj_ref));
                 self.push(iterator_ref);
             }
             Opcode::ForIter(offset) => {
@@ -343,7 +359,11 @@ impl VirtualMachine {
                     .as_code()
                     .expect("MAKE_FUNCTION expected a code object on the stack");
                 let function = FunctionObject::new(code.clone());
-                self.push_value(VmValue::Function(function));
+                let obj = HeapObject::new(
+                    self.runtime.borrow().builtin_types.function,
+                    VmValue::Function(function),
+                );
+                self.push_value(obj);
             }
             Opcode::MakeClosure(num_free) => {
                 let freevars = (0..num_free).map(|_| self.pop()).collect::<Vec<_>>();
@@ -352,7 +372,11 @@ impl VirtualMachine {
                     .as_code()
                     .expect("MAKE_CLOSURE expected a code object on the stack");
                 let function = FunctionObject::new_with_free(code.clone(), freevars);
-                self.push_value(VmValue::Function(function));
+                let obj = HeapObject::new(
+                    self.runtime.borrow().builtin_types.function,
+                    VmValue::Function(function),
+                );
+                self.push_value(obj);
             }
             Opcode::Call(argc) => {
                 let args = (0..argc).map(|_| self.pop()).collect::<Vec<_>>();
@@ -373,11 +397,19 @@ impl VirtualMachine {
                             }
                             FunctionType::Generator => {
                                 let generator = Container::new(Generator::new(frame));
-                                self.push_value(VmValue::Generator(generator));
+                                let obj = HeapObject::new(
+                                    self.runtime.borrow().builtin_types.generator,
+                                    VmValue::Generator(generator),
+                                );
+                                self.push_value(obj);
                             }
                             FunctionType::Async => {
                                 let coroutine = Container::new(Coroutine::new(frame));
-                                self.push_value(VmValue::Coroutine(coroutine));
+                                let obj = HeapObject::new(
+                                    self.runtime.borrow().builtin_types.coroutine,
+                                    VmValue::Coroutine(coroutine),
+                                );
+                                self.push_value(obj);
                             }
                         }
                     }
@@ -387,7 +419,10 @@ impl VirtualMachine {
                         self.push(return_val_ref);
                     }
                     VmValue::Class(ref class) => {
-                        let object = VmValue::Object(Object::new(callable_ref));
+                        let object = HeapObject::new(
+                            self.runtime.borrow().builtin_types.object,
+                            VmValue::Object(Object::new(callable_ref)),
+                        );
                         let reference = self.heapify(object);
 
                         if let Some(init_method) = class.read(Dunder::Init) {
@@ -428,8 +463,8 @@ impl VirtualMachine {
             Opcode::YieldFrom => {
                 if !self.current_frame().has_subgenerator() {
                     // First time hitting this instruction: pop the iterable and store it
-                    let iterable = self.pop_value();
-                    let iterator_ref = step_raised!(builtins::iter_internal(self, iterable));
+                    let iterable_ref = self.pop();
+                    let iterator_ref = step_raised!(builtins::iter_internal(self, iterable_ref));
                     let frame = self.current_frame_mut();
                     frame.set_subgenerator(iterator_ref);
                 }
@@ -481,7 +516,11 @@ impl VirtualMachine {
                 let name = self.resolve_name(index).to_owned();
                 let module_name = ModuleName::from_dotted(&name);
                 let inner_module = step_raised!(self.read_or_load_module(&module_name));
-                let inner_module_ref = self.heapify(VmValue::Module(inner_module));
+                let inner_module = HeapObject::new(
+                    self.runtime.borrow().builtin_types.module,
+                    VmValue::Module(inner_module),
+                );
+                let inner_module_ref = self.heapify(inner_module);
 
                 let outer_module_ref = build_module_chain(self, &module_name, inner_module_ref);
                 self.push(outer_module_ref);
@@ -490,7 +529,11 @@ impl VirtualMachine {
                 let name = self.resolve_name(index).to_owned();
                 let module_name = ModuleName::from_dotted(&name);
                 let inner_module = step_raised!(self.read_or_load_module(&module_name));
-                let inner_module_ref = self.heapify(VmValue::Module(inner_module));
+                let inner_module = HeapObject::new(
+                    self.runtime.borrow().builtin_types.module,
+                    VmValue::Module(inner_module),
+                );
+                let inner_module_ref = self.heapify(inner_module);
                 self.push(inner_module_ref);
             }
             Opcode::PushExcInfo => {
@@ -498,7 +541,11 @@ impl VirtualMachine {
                     .exception_stack
                     .last()
                     .expect("PUSH_EXC_INFO with no active exception");
-                let e_ref = self.heapify(VmValue::Exception(e.clone()));
+                let obj = HeapObject::new(
+                    self.runtime.borrow().builtin_types.exception,
+                    VmValue::Exception(e.clone()),
+                );
+                let e_ref = self.heapify(obj);
                 self.push(e_ref);
             }
             Opcode::PopExcept => {

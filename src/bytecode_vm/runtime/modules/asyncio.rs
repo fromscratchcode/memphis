@@ -40,8 +40,9 @@ fn asyncio_sleep(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Refe
     let micros = duration_in_s * 1_000_000.0;
     let duration = Duration::from_micros(micros as u64);
 
-    let sleep_future = VmValue::SleepFuture(duration);
-    Ok(vm.heapify(sleep_future))
+    let _sleep_future = VmValue::SleepFuture(duration);
+    // TODO I don't know if this should be a real type
+    panic!()
 }
 
 fn expect_float_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<f64> {
@@ -67,9 +68,9 @@ fn expect_coroutine_or_raise(
     }
 }
 
-pub fn init_module(heap: &mut Heap) -> Module {
+pub fn init_module(heap: &mut Heap, class: Reference) -> Module {
     let mut asyncio_mod = Module::new(ModuleName::from_segments(&["asyncio"]));
-    register_builtin_funcs(heap, &mut asyncio_mod, &BUILTINS);
+    register_builtin_funcs(heap, &mut asyncio_mod, class, &BUILTINS);
     asyncio_mod
 }
 

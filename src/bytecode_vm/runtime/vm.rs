@@ -1,12 +1,13 @@
 use crate::{
     bytecode_vm::{
-        compiler::{CodeObject, Opcode},
+        compiler::{CodeObject, Constant, Opcode},
         indices::{ConstantIndex, FreeIndex, LocalIndex, NonlocalIndex},
         result::Raise,
         runtime::{
             modules::builtins,
             types::{Coroutine, Exception, FunctionObject, Generator, Method, Module},
-            CallStack, Completion, Frame, FrameExit, Reference, StepResult, Suspension, VmExecutor,
+            CallStack, Completion, Frame, FrameExit, HeapObject, Reference, StepResult, Suspension,
+            VmExecutor,
         },
         DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
     },
@@ -18,7 +19,7 @@ use crate::{
 mod opcodes;
 
 pub struct VirtualMachine {
-    runtime: Container<Runtime>,
+    pub runtime: Container<Runtime>,
 
     state: Container<MemphisState>,
 
@@ -82,7 +83,10 @@ impl VirtualMachine {
     }
 
     pub fn intern_string(&mut self, val: &str) -> Reference {
-        let s = VmValue::Str(val.to_string());
+        let s = HeapObject::new(
+            self.runtime.borrow().builtin_types.str,
+            VmValue::Str(val.to_string()),
+        );
         self.heapify(s)
     }
 
@@ -161,19 +165,33 @@ impl VirtualMachine {
         self.call_stack.top_mut()
     }
 
-    fn read_constant(&self, index: ConstantIndex) -> VmValue {
-        self.current_frame()
+    fn load_constant(&mut self, index: ConstantIndex) -> Reference {
+        let constant = self
+            .current_frame()
             .function
             .code_object
             .constants
             .get(*index)
-            .map(|c| c.into())
-            .expect("Invalid constant index")
+            .expect("Invalid constant index");
+
+        let payload = VmValue::from(constant);
+
+        let class_ref = match constant {
+            Constant::None => self.runtime.borrow().builtin_types.none,
+            Constant::Int(_) => self.runtime.borrow().builtin_types.int,
+            Constant::Boolean(_) => self.runtime.borrow().builtin_types.bool,
+            Constant::Float(_) => self.runtime.borrow().builtin_types.float,
+            Constant::String(_) => self.runtime.borrow().builtin_types.str,
+            Constant::Code(_) => self.runtime.borrow().builtin_types.code,
+        };
+
+        let obj = HeapObject::new(class_ref, payload);
+        self.heapify(obj)
     }
 
     fn update_fn<F>(&mut self, obj_ref: Reference, function: F)
     where
-        F: FnOnce(&mut VmValue),
+        F: FnOnce(&mut HeapObject),
     {
         if let Some(object_value) = self.runtime.borrow_mut().heap.get_mut(obj_ref) {
             function(object_value)
@@ -276,17 +294,21 @@ impl VirtualMachine {
 
     /// Extract primitives and resolve any references to a [`VmValue`]. All modifications should
     /// occur through VM instructions.
+    // TODO this should probably return HeapObject
     pub fn deref(&self, reference: Reference) -> VmValue {
         match reference {
-            Reference::ObjectRef(_) => self
-                .runtime
-                .borrow()
-                .heap
-                .get(reference)
-                .cloned()
-                .expect("Invalid object reference in heap"),
+            Reference::ObjectRef(_) => {
+                self.runtime
+                    .borrow()
+                    .heap
+                    .get(reference)
+                    .cloned()
+                    .expect("Invalid object reference in heap")
+                    .payload
+            }
             Reference::Int(i) => VmValue::Int(i),
             Reference::Float(f) => VmValue::Float(f),
+            Reference::Null => panic!("Attempted to dereference a null reference"),
         }
     }
 
@@ -385,7 +407,11 @@ impl VirtualMachine {
 
         let bound = match attr_val {
             VmValue::Function(f) if object.should_bind() => {
-                self.heapify(VmValue::Method(Method::new(object_ref, f.clone())))
+                let obj = HeapObject::new(
+                    self.runtime.borrow().builtin_types.method,
+                    VmValue::Method(Method::new(object_ref, f.clone())),
+                );
+                self.heapify(obj)
             }
             _ => attr_ref,
         };
@@ -409,27 +435,27 @@ impl VirtualMachine {
 
     /// Primitives are stored inline on the stack, we create a reference to the global store for
     /// all other types.
-    pub fn heapify(&mut self, value: VmValue) -> Reference {
-        match value {
+    pub fn heapify(&mut self, value: HeapObject) -> Reference {
+        match value.payload {
             // This case is only needed when we receive a generic `VmValue`, i.e. loading a
             // constant. For cases where we know we have a boolean, it is preferred to use
             // `to_heapified_bool` directly.
             VmValue::Bool(bool_val) => self.to_heapified_bool(bool_val),
-            VmValue::Int(_) | VmValue::Float(_) => value.into_ref(),
+            VmValue::Int(_) | VmValue::Float(_) => value.payload.into_ref(),
             _ => self.runtime.borrow_mut().heap.allocate(value),
         }
     }
 
     pub fn none(&self) -> Reference {
-        self.runtime.borrow().heap.none()
+        self.runtime.borrow().builtin_instances.none
     }
 
     pub fn true_(&self) -> Reference {
-        self.runtime.borrow().heap.true_()
+        self.runtime.borrow().builtin_instances.true_obj
     }
 
     pub fn false_(&self) -> Reference {
-        self.runtime.borrow().heap.false_()
+        self.runtime.borrow().builtin_instances.false_obj
     }
 
     pub fn to_heapified_bool(&self, value: bool) -> Reference {
@@ -452,7 +478,7 @@ impl VirtualMachine {
         self.deref(reference)
     }
 
-    fn push_value(&mut self, value: VmValue) {
+    fn push_value(&mut self, value: HeapObject) {
         let reference = self.heapify(value);
         self.push(reference);
     }
@@ -467,7 +493,7 @@ impl VirtualMachine {
         items
     }
 
-    fn try_string_multiplication(a: &VmValue, b: &VmValue) -> Option<VmValue> {
+    fn try_string_multiplication(&mut self, a: &VmValue, b: &VmValue) -> Option<Reference> {
         match (a, b) {
             (VmValue::Str(s), VmValue::Int(n)) | (VmValue::Int(n), VmValue::Str(s)) => {
                 let result = if *n < 0 {
@@ -475,7 +501,11 @@ impl VirtualMachine {
                 } else {
                     s.repeat(*n as usize)
                 };
-                Some(VmValue::Str(result))
+                let obj = HeapObject::new(
+                    self.runtime.borrow().builtin_types.str,
+                    VmValue::Str(result),
+                );
+                Some(self.heapify(obj))
             }
             _ => None,
         }
@@ -488,7 +518,7 @@ impl VirtualMachine {
         let b = self.pop_value();
         let a = self.pop_value();
         let result = if opcode == Opcode::Mul {
-            if let Some(result) = Self::try_string_multiplication(&a, &b) {
+            if let Some(result) = self.try_string_multiplication(&a, &b) {
                 result
             } else {
                 self.binary_numeric_op(op, &a, &b, force_float)?
@@ -509,7 +539,7 @@ impl VirtualMachine {
             self.binary_numeric_op(op, &a, &b, force_float)?
         };
 
-        self.push_value(result);
+        self.push(result);
         Ok(())
     }
 
@@ -530,7 +560,7 @@ impl VirtualMachine {
         a: &VmValue,
         b: &VmValue,
         force_float: bool,
-    ) -> DomainResult<VmValue>
+    ) -> DomainResult<Reference>
     where
         F: FnOnce(f64, f64) -> f64,
     {
@@ -538,21 +568,36 @@ impl VirtualMachine {
             (VmValue::Int(x), VmValue::Int(y)) => {
                 let res = op(*x as f64, *y as f64);
                 if force_float {
-                    VmValue::Float(res)
+                    HeapObject::new(
+                        self.runtime.borrow().builtin_types.float,
+                        VmValue::Float(res),
+                    )
                 } else {
-                    VmValue::Int(res as i64)
+                    HeapObject::new(
+                        self.runtime.borrow().builtin_types.int,
+                        VmValue::Int(res as i64),
+                    )
                 }
             }
-            (VmValue::Float(x), VmValue::Float(y)) => VmValue::Float(op(*x, *y)),
-            (VmValue::Int(x), VmValue::Float(y)) => VmValue::Float(op(*x as f64, *y)),
-            (VmValue::Float(x), VmValue::Int(y)) => VmValue::Float(op(*x, *y as f64)),
+            (VmValue::Float(x), VmValue::Float(y)) => HeapObject::new(
+                self.runtime.borrow().builtin_types.float,
+                VmValue::Float(op(*x, *y)),
+            ),
+            (VmValue::Int(x), VmValue::Float(y)) => HeapObject::new(
+                self.runtime.borrow().builtin_types.float,
+                VmValue::Float(op(*x as f64, *y)),
+            ),
+            (VmValue::Float(x), VmValue::Int(y)) => HeapObject::new(
+                self.runtime.borrow().builtin_types.float,
+                VmValue::Float(op(*x, *y as f64)),
+            ),
             _ => {
                 let msg = self.intern_string("Unsupported operand types for binary operation");
                 return Err(Exception::type_error(msg));
             }
         };
 
-        Ok(result)
+        Ok(self.heapify(result))
     }
 
     fn dynamic_cmp<F>(&mut self, a: &VmValue, b: &VmValue, op: F) -> DomainResult<Reference>
@@ -573,21 +618,26 @@ impl VirtualMachine {
         Ok(self.to_heapified_bool(result))
     }
 
-    fn dynamic_negate(&mut self, value: &VmValue) -> DomainResult<VmValue> {
+    fn dynamic_negate(&mut self, value: &VmValue) -> DomainResult<Reference> {
         let result = match value {
-            VmValue::Int(x) => VmValue::Int(-x),
-            VmValue::Float(x) => VmValue::Float(-x),
+            VmValue::Int(x) => {
+                HeapObject::new(self.runtime.borrow().builtin_types.int, VmValue::Int(-x))
+            }
+            VmValue::Float(x) => HeapObject::new(
+                self.runtime.borrow().builtin_types.float,
+                VmValue::Float(-x),
+            ),
             _ => {
                 let msg = self.intern_string("Unsupported operand type for unary '-'");
                 return Err(Exception::type_error(msg));
             }
         };
 
-        Ok(result)
+        Ok(self.heapify(result))
     }
 
-    fn value_in_iter(&mut self, needle: VmValue, haystack: VmValue) -> VmResult<bool> {
-        let iter = builtins::iter_internal(self, haystack)?;
+    fn value_in_iter(&mut self, needle: VmValue, haystack_ref: Reference) -> VmResult<bool> {
+        let iter = builtins::iter_internal(self, haystack_ref)?;
         loop {
             match builtins::next_internal(self, iter)? {
                 Some(item_ref) => {
@@ -751,10 +801,10 @@ f = Foo()
 "#;
         let ctx = run(text);
         let runtime = ctx.vm().runtime.borrow();
-        let objects: Vec<&VmValue> = runtime
+        let objects: Vec<_> = runtime
             .heap
             .iter()
-            .filter(|object| matches!(object, VmValue::Object(_)))
+            .filter(|object| matches!(object.payload, VmValue::Object(_)))
             .collect();
         assert_eq!(objects.len(), 1);
     }
