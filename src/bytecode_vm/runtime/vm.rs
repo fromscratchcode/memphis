@@ -379,20 +379,34 @@ impl VirtualMachine {
     }
 
     /// Resolves an attribute without applying method binding (used in tests or low-level access).
-    pub fn resolve_raw_attr(&self, value: &VmValue, name: &str) -> DomainResult<Reference> {
+    pub fn resolve_raw_attr(&mut self, value: &VmValue, name: &str) -> DomainResult<Reference> {
         if let Some(object) = value.as_object() {
-            object
-                .read(name, self)?
-                .ok_or_else(|| Exception::attribute_error(&value.get_type(), name))
+            object.read(name, self)?.ok_or_else(|| {
+                let msg = self.intern_string(&format!(
+                    "object {} has no attribute {}",
+                    value.get_type(),
+                    name
+                ));
+                Exception::attribute_error(msg)
+            })
         } else if let Some(module) = value.as_module() {
-            module
-                .borrow()
-                .read(name)
-                .ok_or_else(|| Exception::attribute_error(&value.get_type(), name))
+            module.borrow().read(name).ok_or_else(|| {
+                let msg = self.intern_string(&format!(
+                    "object {} has no attribute {}",
+                    value.get_type(),
+                    name
+                ));
+                Exception::attribute_error(msg)
+            })
         } else if let Some(class) = value.as_class() {
-            class
-                .read(name)
-                .ok_or_else(|| Exception::attribute_error(&value.get_type(), name))
+            class.read(name).ok_or_else(|| {
+                let msg = self.intern_string(&format!(
+                    "object {} has no attribute {}",
+                    value.get_type(),
+                    name
+                ));
+                Exception::attribute_error(msg)
+            })
         } else {
             unimplemented!()
         }

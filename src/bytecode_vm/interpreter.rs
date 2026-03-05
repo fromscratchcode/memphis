@@ -1456,4 +1456,10 @@ b, c
 
         assert_eval_eq!("a = 10; 4 + a", int!(14));
     }
+
+    #[test]
+    fn type_builtin() {
+        let text = r#"type(1).__name__"#;
+        assert_eval_eq!(text, tuple![int!(2), int!(3)]);
+    }
 }
