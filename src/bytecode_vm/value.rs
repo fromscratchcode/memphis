@@ -192,6 +192,13 @@ impl VmValue {
         }
     }
 
+    pub fn as_class_mut(&mut self) -> Option<&mut Class> {
+        match self {
+            VmValue::Class(i) => Some(i),
+            _ => None,
+        }
+    }
+
     pub fn as_coroutine(&self) -> Option<&Container<Coroutine>> {
         match self {
             VmValue::Coroutine(i) => Some(i),

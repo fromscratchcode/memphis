@@ -1,7 +1,10 @@
-use crate::bytecode_vm::{
-    indices::Index,
-    runtime::{HeapObject, Reference},
-    VmValue,
+use crate::{
+    bytecode_vm::{
+        indices::Index,
+        runtime::{types::Class, HeapObject, Reference},
+        VmValue,
+    },
+    domain::Type,
 };
 
 pub struct Heap {
@@ -13,18 +16,26 @@ impl Heap {
         Self { storage: vec![] }
     }
 
-    pub fn allocate(&mut self, value: HeapObject) -> Reference {
+    fn next_index(&self) -> Reference {
         let index = Index::new(self.storage.len());
-        self.storage.push(value);
         Reference::ObjectRef(index)
     }
 
-    // This should only be used in bootstrapping code.
-    pub fn allocate_raw(&mut self, value: VmValue) -> Reference {
-        let index = Index::new(self.storage.len());
-        let obj = HeapObject::new(Reference::Null, value);
+    pub fn allocate(&mut self, value: HeapObject) -> Reference {
+        let index = self.next_index();
+        self.storage.push(value);
+        index
+    }
+
+    /// Special allocator for <class 'type'>, whose class references itself.
+    pub fn allocate_type(&mut self) -> Reference {
+        let type_ref = self.next_index();
+        let obj = HeapObject::new(
+            type_ref,
+            VmValue::Class(Class::new_builtin(Type::Type.to_string())),
+        );
         self.storage.push(obj);
-        Reference::ObjectRef(index)
+        type_ref
     }
 
     pub fn get(&self, reference: Reference) -> Option<&HeapObject> {

@@ -10,7 +10,7 @@ use crate::{
         VmValue,
     },
     core::Container,
-    domain::{ModuleName, Type},
+    domain::{Dunder, ModuleName, Type},
 };
 
 pub struct BuiltinInstances {
@@ -76,18 +76,12 @@ impl BuiltinTypes {
 fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
     let mut type_map = HashMap::new();
 
-    let name_ref = heap.allocate_raw(VmValue::Str(Type::Type.to_string()));
-    let type_ref = heap.allocate_raw(VmValue::Class(Class::new_builtin(
-        Type::Type.to_string(),
-        name_ref,
-    )));
-    heap.get_mut(type_ref).unwrap().class = type_ref;
+    let type_ref = heap.allocate_type();
     type_map.insert(Type::Type, type_ref);
 
-    let name_ref = heap.allocate_raw(VmValue::Str(Type::Object.to_string()));
     let obj = HeapObject::new(
         type_ref,
-        VmValue::Class(Class::new_builtin(Type::Object.to_string(), name_ref)),
+        VmValue::Class(Class::new_builtin(Type::Object.to_string())),
     );
     let object_ref = heap.allocate(obj);
     type_map.insert(Type::Object, object_ref);
@@ -97,16 +91,30 @@ fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
         // these are handled separately
         .filter(|t| !matches!(t, Type::Type | Type::Object))
     {
-        let name_ref = heap.allocate_raw(VmValue::Str(type_.to_string()));
         let obj = HeapObject::new(
             type_ref,
-            VmValue::Class(Class::new_builtin(type_.to_string(), name_ref)),
+            VmValue::Class(Class::new_builtin(type_.to_string())),
         );
         let class_ref = heap.allocate(obj);
         type_map.insert(*type_, class_ref);
     }
 
     type_map
+}
+
+fn write_name_to_type_classes(type_map: &HashMap<Type, Reference>, heap: &mut Heap) {
+    let str_ref = *type_map.get(&Type::Str).unwrap();
+    for type_ in Type::all().iter() {
+        let name_ref = heap.allocate(HeapObject::new(str_ref, VmValue::Str(type_.to_string())));
+
+        let type_ref = *type_map.get(type_).unwrap();
+        heap.get_mut(type_ref)
+            .unwrap()
+            .payload
+            .as_class_mut()
+            .unwrap()
+            .write(Dunder::Name, name_ref);
+    }
 }
 
 pub struct Runtime {
@@ -126,6 +134,7 @@ impl Runtime {
         // The type_map is a bootstrap-only registry to help us construct BuiltinType and
         // initialize the global scope in the builtins module.
         let type_map = init_type_classes(&mut heap);
+        write_name_to_type_classes(&type_map, &mut heap);
         let builtin_mod = builtins::init_module(&mut heap, &type_map);
         let builtin_types = BuiltinTypes::from_map(type_map);
 

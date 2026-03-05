@@ -1461,5 +1461,8 @@ b, c
     fn type_builtin() {
         let text = r#"type([1]).__name__"#;
         assert_eval_eq!(text, str!("list"));
+
+        let text = r#"type(type([1]).__name__).__name__"#;
+        assert_eval_eq!(text, str!("str"));
     }
 }

@@ -308,7 +308,6 @@ impl VirtualMachine {
             }
             Reference::Int(i) => VmValue::Int(i),
             Reference::Float(f) => VmValue::Float(f),
-            Reference::Null => panic!("Attempted to dereference a null reference"),
         }
     }
 
@@ -323,7 +322,6 @@ impl VirtualMachine {
                 .expect("Invalid object reference in heap"),
             Reference::Int(_) => todo!(),
             Reference::Float(_) => todo!(),
-            Reference::Null => panic!("Attempted to dereference a null reference"),
         }
     }
 

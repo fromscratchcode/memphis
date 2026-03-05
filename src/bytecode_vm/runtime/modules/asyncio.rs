@@ -41,7 +41,7 @@ fn asyncio_sleep(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Refe
     let duration = Duration::from_micros(micros as u64);
 
     // TODO I don't know if this should be a real type, we should fix this sooner rather than later
-    let obj = HeapObject::new(Reference::Null, VmValue::SleepFuture(duration));
+    let obj = HeapObject::new(Reference::Int(-1), VmValue::SleepFuture(duration));
     Ok(vm.heapify(obj))
 }
 

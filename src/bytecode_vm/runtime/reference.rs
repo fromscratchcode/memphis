@@ -20,7 +20,6 @@ impl HeapObject {
 /// [`Reference::ObjectRef`] items reference an object in the object table.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reference {
-    Null,
     Int(i64),
     Float(f64),
     ObjectRef(ObjectTableIndex),
