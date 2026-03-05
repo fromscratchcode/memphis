@@ -76,13 +76,18 @@ impl BuiltinTypes {
 fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
     let mut type_map = HashMap::new();
 
-    let type_ref = heap.allocate_raw(VmValue::Class(Class::new_builtin(Type::Type.to_string())));
+    let name_ref = heap.allocate_raw(VmValue::Str(Type::Type.to_string()));
+    let type_ref = heap.allocate_raw(VmValue::Class(Class::new_builtin(
+        Type::Type.to_string(),
+        name_ref,
+    )));
     heap.get_mut(type_ref).unwrap().class = type_ref;
     type_map.insert(Type::Type, type_ref);
 
+    let name_ref = heap.allocate_raw(VmValue::Str(Type::Object.to_string()));
     let obj = HeapObject::new(
         type_ref,
-        VmValue::Class(Class::new_builtin(Type::Object.to_string())),
+        VmValue::Class(Class::new_builtin(Type::Object.to_string(), name_ref)),
     );
     let object_ref = heap.allocate(obj);
     type_map.insert(Type::Object, object_ref);
@@ -92,9 +97,10 @@ fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
         // these are handled separately
         .filter(|t| !matches!(t, Type::Type | Type::Object))
     {
+        let name_ref = heap.allocate_raw(VmValue::Str(type_.to_string()));
         let obj = HeapObject::new(
             type_ref,
-            VmValue::Class(Class::new_builtin(type_.to_string())),
+            VmValue::Class(Class::new_builtin(type_.to_string(), name_ref)),
         );
         let class_ref = heap.allocate(obj);
         type_map.insert(*type_, class_ref);

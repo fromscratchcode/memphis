@@ -14,7 +14,8 @@ use crate::{
     domain::{Dunder, ModuleName, Type},
 };
 
-static BUILTINS: [(&str, BuiltinFn); 8] = [
+static BUILTINS: [(&str, BuiltinFn); 9] = [
+    ("type", type_fn),
     ("bool", bool),
     ("int", int),
     ("list", list),
@@ -33,7 +34,7 @@ fn register_builtin_types(type_map: &HashMap<Type, Reference>, module: &mut Modu
         .filter(|t| {
             !matches!(
                 t,
-                Type::Bool | Type::Int | Type::List | Type::Tuple | Type::Range
+                Type::Bool | Type::Int | Type::List | Type::Tuple | Type::Range | Type::Type
             )
         })
     {
@@ -89,6 +90,21 @@ fn collect_iterable(vm: &mut VirtualMachine, obj_ref: Reference) -> VmResult<Vec
     }
 
     Ok(collected)
+}
+
+fn type_fn(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
+    let obj = match args.len() {
+        1 => vm.deref_new(args[0]),
+        _ => {
+            let msg = vm.intern_string(&format!(
+                "list expected at most 1 argument, got {}",
+                args.len()
+            ));
+            return Exception::type_error(msg).raise(vm);
+        }
+    };
+
+    Ok(obj.class)
 }
 
 fn list(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {

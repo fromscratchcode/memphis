@@ -1459,7 +1459,7 @@ b, c
 
     #[test]
     fn type_builtin() {
-        let text = r#"type(1).__name__"#;
-        assert_eval_eq!(text, tuple![int!(2), int!(3)]);
+        let text = r#"type([1]).__name__"#;
+        assert_eval_eq!(text, str!("list"));
     }
 }

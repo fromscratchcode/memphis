@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::bytecode_vm::{runtime::reference::Namespace, runtime::Reference};
+use crate::{
+    bytecode_vm::runtime::{reference::Namespace, Reference},
+    domain::Dunder,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Class {
@@ -13,11 +16,10 @@ impl Class {
         Self { name, namespace }
     }
 
-    pub fn new_builtin(name: String) -> Self {
-        Self {
-            name,
-            namespace: HashMap::default(),
-        }
+    pub fn new_builtin(name: String, name_ref: Reference) -> Self {
+        let mut namespace = HashMap::new();
+        namespace.insert(Dunder::Name.to_string(), name_ref);
+        Self { name, namespace }
     }
 
     pub fn read<S>(&self, name: S) -> Option<Reference>

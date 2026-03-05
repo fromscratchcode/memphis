@@ -312,6 +312,21 @@ impl VirtualMachine {
         }
     }
 
+    pub fn deref_new(&self, reference: Reference) -> HeapObject {
+        match reference {
+            Reference::ObjectRef(_) => self
+                .runtime
+                .borrow()
+                .heap
+                .get(reference)
+                .cloned()
+                .expect("Invalid object reference in heap"),
+            Reference::Int(_) => todo!(),
+            Reference::Float(_) => todo!(),
+            Reference::Null => panic!("Attempted to dereference a null reference"),
+        }
+    }
+
     pub fn type_name(&self, obj: &VmValue) -> String {
         match obj {
             VmValue::Object(o) => {
