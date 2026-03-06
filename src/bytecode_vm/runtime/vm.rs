@@ -290,22 +290,11 @@ impl VirtualMachine {
 
     /// Extract primitives and resolve any references to a [`VmValue`]. All modifications should
     /// occur through VM instructions.
-    // TODO this should probably return HeapObject
     pub fn deref(&self, reference: Reference) -> VmValue {
-        match reference {
-            Reference::ObjectRef(_) => {
-                self.runtime
-                    .borrow()
-                    .heap
-                    .get(reference)
-                    .cloned()
-                    .expect("Invalid object reference in heap")
-                    .payload
-            }
-        }
+        self.deref_object(reference).payload
     }
 
-    pub fn deref_new(&self, reference: Reference) -> HeapObject {
+    pub fn deref_object(&self, reference: Reference) -> HeapObject {
         match reference {
             Reference::ObjectRef(_) => self
                 .runtime

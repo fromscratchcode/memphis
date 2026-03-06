@@ -93,7 +93,7 @@ fn collect_iterable(vm: &mut VirtualMachine, obj_ref: Reference) -> VmResult<Vec
 
 fn type_fn(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let obj = match args.len() {
-        1 => vm.deref_new(args[0]),
+        1 => vm.deref_object(args[0]),
         _ => {
             let msg = vm.intern_string(&format!(
                 "list expected at most 1 argument, got {}",
