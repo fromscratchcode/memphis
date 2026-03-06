@@ -6,7 +6,7 @@ use crate::{
         runtime::{
             runtime::register_builtin_funcs,
             types::{Class, Exception, List, Module, Range, Tuple},
-            BuiltinFn, Heap, HeapObject, Reference,
+            BuiltinFn, Heap, Reference,
         },
         VirtualMachine, VmResult, VmValue,
     },
@@ -73,11 +73,10 @@ pub fn build_class(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Re
 
     let frame = vm.frame_for_code(code.clone());
     let frame = vm.call_and_return_frame(frame);
-    let obj = HeapObject::new(
-        vm.runtime.borrow().builtin_types.r#type,
-        VmValue::Class(Class::new(name, frame.namespace())),
-    );
-    Ok(vm.heapify(obj))
+
+    let type_ = vm.runtime.borrow().builtin_types.r#type;
+    let obj = vm.new_object(type_, VmValue::Class(Class::new(name, frame.namespace())));
+    Ok(obj)
 }
 
 /// Given a reference to an object, build a collection over its iterator.
@@ -120,11 +119,9 @@ fn list(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         }
     };
 
-    let obj = HeapObject::new(
-        vm.runtime.borrow().builtin_types.list,
-        VmValue::List(Container::new(List::new(items))),
-    );
-    Ok(vm.heapify(obj))
+    let type_ = vm.runtime.borrow().builtin_types.list;
+    let obj = vm.new_object(type_, VmValue::List(Container::new(List::new(items))));
+    Ok(obj)
 }
 
 fn tuple(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
@@ -140,11 +137,9 @@ fn tuple(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         }
     };
 
-    let obj = HeapObject::new(
-        vm.runtime.borrow().builtin_types.tuple,
-        VmValue::Tuple(Tuple::new(items)),
-    );
-    Ok(vm.heapify(obj))
+    let type_ = vm.runtime.borrow().builtin_types.tuple;
+    let obj = vm.new_object(type_, VmValue::Tuple(Tuple::new(items)));
+    Ok(obj)
 }
 
 fn bool(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
@@ -176,8 +171,9 @@ fn int(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         }
     };
 
-    let obj = HeapObject::new(vm.runtime.borrow().builtin_types.int, VmValue::Int(value));
-    Ok(vm.heapify(obj))
+    let type_ = vm.runtime.borrow().builtin_types.int;
+    let obj = vm.new_object(type_, VmValue::Int(value));
+    Ok(obj)
 }
 
 fn range(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
@@ -213,11 +209,9 @@ fn range(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         }
     };
 
-    let obj = HeapObject::new(
-        vm.runtime.borrow().builtin_types.range,
-        VmValue::Range(range),
-    );
-    Ok(vm.heapify(obj))
+    let type_ = vm.runtime.borrow().builtin_types.range;
+    let obj = vm.new_object(type_, VmValue::Range(range));
+    Ok(obj)
 }
 
 fn expect_integer_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<i64> {
@@ -237,25 +231,16 @@ pub fn iter_internal(vm: &mut VirtualMachine, obj_ref: Reference) -> VmResult<Re
     let iterator_ref = match value {
         VmValue::Generator(_) => obj_ref,
         VmValue::List(list) => {
-            let obj = HeapObject::new(
-                vm.runtime.borrow().builtin_types.list_iter,
-                VmValue::ListIter(Container::new(list.into_iter())),
-            );
-            vm.heapify(obj)
+            let type_ = vm.runtime.borrow().builtin_types.list_iter;
+            vm.new_object(type_, VmValue::ListIter(Container::new(list.into_iter())))
         }
         VmValue::Tuple(tuple) => {
-            let obj = HeapObject::new(
-                vm.runtime.borrow().builtin_types.list_iter,
-                VmValue::TupleIter(Container::new(tuple.iter())),
-            );
-            vm.heapify(obj)
+            let type_ = vm.runtime.borrow().builtin_types.tuple_iter;
+            vm.new_object(type_, VmValue::TupleIter(Container::new(tuple.iter())))
         }
         VmValue::Range(range) => {
-            let obj = HeapObject::new(
-                vm.runtime.borrow().builtin_types.list_iter,
-                VmValue::RangeIter(Container::new(range.iter())),
-            );
-            vm.heapify(obj)
+            let type_ = vm.runtime.borrow().builtin_types.range_iter;
+            vm.new_object(type_, VmValue::RangeIter(Container::new(range.iter())))
         }
         _ => {
             let msg = vm.intern_string(&format!("'{}' object is not iterable", value.get_type()));
@@ -289,8 +274,8 @@ pub fn next_internal(vm: &mut VirtualMachine, iter_ref: Reference) -> VmResult<O
         VmValue::RangeIter(ref range_iter) => Ok(range_iter.borrow_mut().next().map(|i| {
             // TODO it doesn't feel like this should be necessary, what if the range iter
             // returned full objects here.
-            let obj = HeapObject::new(vm.runtime.borrow().builtin_types.int, VmValue::Int(i));
-            vm.heapify(obj)
+            let type_ = vm.runtime.borrow().builtin_types.int;
+            vm.new_object(type_, VmValue::Int(i))
         })),
         _ => {
             let msg = vm.intern_string(&format!(

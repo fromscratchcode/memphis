@@ -83,11 +83,8 @@ impl VirtualMachine {
     }
 
     pub fn intern_string(&mut self, val: &str) -> Reference {
-        let s = HeapObject::new(
-            self.runtime.borrow().builtin_types.str,
-            VmValue::Str(val.to_string()),
-        );
-        self.heapify(s)
+        let type_ = self.runtime.borrow().builtin_types.str;
+        self.new_object(type_, VmValue::Str(val.to_string()))
     }
 
     pub fn read_global(&self, name: &str) -> Option<VmValue> {
@@ -185,8 +182,7 @@ impl VirtualMachine {
             Constant::Code(_) => self.runtime.borrow().builtin_types.code,
         };
 
-        let obj = HeapObject::new(class_ref, payload);
-        self.heapify(obj)
+        self.new_object(class_ref, payload)
     }
 
     fn update_fn<F>(&mut self, obj_ref: Reference, function: F)
@@ -435,11 +431,8 @@ impl VirtualMachine {
 
         let bound = match attr_val {
             VmValue::Function(f) if object.should_bind() => {
-                let obj = HeapObject::new(
-                    self.runtime.borrow().builtin_types.method,
-                    VmValue::Method(Method::new(object_ref, f.clone())),
-                );
-                self.heapify(obj)
+                let type_ = self.runtime.borrow().builtin_types.method;
+                self.new_object(type_, VmValue::Method(Method::new(object_ref, f.clone())))
             }
             _ => attr_ref,
         };
@@ -523,11 +516,9 @@ impl VirtualMachine {
                 } else {
                     s.repeat(*n as usize)
                 };
-                let obj = HeapObject::new(
-                    self.runtime.borrow().builtin_types.str,
-                    VmValue::Str(result),
-                );
-                Some(self.heapify(obj))
+                let type_ = self.runtime.borrow().builtin_types.str;
+                let obj_ref = self.new_object(type_, VmValue::Str(result));
+                Some(obj_ref)
             }
             _ => None,
         }
@@ -590,36 +581,32 @@ impl VirtualMachine {
             (VmValue::Int(x), VmValue::Int(y)) => {
                 let res = op(*x as f64, *y as f64);
                 if force_float {
-                    HeapObject::new(
-                        self.runtime.borrow().builtin_types.float,
-                        VmValue::Float(res),
-                    )
+                    let type_ = self.runtime.borrow().builtin_types.float;
+                    self.new_object(type_, VmValue::Float(res))
                 } else {
-                    HeapObject::new(
-                        self.runtime.borrow().builtin_types.int,
-                        VmValue::Int(res as i64),
-                    )
+                    let type_ = self.runtime.borrow().builtin_types.int;
+                    self.new_object(type_, VmValue::Int(res as i64))
                 }
             }
-            (VmValue::Float(x), VmValue::Float(y)) => HeapObject::new(
-                self.runtime.borrow().builtin_types.float,
-                VmValue::Float(op(*x, *y)),
-            ),
-            (VmValue::Int(x), VmValue::Float(y)) => HeapObject::new(
-                self.runtime.borrow().builtin_types.float,
-                VmValue::Float(op(*x as f64, *y)),
-            ),
-            (VmValue::Float(x), VmValue::Int(y)) => HeapObject::new(
-                self.runtime.borrow().builtin_types.float,
-                VmValue::Float(op(*x, *y as f64)),
-            ),
+            (VmValue::Float(x), VmValue::Float(y)) => {
+                let type_ = self.runtime.borrow().builtin_types.float;
+                self.new_object(type_, VmValue::Float(op(*x, *y)))
+            }
+            (VmValue::Int(x), VmValue::Float(y)) => {
+                let type_ = self.runtime.borrow().builtin_types.float;
+                self.new_object(type_, VmValue::Float(op(*x as f64, *y)))
+            }
+            (VmValue::Float(x), VmValue::Int(y)) => {
+                let type_ = self.runtime.borrow().builtin_types.float;
+                self.new_object(type_, VmValue::Float(op(*x, *y as f64)))
+            }
             _ => {
                 let msg = self.intern_string("Unsupported operand types for binary operation");
                 return Err(Exception::type_error(msg));
             }
         };
 
-        Ok(self.heapify(result))
+        Ok(result)
     }
 
     fn dynamic_cmp<F>(&mut self, a: &VmValue, b: &VmValue, op: F) -> DomainResult<Reference>
@@ -643,19 +630,20 @@ impl VirtualMachine {
     fn dynamic_negate(&mut self, value: &VmValue) -> DomainResult<Reference> {
         let result = match value {
             VmValue::Int(x) => {
-                HeapObject::new(self.runtime.borrow().builtin_types.int, VmValue::Int(-x))
+                let type_ = self.runtime.borrow().builtin_types.int;
+                self.new_object(type_, VmValue::Int(-x))
             }
-            VmValue::Float(x) => HeapObject::new(
-                self.runtime.borrow().builtin_types.float,
-                VmValue::Float(-x),
-            ),
+            VmValue::Float(x) => {
+                let type_ = self.runtime.borrow().builtin_types.float;
+                self.new_object(type_, VmValue::Float(-x))
+            }
             _ => {
                 let msg = self.intern_string("Unsupported operand type for unary '-'");
                 return Err(Exception::type_error(msg));
             }
         };
 
-        Ok(self.heapify(result))
+        Ok(result)
     }
 
     /// Compares semantic equality for two Python objects, including recursively inspecting inside

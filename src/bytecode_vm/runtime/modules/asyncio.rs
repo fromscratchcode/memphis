@@ -6,7 +6,7 @@ use crate::{
         runtime::{
             runtime::register_builtin_funcs,
             types::{Coroutine, Exception, Module},
-            BuiltinFn, Heap, HeapObject, Reference,
+            BuiltinFn, Heap, Reference,
         },
         VirtualMachine, VmResult, VmValue,
     },
@@ -42,11 +42,9 @@ fn asyncio_sleep(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Refe
 
     // TODO we don't have a real sleep_future type, let's just call this an object for now.
     // This will eventually go away once we implement the __await__ protocol.
-    let obj = HeapObject::new(
-        vm.runtime.borrow().builtin_types.object,
-        VmValue::SleepFuture(duration),
-    );
-    Ok(vm.heapify(obj))
+    let type_ = vm.runtime.borrow().builtin_types.object;
+    let obj = vm.new_object(type_, VmValue::SleepFuture(duration));
+    Ok(obj)
 }
 
 fn expect_float_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<f64> {

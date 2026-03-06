@@ -1,6 +1,6 @@
 use crate::{
     bytecode_vm::{
-        runtime::{types::Module, HeapObject, Reference},
+        runtime::{types::Module, Reference},
         VirtualMachine, VmValue,
     },
     core::Container,
@@ -35,11 +35,8 @@ pub fn build_module_chain(
         // insert inner module under the child's name
         outer.write(&child_key, inner);
 
-        let obj = HeapObject::new(
-            vm.runtime.borrow().builtin_types.module,
-            VmValue::Module(Container::new(outer)),
-        );
-        inner = vm.heapify(obj);
+        let type_ = vm.runtime.borrow().builtin_types.module;
+        inner = vm.new_object(type_, VmValue::Module(Container::new(outer)));
 
         // Next iteration the child key becomes this parent's last segment
         child_key = parent_name.tail().to_owned();
