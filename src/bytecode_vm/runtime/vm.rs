@@ -295,15 +295,12 @@ impl VirtualMachine {
     }
 
     pub fn deref_object(&self, reference: Reference) -> HeapObject {
-        match reference {
-            Reference::ObjectRef(_) => self
-                .runtime
-                .borrow()
-                .heap
-                .get(reference)
-                .cloned()
-                .expect("Invalid object reference in heap"),
-        }
+        self.runtime
+            .borrow()
+            .heap
+            .get(reference)
+            .cloned()
+            .expect("Invalid object reference in heap")
     }
 
     pub fn new_object(&mut self, class: Reference, payload: VmValue) -> Reference {

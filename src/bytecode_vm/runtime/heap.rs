@@ -18,7 +18,7 @@ impl Heap {
 
     fn next_index(&self) -> Reference {
         let index = Index::new(self.storage.len());
-        Reference::ObjectRef(index)
+        Reference::new(index)
     }
 
     pub fn allocate(&mut self, value: HeapObject) -> Reference {
@@ -39,15 +39,11 @@ impl Heap {
     }
 
     pub fn get(&self, reference: Reference) -> Option<&HeapObject> {
-        match reference {
-            Reference::ObjectRef(index) => self.storage.get(*index),
-        }
+        self.storage.get(*reference.index())
     }
 
     pub fn get_mut(&mut self, reference: Reference) -> Option<&mut HeapObject> {
-        match reference {
-            Reference::ObjectRef(index) => self.storage.get_mut(*index),
-        }
+        self.storage.get_mut(*reference.index())
     }
 
     #[cfg(test)]
