@@ -8,7 +8,7 @@ use crate::{
                 str_getitem, Coroutine, Dict, Exception, FunctionObject, Generator, List, Method,
                 Object, Tuple,
             },
-            BuiltinFunction, Completion, FrameExit, HeapObject, Reference, StepResult, Suspension,
+            BuiltinFunction, Completion, FrameExit, HeapObject, StepResult, Suspension,
         },
         VirtualMachine, VmValue,
     },
@@ -169,16 +169,16 @@ impl VirtualMachine {
             }
             Opcode::In => {
                 let haystack_ref = self.pop();
-                let needle = self.pop_value();
+                let needle_ref = self.pop();
 
-                let in_result = step_raised!(self.value_in_iter(needle, haystack_ref));
+                let in_result = step_raised!(self.value_in_iter(needle_ref, haystack_ref));
                 self.push(self.to_heapified_bool(in_result));
             }
             Opcode::NotIn => {
                 let haystack_ref = self.pop();
-                let needle = self.pop_value();
+                let needle_ref = self.pop();
 
-                let in_result = !step_raised!(self.value_in_iter(needle, haystack_ref));
+                let in_result = !step_raised!(self.value_in_iter(needle_ref, haystack_ref));
                 self.push(self.to_heapified_bool(in_result));
             }
             Opcode::UnaryNegative => {
@@ -194,7 +194,12 @@ impl VirtualMachine {
                 let right = self.pop_value().as_integer();
 
                 if let Some(right) = right {
-                    self.push(Reference::Int(!right));
+                    let obj = HeapObject::new(
+                        self.runtime.borrow().builtin_types.int,
+                        VmValue::Int(!right),
+                    );
+                    let obj_ref = self.heapify(obj);
+                    self.push(obj_ref);
                 } else {
                     let msg = self.intern_string("Unsupported operand type for '~'");
                     let exp = Exception::type_error(msg);

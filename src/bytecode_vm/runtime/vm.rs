@@ -306,8 +306,6 @@ impl VirtualMachine {
                     .expect("Invalid object reference in heap")
                     .payload
             }
-            Reference::Int(i) => VmValue::Int(i),
-            Reference::Float(f) => VmValue::Float(f),
         }
     }
 
@@ -320,8 +318,6 @@ impl VirtualMachine {
                 .get(reference)
                 .cloned()
                 .expect("Invalid object reference in heap"),
-            Reference::Int(_) => todo!(),
-            Reference::Float(_) => todo!(),
         }
     }
 
@@ -468,7 +464,6 @@ impl VirtualMachine {
             // constant. For cases where we know we have a boolean, it is preferred to use
             // `to_heapified_bool` directly.
             VmValue::Bool(bool_val) => self.to_heapified_bool(bool_val),
-            VmValue::Int(_) | VmValue::Float(_) => value.payload.into_ref(),
             _ => self.runtime.borrow_mut().heap.allocate(value),
         }
     }
@@ -663,12 +658,37 @@ impl VirtualMachine {
         Ok(self.heapify(result))
     }
 
-    fn value_in_iter(&mut self, needle: VmValue, haystack_ref: Reference) -> VmResult<bool> {
+    /// Compares semantic equality for two Python objects, including recursively inspecting inside
+    /// containers.
+    fn equals(&self, a_ref: Reference, b_ref: Reference) -> bool {
+        let a = self.deref(a_ref);
+        let b = self.deref(b_ref);
+
+        match (&a, &b) {
+            (VmValue::List(a), VmValue::List(b)) => {
+                if a.borrow().len() != b.borrow().len() {
+                    return false;
+                }
+
+                for (x, y) in a.clone().into_iter().zip(b.clone().into_iter()) {
+                    if !self.equals(x, y) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            // TODO move off PartialEq for VmValue
+            _ => a == b,
+        }
+    }
+
+    fn value_in_iter(&mut self, needle_ref: Reference, haystack_ref: Reference) -> VmResult<bool> {
         let iter = builtins::iter_internal(self, haystack_ref)?;
         loop {
             match builtins::next_internal(self, iter)? {
                 Some(item_ref) => {
-                    if needle == self.deref(item_ref) {
+                    if self.equals(needle_ref, item_ref) {
                         return Ok(true);
                     }
                 }

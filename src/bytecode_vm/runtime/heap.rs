@@ -41,14 +41,12 @@ impl Heap {
     pub fn get(&self, reference: Reference) -> Option<&HeapObject> {
         match reference {
             Reference::ObjectRef(index) => self.storage.get(*index),
-            _ => None,
         }
     }
 
     pub fn get_mut(&mut self, reference: Reference) -> Option<&mut HeapObject> {
         match reference {
             Reference::ObjectRef(index) => self.storage.get_mut(*index),
-            _ => None,
         }
     }
 

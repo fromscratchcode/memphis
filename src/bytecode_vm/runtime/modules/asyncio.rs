@@ -6,7 +6,7 @@ use crate::{
         runtime::{
             runtime::register_builtin_funcs,
             types::{Coroutine, Exception, Module},
-            BuiltinFn, Heap, HeapObject, Reference,
+            BuiltinFn, Heap, Reference,
         },
         VirtualMachine, VmResult, VmValue,
     },
@@ -38,11 +38,12 @@ fn asyncio_sleep(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Refe
     let duration_in_s = expect_float_or_raise(vm, &vm.deref(args[0]))?;
 
     let micros = duration_in_s * 1_000_000.0;
-    let duration = Duration::from_micros(micros as u64);
+    let _duration = Duration::from_micros(micros as u64);
 
     // TODO I don't know if this should be a real type, we should fix this sooner rather than later
-    let obj = HeapObject::new(Reference::Int(-1), VmValue::SleepFuture(duration));
-    Ok(vm.heapify(obj))
+    todo!();
+    // let obj = HeapObject::new(Reference::Int(-1), VmValue::SleepFuture(duration));
+    // Ok(vm.heapify(obj))
 }
 
 fn expect_float_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<f64> {
