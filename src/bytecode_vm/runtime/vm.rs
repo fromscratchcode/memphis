@@ -321,6 +321,11 @@ impl VirtualMachine {
         }
     }
 
+    pub fn new_object(&mut self, class: Reference, payload: VmValue) -> Reference {
+        let obj = HeapObject::new(class, payload);
+        self.heapify(obj)
+    }
+
     pub fn type_name(&self, obj: &VmValue) -> String {
         match obj {
             VmValue::Object(o) => {
@@ -498,11 +503,6 @@ impl VirtualMachine {
     fn pop_value(&mut self) -> VmValue {
         let reference = self.pop();
         self.deref(reference)
-    }
-
-    fn push_value(&mut self, value: HeapObject) {
-        let reference = self.heapify(value);
-        self.push(reference);
     }
 
     fn collect_n(&mut self, n: usize) -> Vec<Reference> {
