@@ -84,7 +84,7 @@ pub enum Type {
 
 impl Type {
     /// A list of all the variants of [`Type`] which should have a type class created.
-    const ALL: [Type; 68] = [
+    const ALL: [Type; 69] = [
         Type::Type,
         Type::Object,
         Type::Super,
@@ -153,6 +153,7 @@ impl Type {
         Type::AssertionError,
         Type::SyntaxError,
         Type::IOError,
+        Type::IndexError,
     ];
 
     pub fn all() -> &'static [Type] {
