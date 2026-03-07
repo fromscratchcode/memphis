@@ -6,9 +6,9 @@ use crate::{
         runtime::{
             runtime::register_builtin_funcs,
             types::{Coroutine, Exception, Module},
-            BuiltinFn, Heap, Reference,
+            BuiltinFn, Reference,
         },
-        VirtualMachine, VmResult, VmValue,
+        Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::Container,
     domain::ModuleName,
@@ -70,9 +70,9 @@ fn expect_coroutine_or_raise(
     }
 }
 
-pub fn init_module(heap: &mut Heap, class: Reference) -> Module {
+pub fn init_module(runtime: &mut Runtime) -> Module {
     let mut asyncio_mod = Module::new(ModuleName::from_segments(&["asyncio"]));
-    register_builtin_funcs(heap, &mut asyncio_mod, class, &BUILTINS);
+    register_builtin_funcs(runtime, &mut asyncio_mod, &BUILTINS);
     asyncio_mod
 }
 

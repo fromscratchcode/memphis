@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-
 use crate::{
     bytecode_vm::{
         result::Raise,
         runtime::{
             runtime::register_builtin_funcs,
             types::{Class, Exception, List, Module, Range, Tuple},
-            BuiltinFn, Heap, Reference,
+            BuiltinFn, Reference,
         },
-        VirtualMachine, VmResult, VmValue,
+        Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::Container,
     domain::{Dunder, ModuleName, Type},
@@ -26,7 +24,7 @@ static BUILTINS: [(&str, BuiltinFn); 9] = [
     ("next", next),
 ];
 
-fn register_builtin_types(type_map: &HashMap<Type, Reference>, module: &mut Module) {
+fn register_builtin_types(runtime: &Runtime, module: &mut Module) {
     for type_ in Type::all()
         .iter()
         .filter(|t| t.exported_in_builtins())
@@ -38,23 +36,16 @@ fn register_builtin_types(type_map: &HashMap<Type, Reference>, module: &mut Modu
             )
         })
     {
-        let class_ref = type_map
-            .get(type_)
-            .unwrap_or_else(|| panic!("Boot failed: builtin {:?} not found", type_));
-        module.write(&type_.to_string(), *class_ref);
+        let class_ref = runtime.builtin_types.get(type_);
+        module.write(&type_.to_string(), class_ref);
     }
 }
 
-pub fn init_module(heap: &mut Heap, type_map: &HashMap<Type, Reference>) -> Module {
+pub fn init_module(runtime: &mut Runtime) -> Module {
     let mut module = Module::new(ModuleName::from_segments(&[Dunder::Builtins]));
 
-    register_builtin_funcs(
-        heap,
-        &mut module,
-        *type_map.get(&Type::BuiltinFunction).unwrap(),
-        &BUILTINS,
-    );
-    register_builtin_types(type_map, &mut module);
+    register_builtin_funcs(runtime, &mut module, &BUILTINS);
+    register_builtin_types(runtime, &mut module);
 
     module
 }
@@ -320,12 +311,7 @@ mod tests {
     fn register_builtins_inserts_list() {
         let mut runtime = Runtime::new();
         let mut module = Module::new(ModuleName::from_segments(&["test_module"]));
-        register_builtin_funcs(
-            &mut runtime.heap,
-            &mut module,
-            runtime.builtin_types.builtin_function,
-            &BUILTINS,
-        );
+        register_builtin_funcs(&mut runtime, &mut module, &BUILTINS);
         assert!(module.global_store().contains_key("list"));
         assert!(!module.global_store().contains_key("dict"));
     }

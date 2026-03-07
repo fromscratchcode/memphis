@@ -166,7 +166,7 @@ impl BuiltinTypes {
         }
     }
 
-    fn get(&self, type_: &Type) -> Reference {
+    pub fn get(&self, type_: &Type) -> Reference {
         match type_ {
             Type::Type => self.r#type,
             Type::TypeMeta => self.r#type,
@@ -243,7 +243,7 @@ impl BuiltinTypes {
     }
 }
 
-fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
+fn init_builtin_types(heap: &mut Heap) -> BuiltinTypes {
     let mut type_map = HashMap::new();
 
     let type_ref = heap.allocate_type();
@@ -269,7 +269,7 @@ fn init_type_classes(heap: &mut Heap) -> HashMap<Type, Reference> {
         type_map.insert(*type_, class_ref);
     }
 
-    type_map
+    BuiltinTypes::from_map(type_map)
 }
 
 fn write_name_to_type_classes(builtin_types: &BuiltinTypes, heap: &mut Heap) {
@@ -289,6 +289,18 @@ fn write_name_to_type_classes(builtin_types: &BuiltinTypes, heap: &mut Heap) {
     }
 }
 
+fn init_builtin_instances(heap: &mut Heap, builtin_types: &BuiltinTypes) -> BuiltinInstances {
+    let none = heap.allocate(HeapObject::new(builtin_types.none, VmValue::None));
+    let true_obj = heap.allocate(HeapObject::new(builtin_types.bool, VmValue::Bool(true)));
+    let false_obj = heap.allocate(HeapObject::new(builtin_types.bool, VmValue::Bool(false)));
+
+    BuiltinInstances {
+        none,
+        true_obj,
+        false_obj,
+    }
+}
+
 pub struct Runtime {
     pub heap: Heap,
 
@@ -303,24 +315,10 @@ impl Runtime {
     pub fn new() -> Self {
         let mut heap = Heap::new();
 
-        // The type_map is a bootstrap-only registry to help us construct BuiltinType and
-        // initialize the global scope in the builtins module.
-        let type_map = init_type_classes(&mut heap);
-        let builtin_mod = builtins::init_module(&mut heap, &type_map);
-        let builtin_types = BuiltinTypes::from_map(type_map);
+        let builtin_types = init_builtin_types(&mut heap);
         write_name_to_type_classes(&builtin_types, &mut heap);
 
-        let none = heap.allocate(HeapObject::new(builtin_types.none, VmValue::None));
-        let true_obj = heap.allocate(HeapObject::new(builtin_types.bool, VmValue::Bool(true)));
-        let false_obj = heap.allocate(HeapObject::new(builtin_types.bool, VmValue::Bool(false)));
-
-        let builtin_instances = BuiltinInstances {
-            none,
-            true_obj,
-            false_obj,
-        };
-
-        let async_mod = asyncio::init_module(&mut heap, builtin_types.builtin_function);
+        let builtin_instances = init_builtin_instances(&mut heap, &builtin_types);
 
         let mut runtime = Self {
             heap,
@@ -329,11 +327,19 @@ impl Runtime {
             module_store: HashMap::new(),
         };
 
-        let _ = runtime.create_module(&ModuleName::main());
-        runtime.store_module(Container::new(builtin_mod));
-        runtime.store_module(Container::new(async_mod));
+        runtime.init_modules();
 
         runtime
+    }
+
+    fn init_modules(&mut self) {
+        let builtin_mod = builtins::init_module(self);
+        let async_mod = asyncio::init_module(self);
+
+        let _ = self.create_module(&ModuleName::main());
+
+        self.store_module(Container::new(builtin_mod));
+        self.store_module(Container::new(async_mod));
     }
 
     pub fn read_module(&self, name: &ModuleName) -> Option<Container<Module>> {
@@ -354,17 +360,16 @@ impl Runtime {
 }
 
 pub fn register_builtin_funcs(
-    heap: &mut Heap,
+    runtime: &mut Runtime,
     module: &mut Module,
-    class: Reference,
     builtins: &[(&str, BuiltinFn)],
 ) {
     for (name, func) in builtins {
         let obj = HeapObject::new(
-            class,
+            runtime.builtin_types.builtin_function,
             VmValue::BuiltinFunction(BuiltinFunction::new(name, *func)),
         );
-        let func_ref = heap.allocate(obj);
+        let func_ref = runtime.heap.allocate(obj);
         module.write(name, func_ref);
     }
 }
