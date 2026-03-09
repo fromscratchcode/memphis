@@ -5,7 +5,7 @@ use crate::{
         runtime::{
             modules::{asyncio, builtins},
             types::Module,
-            BuiltinFn, BuiltinFunction, Heap,
+            BuiltinFn, BuiltinFunction, BuiltinInstances, BuiltinTypes, Heap, HeapObject,
         },
         VmValue,
     },
@@ -13,28 +13,43 @@ use crate::{
     domain::ModuleName,
 };
 
-#[derive(Default)]
 pub struct Runtime {
-    /// This is kind of similar to the heap. When an object is created, it will live here and a
-    /// reference to it will be placed on the stack. Objects here can be from any function context.
-    /// This store retains ownership of the Rust objects throughout the runtime. When non-primitive
-    /// objects are pushed onto the stack, a reference is used so as to not take ownership of the
-    /// objects.
     pub heap: Heap,
 
     module_store: HashMap<ModuleName, Container<Module>>,
+
+    pub builtin_types: BuiltinTypes,
+
+    pub builtin_instances: BuiltinInstances,
 }
 
 impl Runtime {
     pub fn new() -> Self {
-        let mut runtime = Self::default();
+        let mut heap = Heap::new();
 
-        let _ = runtime.create_module(&ModuleName::main());
+        let builtin_types = BuiltinTypes::init(&mut heap);
+        let builtin_instances = BuiltinInstances::init(&mut heap, &builtin_types);
 
-        builtins::init_module(&mut runtime);
-        asyncio::init_module(&mut runtime);
+        let mut runtime = Self {
+            heap,
+            builtin_types,
+            builtin_instances,
+            module_store: HashMap::new(),
+        };
+
+        runtime.init_modules();
 
         runtime
+    }
+
+    fn init_modules(&mut self) {
+        let builtin_mod = builtins::init_module(self);
+        let async_mod = asyncio::init_module(self);
+
+        let _ = self.create_module(&ModuleName::main());
+
+        self.store_module(Container::new(builtin_mod));
+        self.store_module(Container::new(async_mod));
     }
 
     pub fn read_module(&self, name: &ModuleName) -> Option<Container<Module>> {
@@ -60,9 +75,11 @@ pub fn register_builtin_funcs(
     builtins: &[(&str, BuiltinFn)],
 ) {
     for (name, func) in builtins {
-        let func_ref = runtime
-            .heap
-            .allocate(VmValue::BuiltinFunction(BuiltinFunction::new(name, *func)));
+        let obj = HeapObject::new(
+            runtime.builtin_types.builtin_function,
+            VmValue::BuiltinFunction(BuiltinFunction::new(name, *func)),
+        );
+        let func_ref = runtime.heap.allocate(obj);
         module.write(name, func_ref);
     }
 }

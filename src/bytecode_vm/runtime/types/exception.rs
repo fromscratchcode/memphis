@@ -67,7 +67,7 @@ impl Exception {
         Self::new(ExceptionKind::DivisionByZero, vec![msg])
     }
 
-    pub fn attribute_error(_object_type: impl Into<String>, _attr: impl Into<String>) -> Self {
-        todo!();
+    pub fn attribute_error(msg: Reference) -> Self {
+        Self::new(ExceptionKind::AttributeError, vec![msg])
     }
 }

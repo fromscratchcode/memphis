@@ -94,139 +94,22 @@ fn descriptors() -> HashMap<Type, Vec<Box<dyn CloneableNonDataDescriptor>>> {
     methods
 }
 
-/// A list of all the variants of [`Type`] which should have a type class created. As of 2024-02-16,
-/// this is all the variants.
-///
-/// We leave [`Type::Type`] out of here beacuse it must be initialized first as it is the metaclass
-/// for all the these type classes.
-///
-/// We also leave [`Type::Object`] out of here because it must be initialized first as it is the
-/// parent class for all of these type classes.
-static ALL_TYPES: [Type; 66] = [
-    Type::Super,
-    Type::GetSetDescriptor,
-    Type::MemberDescriptor,
-    Type::Method,
-    Type::Function,
-    Type::BuiltinFunction,
-    Type::BuiltinMethod,
-    Type::Generator,
-    Type::Coroutine,
-    Type::None,
-    Type::Ellipsis,
-    Type::NotImplemented,
-    Type::Bool,
-    Type::Int,
-    Type::Float,
-    Type::Str,
-    Type::List,
-    Type::Set,
-    Type::FrozenSet,
-    Type::Zip,
-    Type::Tuple,
-    Type::Range,
-    Type::Slice,
-    Type::Complex,
-    Type::Bytes,
-    Type::ByteArray,
-    Type::Memoryview,
-    Type::Dict,
-    Type::DictItems,
-    Type::DictKeys,
-    Type::DictValues,
-    Type::MappingProxy,
-    Type::DictItemIter,
-    Type::DictKeyIter,
-    Type::DictValueIter,
-    Type::BytesIter,
-    Type::ByteArrayIter,
-    Type::RangeIter,
-    Type::StrIter,
-    Type::ListIter,
-    Type::ReversedIter,
-    Type::SetIter,
-    Type::TupleIter,
-    Type::Traceback,
-    Type::Frame,
-    Type::Module,
-    Type::Cell,
-    Type::Code,
-    Type::Classmethod,
-    Type::Staticmethod,
-    Type::Property,
-    Type::BaseException,
-    Type::Exception,
-    Type::StopIteration,
-    Type::TypeError,
-    Type::ZeroDivisionError,
-    Type::RuntimeError,
-    Type::ImportError,
-    Type::LookupError,
-    Type::KeyError,
-    Type::ValueError,
-    Type::NameError,
-    Type::AttributeError,
-    Type::AssertionError,
-    Type::SyntaxError,
-    Type::IOError,
-];
-
-/// These types are callable and behave like a builtin function.
-static CALLABLE_TYPES: [Type; 38] = [
-    Type::Type,
-    Type::Object,
-    Type::Super,
-    Type::Bool,
-    Type::Int,
-    Type::Str,
-    Type::List,
-    Type::Dict,
-    Type::Set,
-    Type::FrozenSet,
-    Type::Tuple,
-    Type::Range,
-    Type::Slice,
-    Type::Complex,
-    Type::Float,
-    Type::Bytes,
-    Type::ByteArray,
-    Type::Memoryview,
-    Type::Zip, // this refers to the iterator itself
-    Type::ReversedIter,
-    Type::Classmethod,
-    Type::Staticmethod,
-    Type::Property,
-    Type::BaseException,
-    Type::Exception,
-    Type::StopIteration,
-    Type::TypeError,
-    Type::ZeroDivisionError,
-    Type::RuntimeError,
-    Type::ImportError,
-    Type::LookupError,
-    Type::KeyError,
-    Type::ValueError,
-    Type::NameError,
-    Type::AttributeError,
-    Type::AssertionError,
-    Type::SyntaxError,
-    Type::IOError,
-];
-
 /// Create the [`Type::Type`] class which is the metaclass to all classes, including itself.
 ///
-/// For the hierarchy to work, we give it a parent class of [`Type::ObjectMeta`], which contains
-/// all the builtin methods of [`Type::Object`], and a metaclass of [`Type::TypeMeta`], which
+/// For the hierarchy to work, we give it a parent class of [`Type::Object`], which contains
+/// all the builtin methods of [`Type::Object`], and a metaclass of [`Type::Type`], which
 /// contains all the builtin methods of [`Type::Type`]. The "meta" types should never be used
 /// directly, but a cycle is created if we try to make Type inherit from Object while Object's
 /// metaclass is Type.
+///
+/// tldr these are fake leaf nodes.
 fn type_class() -> Class {
-    let mut object_base = Class::new_builtin(Type::ObjectMeta, None, vec![]);
+    let mut object_base = Class::new_builtin(Type::Object, None, vec![]);
     for method in Object::get_methods().into_iter() {
         object_base.set_on_class(&method.name(), TreewalkValue::BuiltinMethod(method));
     }
 
-    let mut type_base = Class::new_builtin(Type::TypeMeta, None, vec![]);
+    let mut type_base = Class::new_builtin(Type::Type, None, vec![]);
     for method in TypeClass::get_methods().into_iter() {
         type_base.set_on_class(&method.name(), TreewalkValue::BuiltinMethod(method));
     }
@@ -286,7 +169,12 @@ fn init_type_classes() -> HashMap<Type, Container<Class>> {
     // Create all the other type classes using `Type::Type` and `Type::Object`.
     let mut methods = builtin_methods();
     let mut attributes = descriptors();
-    for type_ in ALL_TYPES.iter() {
+
+    // Exclude Type and Object because they are initialized separately above.
+    for type_ in Type::all()
+        .iter()
+        .filter(|t| !matches!(t, Type::Type | Type::Object))
+    {
         let parent_classes = parent_classes(type_, &type_classes);
         let mut class = Class::new_builtin(*type_, Some(type_class.clone()), parent_classes);
 
@@ -328,7 +216,7 @@ impl TypeRegistry {
 
     /// Safe to call `unwrap()` here because we will have a type class for all `Type`s.
     /// TODO we still need to enforce this at compile-time ideally.
-    pub fn get_type_class(&self, type_: &Type) -> Container<Class> {
+    pub fn type_class(&self, type_: &Type) -> Container<Class> {
         self.type_classes
             .get(type_)
             .unwrap_or_else(|| panic!("TypeRegistry initialization failed for <{type_}>!"))
@@ -337,10 +225,11 @@ impl TypeRegistry {
 
     /// We need a way to expose the builtin types so they can be stored in the builtin scope inside
     /// the `ScopeManager`.
-    pub fn get_callable_builtin_types(&self) -> Vec<Container<Class>> {
-        CALLABLE_TYPES
+    pub fn builtin_exported_classes(&self) -> Vec<Container<Class>> {
+        Type::all()
             .iter()
-            .map(|callable_type| self.get_type_class(callable_type))
+            .filter(|t| t.exported_in_builtins())
+            .map(|callable_type| self.type_class(callable_type))
             .collect()
     }
 }

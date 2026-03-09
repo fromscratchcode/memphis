@@ -1,60 +1,53 @@
-use crate::bytecode_vm::{indices::Index, runtime::Reference, VmValue};
-
-const NONE_INDEX: usize = 0;
-const TRUE_INDEX: usize = 1;
-const FALSE_INDEX: usize = 2;
+use crate::{
+    bytecode_vm::{
+        indices::Index,
+        runtime::{types::Class, HeapObject, Reference},
+        VmValue,
+    },
+    domain::Type,
+};
 
 pub struct Heap {
-    storage: Vec<VmValue>,
+    storage: Vec<HeapObject>,
 }
 
 impl Heap {
     pub fn new() -> Self {
-        Self {
-            storage: vec![VmValue::None, VmValue::Bool(true), VmValue::Bool(false)],
-        }
+        Self { storage: vec![] }
     }
 
-    pub fn none(&self) -> Reference {
-        Reference::ObjectRef(Index::new(NONE_INDEX))
-    }
-
-    pub fn true_(&self) -> Reference {
-        Reference::ObjectRef(Index::new(TRUE_INDEX))
-    }
-
-    pub fn false_(&self) -> Reference {
-        Reference::ObjectRef(Index::new(FALSE_INDEX))
-    }
-
-    pub fn allocate(&mut self, value: VmValue) -> Reference {
+    fn next_index(&self) -> Reference {
         let index = Index::new(self.storage.len());
+        Reference::new(index)
+    }
+
+    pub fn allocate(&mut self, value: HeapObject) -> Reference {
+        let index = self.next_index();
         self.storage.push(value);
-        Reference::ObjectRef(index)
+        index
     }
 
-    pub fn get(&self, reference: Reference) -> Option<&VmValue> {
-        match reference {
-            Reference::ObjectRef(index) => self.storage.get(*index),
-            _ => None,
-        }
+    /// Special allocator for <class 'type'>, whose class references itself.
+    pub fn allocate_type(&mut self) -> Reference {
+        let type_ref = self.next_index();
+        let obj = HeapObject::new(
+            type_ref,
+            VmValue::Class(Class::new_builtin(Type::Type.to_string())),
+        );
+        self.storage.push(obj);
+        type_ref
     }
 
-    pub fn get_mut(&mut self, reference: Reference) -> Option<&mut VmValue> {
-        match reference {
-            Reference::ObjectRef(index) => self.storage.get_mut(*index),
-            _ => None,
-        }
+    pub fn get(&self, reference: Reference) -> Option<&HeapObject> {
+        self.storage.get(*reference.index())
+    }
+
+    pub fn get_mut(&mut self, reference: Reference) -> Option<&mut HeapObject> {
+        self.storage.get_mut(*reference.index())
     }
 
     #[cfg(test)]
-    pub fn iter(&self) -> impl Iterator<Item = &VmValue> {
+    pub fn iter(&self) -> impl Iterator<Item = &HeapObject> {
         self.storage.iter()
-    }
-}
-
-impl Default for Heap {
-    fn default() -> Self {
-        Self::new()
     }
 }

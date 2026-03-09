@@ -1,4 +1,5 @@
 mod crosscheck_assignment;
+mod crosscheck_asyncio;
 mod crosscheck_closures;
 mod crosscheck_control_flow;
 mod crosscheck_expressions;

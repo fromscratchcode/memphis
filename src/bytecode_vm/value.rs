@@ -8,7 +8,7 @@ use crate::{
                 Class, Coroutine, Dict, Exception, FunctionObject, Generator, List, ListIter,
                 Method, Module, Object, Range, RangeIter, Tuple, TupleIter,
             },
-            BuiltinFunction, Reference,
+            BuiltinFunction,
         },
         utils::HashKey,
     },
@@ -44,14 +44,6 @@ pub enum VmValue {
 }
 
 impl VmValue {
-    pub fn into_ref(self) -> Reference {
-        match self {
-            VmValue::Int(i) => Reference::Int(i),
-            VmValue::Float(i) => Reference::Float(i),
-            _ => unimplemented!("Conversion to reference not supported for {:?}", self),
-        }
-    }
-
     pub fn as_hash_key(&self) -> Option<HashKey> {
         match self {
             VmValue::Int(i) => Some(HashKey::Int(*i)),
@@ -71,7 +63,9 @@ impl PartialEq for VmValue {
             (VmValue::Float(a), VmValue::Int(b)) => floats_equal(*a, *b as f64),
             (VmValue::Str(a), VmValue::Str(b)) => a == b,
             (VmValue::Bool(a), VmValue::Bool(b)) => a == b,
-            (VmValue::List(a), VmValue::List(b)) => a == b,
+            (VmValue::List(_), VmValue::List(_)) => {
+                unimplemented!("Moved to VirtualMachine::equals.")
+            }
             (VmValue::Tuple(a), VmValue::Tuple(b)) => a == b,
             (VmValue::Dict(a), VmValue::Dict(b)) => a == b,
             (VmValue::Range(a), VmValue::Range(b)) => a == b,
@@ -186,6 +180,13 @@ impl VmValue {
     }
 
     pub fn as_class(&self) -> Option<&Class> {
+        match self {
+            VmValue::Class(i) => Some(i),
+            _ => None,
+        }
+    }
+
+    pub fn as_class_mut(&mut self) -> Option<&mut Class> {
         match self {
             VmValue::Class(i) => Some(i),
             _ => None,

@@ -40,8 +40,11 @@ fn asyncio_sleep(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Refe
     let micros = duration_in_s * 1_000_000.0;
     let duration = Duration::from_micros(micros as u64);
 
-    let sleep_future = VmValue::SleepFuture(duration);
-    Ok(vm.heapify(sleep_future))
+    // TODO we don't have a real sleep_future type, let's just call this an object for now.
+    // This will eventually go away once we implement the __await__ protocol.
+    let type_ = vm.runtime.borrow().builtin_types.object;
+    let obj = vm.new_object(type_, VmValue::SleepFuture(duration));
+    Ok(obj)
 }
 
 fn expect_float_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult<f64> {
@@ -67,10 +70,10 @@ fn expect_coroutine_or_raise(
     }
 }
 
-pub fn init_module(runtime: &mut Runtime) {
+pub fn init_module(runtime: &mut Runtime) -> Module {
     let mut asyncio_mod = Module::new(ModuleName::from_segments(&["asyncio"]));
     register_builtin_funcs(runtime, &mut asyncio_mod, &BUILTINS);
-    runtime.store_module(Container::new(asyncio_mod));
+    asyncio_mod
 }
 
 static BUILTINS: [(&str, BuiltinFn); 3] = [

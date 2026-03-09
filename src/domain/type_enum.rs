@@ -6,11 +6,6 @@ use std::fmt::{Display, Error, Formatter};
 pub enum Type {
     #[allow(clippy::enum_variant_names)]
     Type,
-    // This is a hack to avoid a circular reference from `Type` to itself.
-    // We do the same thing with `ObjectMeta`.
-    #[allow(clippy::enum_variant_names)]
-    TypeMeta,
-    ObjectMeta,
     Object,
     Super,
     GetSetDescriptor,
@@ -31,7 +26,7 @@ pub enum Type {
     List,
     Set,
     FrozenSet,
-    Zip,
+    Zip, // this refers to the iterator itself
     Tuple,
     Range,
     Slice,
@@ -83,12 +78,87 @@ pub enum Type {
 }
 
 impl Type {
+    /// A list of all the variants of [`Type`] which should have a type class created.
+    const ALL: [Type; 69] = [
+        Type::Type,
+        Type::Object,
+        Type::Super,
+        Type::GetSetDescriptor,
+        Type::MemberDescriptor,
+        Type::Method,
+        Type::Function,
+        Type::BuiltinFunction,
+        Type::BuiltinMethod,
+        Type::Generator,
+        Type::Coroutine,
+        Type::None,
+        Type::Ellipsis,
+        Type::NotImplemented,
+        Type::Bool,
+        Type::Int,
+        Type::Float,
+        Type::Str,
+        Type::List,
+        Type::Set,
+        Type::FrozenSet,
+        Type::Zip,
+        Type::Tuple,
+        Type::Range,
+        Type::Slice,
+        Type::Complex,
+        Type::Bytes,
+        Type::ByteArray,
+        Type::Memoryview,
+        Type::Dict,
+        Type::DictItems,
+        Type::DictKeys,
+        Type::DictValues,
+        Type::MappingProxy,
+        Type::DictItemIter,
+        Type::DictKeyIter,
+        Type::DictValueIter,
+        Type::BytesIter,
+        Type::ByteArrayIter,
+        Type::RangeIter,
+        Type::StrIter,
+        Type::ListIter,
+        Type::ReversedIter,
+        Type::SetIter,
+        Type::TupleIter,
+        Type::Traceback,
+        Type::Frame,
+        Type::Module,
+        Type::Cell,
+        Type::Code,
+        Type::Classmethod,
+        Type::Staticmethod,
+        Type::Property,
+        Type::BaseException,
+        Type::Exception,
+        Type::StopIteration,
+        Type::TypeError,
+        Type::ZeroDivisionError,
+        Type::RuntimeError,
+        Type::ImportError,
+        Type::LookupError,
+        Type::KeyError,
+        Type::ValueError,
+        Type::NameError,
+        Type::AttributeError,
+        Type::AssertionError,
+        Type::SyntaxError,
+        Type::IOError,
+        Type::IndexError,
+    ];
+
+    pub fn all() -> &'static [Type] {
+        &Self::ALL
+    }
+
     fn value(&self) -> &'static str {
         match self {
             Type::Type => "type",
-            Type::TypeMeta => "type",
             Type::Object => "object",
-            Type::ObjectMeta => "object",
             Type::Super => "super",
             Type::GetSetDescriptor => "getset_descriptor",
             Type::MemberDescriptor => "member_descriptor",
@@ -167,6 +237,50 @@ impl Type {
             .find(|(t, _)| t == self)
             .map(|(_, parents)| *parents)
             .unwrap_or(&[Type::Object])
+    }
+
+    pub fn exported_in_builtins(&self) -> bool {
+        matches!(
+            self,
+            Type::Type
+                | Type::Object
+                | Type::Super
+                | Type::Bool
+                | Type::Int
+                | Type::Str
+                | Type::List
+                | Type::Dict
+                | Type::Set
+                | Type::FrozenSet
+                | Type::Tuple
+                | Type::Range
+                | Type::Slice
+                | Type::Complex
+                | Type::Float
+                | Type::Bytes
+                | Type::ByteArray
+                | Type::Memoryview
+                | Type::Zip
+                | Type::ReversedIter
+                | Type::Classmethod
+                | Type::Staticmethod
+                | Type::Property
+                | Type::BaseException
+                | Type::Exception
+                | Type::StopIteration
+                | Type::TypeError
+                | Type::ZeroDivisionError
+                | Type::RuntimeError
+                | Type::ImportError
+                | Type::LookupError
+                | Type::KeyError
+                | Type::ValueError
+                | Type::NameError
+                | Type::AttributeError
+                | Type::AssertionError
+                | Type::SyntaxError
+                | Type::IOError
+        )
     }
 }
 

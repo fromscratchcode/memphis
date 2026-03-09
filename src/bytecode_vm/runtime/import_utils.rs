@@ -35,7 +35,8 @@ pub fn build_module_chain(
         // insert inner module under the child's name
         outer.write(&child_key, inner);
 
-        inner = vm.heapify(VmValue::Module(Container::new(outer)));
+        let type_ = vm.runtime.borrow().builtin_types.module;
+        inner = vm.new_object(type_, VmValue::Module(Container::new(outer)));
 
         // Next iteration the child key becomes this parent's last segment
         child_key = parent_name.tail().to_owned();

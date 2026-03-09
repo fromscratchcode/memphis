@@ -1456,4 +1456,13 @@ b, c
 
         assert_eval_eq!("a = 10; 4 + a", int!(14));
     }
+
+    #[test]
+    fn type_builtin() {
+        let text = r#"type([1]).__name__"#;
+        assert_eval_eq!(text, str!("list"));
+
+        let text = r#"type(type([1]).__name__).__name__"#;
+        assert_eval_eq!(text, str!("str"));
+    }
 }
