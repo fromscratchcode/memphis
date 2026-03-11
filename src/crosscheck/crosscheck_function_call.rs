@@ -4,27 +4,54 @@ use super::macros::*;
 
 #[test]
 fn function_call() {
-    let mut session = crosscheck_eval!(
-        r#"
+    let input = r#"
 def foo(a, b):
     return a + b
 
-a = foo(2, 9)
-"#
-    );
-    assert_crosscheck_eq!(session, "a", int!(11));
+foo(2, 9)
+"#;
+    assert_crosscheck_return!(input, int!(11));
 
-    let mut session = crosscheck_eval!(
-        r#"
+    let input = r#"
 def foo(a, b):
     c = 9
     return a + b + c
 
-a = foo(2, 9)
-"#
-    );
-    assert_crosscheck_eq!(session, "a", int!(20));
+foo(2, 9)
+"#;
+    assert_crosscheck_return!(input, int!(20));
+}
 
+#[test]
+fn function_call_with_no_return() {
+    let text = r#"
+def hello():
+    print("Hello")
+
+def world():
+    print("World")
+
+hello()
+world()
+"#;
+    assert_crosscheck_return!(text, none!());
+}
+
+#[test]
+fn function_call_with_nested_function() {
+    let text = r#"
+def foo(a, b):
+    def inner(c, d):
+        return c * d
+    return a + b + inner(a, b)
+
+foo(2, 9)
+"#;
+    assert_crosscheck_return!(text, int!(29));
+}
+
+#[test]
+fn stack_trace() {
     let e = crosscheck_expect_error!(
         r#"
 def middle_call():

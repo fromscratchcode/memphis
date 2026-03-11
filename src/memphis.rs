@@ -10,7 +10,7 @@ use crate::{core::memphis_utils, domain::Source, Engine, MemphisContext};
 pub struct Memphis;
 
 impl Memphis {
-    pub fn run_script(filepath: &str, engine: Engine) {
+    pub fn script(filepath: &str, engine: Engine) {
         match engine {
             Engine::Treewalk | Engine::BytecodeVm => {
                 let source = Source::from_path(filepath)
@@ -19,8 +19,8 @@ impl Memphis {
                         process::exit(1);
                     })
                     .unwrap();
-                let _ = MemphisContext::from_source(engine, source)
-                    .run()
+                let _ = MemphisContext::script(engine, source.clone())
+                    .eval(source.text().clone())
                     .map_err(|err| memphis_utils::exit(err));
             }
             #[cfg(feature = "llvm_backend")]
@@ -31,7 +31,7 @@ impl Memphis {
     }
 
     #[cfg(feature = "repl")]
-    pub fn run_repl(engine: Engine) {
-        Repl::default().run(engine);
+    pub fn repl(engine: Engine) {
+        Repl::new(engine).start();
     }
 }

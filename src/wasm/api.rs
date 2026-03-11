@@ -19,8 +19,8 @@ pub fn evaluate(code: String) -> String {
     // Set the panic hook for better error messages in the browser console
     set_once();
 
-    let mut context = MemphisContext::from_text(Engine::Treewalk, Text::new(&code));
-    let result = context.run().expect("Failed to evaluate.");
+    let mut context = MemphisContext::stdin(Engine::Treewalk);
+    let result = context.eval(Text::new(&code)).expect("Failed to evaluate.");
     result.to_string()
 }
 
@@ -40,10 +40,13 @@ pub fn lex(text: String) -> JsValue {
 }
 
 fn actually_compile(text: &str) -> CompilerResult<CodeObject> {
-    VmContext::from_text(Text::new(text)).compile()
+    let mut ctx = VmContext::stdin();
+    ctx.add_text(Text::new(text));
+    ctx.compile()
 }
 
 fn actually_lex(text: &str) -> Vec<Token> {
-    let l = Lexer::new(&Text::new(text));
+    let mut l = Lexer::new();
+    l.add_text(&Text::new(text));
     l.collect()
 }

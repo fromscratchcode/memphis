@@ -1,12 +1,13 @@
 #[cfg(test)]
 use crate::domain::Source;
 use crate::{
-    core::{Container, Interpreter},
+    core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     lexer::Lexer,
     parser::Parser,
     runtime::MemphisState,
     treewalk::{types::Module, RaisedException, TreewalkInterpreter, TreewalkState, TreewalkValue},
+    Interpreter,
 };
 
 pub struct TreewalkContext {
@@ -15,19 +16,24 @@ pub struct TreewalkContext {
 }
 
 impl TreewalkContext {
-    pub fn new(text: Text, origin: ModuleOrigin) -> Self {
+    pub fn new(origin: ModuleOrigin) -> Self {
         let state = Self::init_state(origin);
-        Self::from_state(text, state)
+        Self::from_state(state)
     }
 
-    pub fn from_state(text: Text, treewalk_state: Container<TreewalkState>) -> Self {
+    pub fn from_state(treewalk_state: Container<TreewalkState>) -> Self {
         Self {
-            lexer: Lexer::new(&text),
+            lexer: Lexer::new(),
             interpreter: TreewalkInterpreter::new(treewalk_state),
         }
     }
 
-    pub fn run_inner(&mut self) -> Result<TreewalkValue, RaisedException> {
+    pub fn eval_inner(&mut self, text: Text) -> Result<TreewalkValue, RaisedException> {
+        self.add_text(text);
+        self.run()
+    }
+
+    fn run(&mut self) -> Result<TreewalkValue, RaisedException> {
         // Destructure to break the borrow into disjoint pieces
         let TreewalkContext {
             lexer, interpreter, ..
@@ -37,11 +43,7 @@ impl TreewalkContext {
         interpreter.execute(&mut parser)
     }
 
-    pub fn read_inner(&self, name: &str) -> Option<TreewalkValue> {
-        self.interpreter.load_var(name).ok()
-    }
-
-    pub fn add_text_inner(&mut self, line: Text) {
+    fn add_text(&mut self, line: Text) {
         self.lexer.add_text(&line);
     }
 
@@ -61,29 +63,24 @@ impl TreewalkContext {
     }
 
     #[cfg(test)]
-    pub fn from_text(text: Text) -> Self {
-        Self::new(text, ModuleOrigin::Stdin)
+    /// This is deprecated, but we still depend on it in a lot of the tests.
+    pub fn read_inner(&self, name: &str) -> Option<TreewalkValue> {
+        self.interpreter.load_var(name).ok()
     }
 
     #[cfg(test)]
-    pub fn from_source(source: Source) -> Self {
-        Self::new(
-            source.text().clone(),
-            ModuleOrigin::File(source.path().to_path_buf()),
-        )
+    pub fn stdin() -> Self {
+        Self::new(ModuleOrigin::Stdin)
+    }
+
+    #[cfg(test)]
+    pub fn script(source: Source) -> Self {
+        Self::new(ModuleOrigin::File(source.path().to_path_buf()))
     }
 }
 
 impl Interpreter for TreewalkContext {
-    fn run(&mut self) -> MemphisResult<MemphisValue> {
-        self.run_inner().map(Into::into).map_err(Into::into)
-    }
-
-    fn read(&self, name: &str) -> Option<MemphisValue> {
-        self.read_inner(name).map(Into::into)
-    }
-
-    fn add_text(&mut self, line: Text) {
-        self.add_text_inner(line);
+    fn eval(&mut self, text: Text) -> MemphisResult<MemphisValue> {
+        self.eval_inner(text).map(Into::into).map_err(Into::into)
     }
 }

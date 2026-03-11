@@ -16,7 +16,9 @@ fn init() -> Compiler {
 }
 
 fn init_ctx(text: &str) -> VmContext {
-    VmContext::from_text(Text::new(text))
+    let mut ctx = VmContext::stdin();
+    ctx.add_text(Text::new(text));
+    ctx
 }
 
 pub fn compile_stmt(stmt: Statement) -> Bytecode {

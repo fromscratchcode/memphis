@@ -21,7 +21,7 @@ mod opcodes;
 pub struct VirtualMachine {
     pub runtime: Container<Runtime>,
 
-    state: Container<MemphisState>,
+    pub state: Container<MemphisState>,
 
     pub executor: VmExecutor,
 
@@ -87,26 +87,6 @@ impl VirtualMachine {
         self.new_object(type_, VmValue::Str(val.to_string()))
     }
 
-    pub fn read_global(&self, name: &str) -> Option<VmValue> {
-        let reference = self.load_global_by_name(name)?;
-        Some(self.deref(reference))
-    }
-
-    /// Read a global variable from the `__main__` module.
-    // TODO this should really only be available in test/repl mode, but we currently call this in
-    // the Interpreter trait. The other option is splitting Interpreter into two traits and putting
-    // the read one behind a test/repl flag.
-    //
-    // We use unwrap here because:
-    // 1) the main module should always exist, and
-    // 2) constructing a real error with a heapified string would require this to take a mutable
-    //    reference to the VM, which would ripple through the tests.
-    fn load_global_by_name(&self, name: &str) -> Option<Reference> {
-        let module = self.read_module(&ModuleName::main());
-        let module_binding = module.borrow();
-        module_binding.read(name)
-    }
-
     fn current_module(&self) -> Container<Module> {
         self.current_frame().module.clone()
     }
@@ -143,13 +123,12 @@ impl VirtualMachine {
         let mut context = VmContext::from_state(
             resolved.name.clone(),
             resolved.package.clone(),
-            source.text().clone(),
             ModuleOrigin::File(source.path().to_path_buf()),
             self.state.clone(),
             self.runtime.clone(),
         );
 
-        context.run_inner()?;
+        context.eval_inner(source.text().clone())?;
 
         Ok(module)
     }

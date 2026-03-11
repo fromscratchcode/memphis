@@ -18,15 +18,6 @@ fn binary_expression() {
 }
 
 #[test]
-fn binary_expression_compare_op() {
-    let input = "4 < 5";
-    assert_crosscheck_return!(input, bool!(true));
-
-    let input = "4 > 5";
-    assert_crosscheck_return!(input, bool!(false));
-}
-
-#[test]
 fn operator_chaining() {
     // Equal chains
     let input = "2 == 2 == 2";
@@ -139,76 +130,115 @@ fn operator_chaining() {
 }
 
 #[test]
-fn binary_expression_logical_op() {
+fn binary_logical_and() {
+    let input = "False and False";
+    assert_crosscheck_return!(input, bool!(false));
+
     let input = "True and False";
+    assert_crosscheck_return!(input, bool!(false));
+
+    let input = "False and True";
+    assert_crosscheck_return!(input, bool!(false));
+
+    let input = "True and True";
+    assert_crosscheck_return!(input, bool!(true));
+}
+
+#[test]
+fn binary_logical_or() {
+    let input = "False or False";
     assert_crosscheck_return!(input, bool!(false));
 
     let input = "True or False";
     assert_crosscheck_return!(input, bool!(true));
-}
 
-#[test]
-fn unary_expression_negative() {
-    let input = "-2";
-    assert_crosscheck_return!(input, int!(-2));
-
-    let input = "-2.5";
-    assert_crosscheck_return!(input, float!(-2.5));
-
-    let input = "-(-2)";
-    assert_crosscheck_return!(input, int!(2));
-
-    let input = "-(-2.5)";
-    assert_crosscheck_return!(input, float!(2.5));
-}
-
-#[test]
-fn unary_expression_positive() {
-    let input = "+5";
-    assert_crosscheck_return!(input, int!(5));
-
-    let input = "+(-5)";
-    assert_crosscheck_return!(input, int!(-5));
-}
-
-#[test]
-fn unary_expression_not() {
-    let input = "not True";
-    assert_crosscheck_return!(input, bool!(false));
-
-    let input = "not False";
+    let input = "False or True";
     assert_crosscheck_return!(input, bool!(true));
 
-    let input = "not None";
-    assert_crosscheck_return!(input, bool!(true));
-
-    let input = "not 1";
-    assert_crosscheck_return!(input, bool!(false));
-
-    let input = "not 0";
-    assert_crosscheck_return!(input, bool!(true));
-
-    let input = "not 1.0";
-    assert_crosscheck_return!(input, bool!(false));
-
-    let input = "not 0.0";
-    assert_crosscheck_return!(input, bool!(true));
-
-    let input = r#"not "a""#;
-    assert_crosscheck_return!(input, bool!(false));
-
-    let input = r#"not """#;
-    assert_crosscheck_return!(input, bool!(true));
-
-    let input = "not [1]";
-    assert_crosscheck_return!(input, bool!(false));
-
-    let input = "not []";
+    let input = "True or True";
     assert_crosscheck_return!(input, bool!(true));
 }
 
 #[test]
-fn unary_expression_invert() {
-    let input = "~0b1101";
-    assert_crosscheck_return!(input, int!(-14));
+fn binary_addition() {
+    let text = "4 + 3";
+    assert_crosscheck_return!(text, int!(7));
+
+    let text = "4.1 + 3.01";
+    assert_crosscheck_return!(text, float!(7.11));
+
+    let text = "4 + 3.01";
+    assert_crosscheck_return!(text, float!(7.01));
+
+    let text = "4.1 + 3";
+    assert_crosscheck_return!(text, float!(7.1));
+
+    let text = "-4 + 3";
+    assert_crosscheck_return!(text, int!(-1));
+
+    let text = "4.1 + 'a'";
+    let e = crosscheck_expect_error!(text);
+    assert_type_error!(e.exception, "unsupported operand type(s) for +");
+}
+
+#[test]
+fn binary_subtraction() {
+    let text = "4 - 3";
+    assert_crosscheck_return!(text, int!(1));
+
+    let text = "4.1 - 3.01";
+    assert_crosscheck_return!(text, float!(1.09));
+
+    let text = "4 - 3.01";
+    assert_crosscheck_return!(text, float!(0.99));
+
+    let text = "4.1 - 3";
+    assert_crosscheck_return!(text, float!(1.1));
+
+    let text = "-4 - 3";
+    assert_crosscheck_return!(text, int!(-7));
+
+    let text = "4.1 - 'a'";
+    let e = crosscheck_expect_error!(text);
+    assert_type_error!(e.exception, "unsupported operand type(s) for -");
+}
+
+#[test]
+fn binary_multiplication() {
+    let text = "4 * 3";
+    assert_crosscheck_return!(text, int!(12));
+
+    let text = "4.1 * 3.01";
+    assert_crosscheck_return!(text, float!(12.341));
+
+    let text = "4 * 3.01";
+    assert_crosscheck_return!(text, float!(12.04));
+
+    let text = "4.1 * 3";
+    assert_crosscheck_return!(text, float!(12.3));
+
+    let text = "-4 * 3";
+    assert_crosscheck_return!(text, int!(-12));
+}
+
+#[test]
+fn binary_division() {
+    let text = "4 / 3";
+    assert_crosscheck_return!(text, float!(1.33333333333));
+
+    let text = "-4 / 3";
+    assert_crosscheck_return!(text, float!(-1.33333333333));
+
+    let text = "4.1 / 3.01";
+    assert_crosscheck_return!(text, float!(1.36212624585));
+
+    let text = "4 / 3.01";
+    assert_crosscheck_return!(text, float!(1.32890365449));
+
+    let text = "4.1 / 3";
+    assert_crosscheck_return!(text, float!(1.36666666667));
+
+    let text = "4.1 / 'a'";
+    let e = crosscheck_expect_error!(text);
+    assert_type_error!(e.exception, "unsupported operand type(s) for /");
 }

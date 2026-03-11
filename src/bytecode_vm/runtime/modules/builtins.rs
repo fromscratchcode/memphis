@@ -291,13 +291,12 @@ fn next(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 }
 
 fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
-    let rendered: Vec<String> = args
+    let value = args
         .iter()
         .map(|arg| vm.normalize_vm_ref(*arg).to_string())
-        .collect();
-
-    println!("{}", rendered.join(" "));
-
+        .collect::<Vec<_>>()
+        .join(" ");
+    vm.state.borrow_mut().io.print_line(&value);
     Ok(vm.none())
 }
 

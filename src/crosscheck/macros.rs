@@ -1,16 +1,7 @@
-macro_rules! crosscheck_eval {
-    ($src:expr) => {{
-        $crate::crosscheck::CrosscheckSession::new($crate::domain::Text::new($src))
-            .run()
-            .expect("Crosscheck session failed")
-    }};
-}
-
 macro_rules! crosscheck_expect_error {
     ($src:expr) => {{
-        let (tw_err, vm_err) =
-            $crate::crosscheck::CrosscheckSession::new($crate::domain::Text::new($src))
-                .run_expect_error();
+        let (tw_err, vm_err) = $crate::crosscheck::CrosscheckSession::new()
+            .run_expect_error($crate::domain::Text::new($src));
         assert_eq!(
             tw_err, vm_err,
             "Engines did not return the same error (trewalk, VM)"
@@ -19,27 +10,10 @@ macro_rules! crosscheck_expect_error {
     }};
 }
 
-macro_rules! assert_crosscheck_eq {
-    ($session:expr, $name:expr, $expected:expr) => {{
-        let (tw_val, vm_val) = $session.read($name);
-        assert_eq!(tw_val, vm_val, "Engines did not return the same value.");
-
-        let tw_val = tw_val.expect(&format!("Variable not found: {}", $name));
-        assert_eq!(tw_val, $expected, "Treewalk value did not match expected.");
-
-        let vm_val = vm_val.expect(&format!("Variable not found: {}", $name));
-        assert_eq!(
-            vm_val, $expected,
-            "Bytecode VM value did not match expected."
-        );
-    }};
-}
-
 macro_rules! assert_crosscheck_return {
     ($src:expr, $expected:expr) => {{
-        let mut session =
-            $crate::crosscheck::CrosscheckSession::new($crate::domain::Text::new($src));
-        let (tw_val, vm_val) = session.eval();
+        let mut session = $crate::crosscheck::CrosscheckSession::new();
+        let (tw_val, vm_val) = session.eval($crate::domain::Text::new($src));
         assert_eq!(tw_val, vm_val, "Engines did not return the same value");
         assert_eq!(
             tw_val, $expected,
@@ -52,7 +26,5 @@ macro_rules! assert_crosscheck_return {
     }};
 }
 
-pub(crate) use assert_crosscheck_eq;
 pub(crate) use assert_crosscheck_return;
-pub(crate) use crosscheck_eval;
 pub(crate) use crosscheck_expect_error;

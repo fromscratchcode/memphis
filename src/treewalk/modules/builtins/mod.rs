@@ -256,22 +256,21 @@ impl Callable for IssubclassBuiltin {
 }
 
 impl Callable for PrintBuiltin {
-    fn call(
-        &self,
-        _interpreter: &TreewalkInterpreter,
-        args: Args,
-    ) -> TreewalkResult<TreewalkValue> {
-        println!(
-            "{}",
-            args.iter_args()
-                .map(|a| {
-                    let mv: MemphisValue = a.clone().into();
-                    mv.to_string()
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        let value = args
+            .iter_args()
+            .map(|a| {
+                let mv: MemphisValue = a.clone().into();
+                mv.to_string()
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        interpreter
+            .state
+            .memphis_state()
+            .borrow_mut()
+            .io
+            .print_line(&value);
         Ok(TreewalkValue::None)
     }
 

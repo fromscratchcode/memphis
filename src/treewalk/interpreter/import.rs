@@ -88,8 +88,8 @@ impl TreewalkInterpreter {
         let module = self.prepare_imported_module(&resolved);
         self.enter_imported_module(module);
 
-        TreewalkContext::from_state(source.text().clone(), self.state.clone())
-            .run_inner()
+        TreewalkContext::from_state(self.state.clone())
+            .eval_inner(source.text().clone())
             .map_err(TreewalkDisruption::Error)?;
 
         let module = self.exit_imported_module().raise(self)?;

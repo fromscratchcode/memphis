@@ -55,14 +55,12 @@ impl Iterator for Lexer {
 }
 
 impl Lexer {
-    pub fn new(text: &Text) -> Lexer {
-        let mut lexer = Lexer::default();
-        lexer.add_text(text);
-        lexer
+    pub fn new() -> Lexer {
+        Lexer::default()
     }
 
-    pub fn add_text(&mut self, line: &Text) {
-        self.source_lines.push_back(line.as_str().to_string());
+    pub fn add_text(&mut self, text: &Text) {
+        self.source_lines.push_back(text.as_str().to_string());
     }
 
     /// Since we tokenize one line at a time, we must consider whether we are inside a multiline

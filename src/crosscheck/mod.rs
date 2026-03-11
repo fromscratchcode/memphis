@@ -1,6 +1,7 @@
 mod crosscheck_assignment;
 mod crosscheck_asyncio;
 mod crosscheck_closures;
+mod crosscheck_compare_op;
 mod crosscheck_control_flow;
 mod crosscheck_expressions;
 mod crosscheck_function_call;
@@ -8,6 +9,7 @@ mod crosscheck_generators;
 mod crosscheck_import;
 mod crosscheck_index_access;
 mod crosscheck_method_call;
+mod crosscheck_unary_expression;
 mod macros;
 mod session;
 

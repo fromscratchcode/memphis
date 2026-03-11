@@ -131,3 +131,13 @@ a["10"] = 10
     let e = crosscheck_expect_error!(input);
     assert_type_error!(e.exception, "'int' object does not support item assignment");
 }
+
+#[test]
+#[ignore]
+fn index_access_tuple_key() {
+    let input = r#"
+a = { (4,2): False }
+a[(4, 2)]
+"#;
+    assert_crosscheck_return!(input, list![int!(10), int!(2), int!(3),]);
+}

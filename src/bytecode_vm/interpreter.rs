@@ -17,66 +17,7 @@ mod tests_vm_interpreter {
     }
 
     #[test]
-    fn binary_addition() {
-        let text = "4 + 3";
-        assert_eval_eq!(text, int!(7));
-
-        let text = "4.1 + 3.01";
-        assert_eval_eq!(text, float!(7.11));
-
-        let text = "4 + 3.01";
-        assert_eval_eq!(text, float!(7.01));
-
-        let text = "4.1 + 3";
-        assert_eval_eq!(text, float!(7.1));
-
-        let text = "-4 + 3";
-        assert_eval_eq!(text, int!(-1));
-
-        let text = "4.1 + 'a'";
-        let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "unsupported operand type(s) for +");
-    }
-
-    #[test]
-    fn binary_subtraction() {
-        let text = "4 - 3";
-        assert_eval_eq!(text, int!(1));
-
-        let text = "4.1 - 3.01";
-        assert_eval_eq!(text, float!(1.09));
-
-        let text = "4 - 3.01";
-        assert_eval_eq!(text, float!(0.99));
-
-        let text = "4.1 - 3";
-        assert_eval_eq!(text, float!(1.1));
-
-        let text = "-4 - 3";
-        assert_eval_eq!(text, int!(-7));
-
-        let text = "4.1 - 'a'";
-        let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "unsupported operand type(s) for -");
-    }
-
-    #[test]
-    fn binary_multiplication() {
-        let text = "4 * 3";
-        assert_eval_eq!(text, int!(12));
-
-        let text = "4.1 * 3.01";
-        assert_eval_eq!(text, float!(12.341));
-
-        let text = "4 * 3.01";
-        assert_eval_eq!(text, float!(12.04));
-
-        let text = "4.1 * 3";
-        assert_eval_eq!(text, float!(12.3));
-
-        let text = "-4 * 3";
-        assert_eval_eq!(text, int!(-12));
-
+    fn binary_multiplication_str() {
         let text = "4 * 'a'";
         assert_eval_eq!(text, str!("aaaa"));
 
@@ -92,453 +33,6 @@ mod tests_vm_interpreter {
         let text = "4.1 * 'a'";
         let e = eval_expect_error(text);
         assert_type_error!(e.exception, "unsupported operand type(s) for *");
-    }
-
-    #[test]
-    fn binary_division() {
-        let text = "4 / 3";
-        assert_eval_eq!(text, float!(1.33333333333));
-
-        let text = "-4 / 3";
-        assert_eval_eq!(text, float!(-1.33333333333));
-
-        let text = "4.1 / 3.01";
-        assert_eval_eq!(text, float!(1.36212624585));
-
-        let text = "4 / 3.01";
-        assert_eval_eq!(text, float!(1.32890365449));
-
-        let text = "4.1 / 3";
-        assert_eval_eq!(text, float!(1.36666666667));
-
-        let text = "4.1 / 'a'";
-        let e = eval_expect_error(text);
-        assert_type_error!(e.exception, "unsupported operand type(s) for /");
-    }
-
-    #[test]
-    fn comparison_in() {
-        let text = "4 in [1,2,3,4]";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4 in [1,2,3,5]";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "not (4 in [1,2,3,5])";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = r#""a" in ["a"]"#;
-        assert_eval_eq!(text, bool!(true));
-
-        let text = r#""a" in "a""#;
-        let e = eval_expect_error(text);
-        // TODO this shouldn't actually fail
-        assert_type_error!(e.exception, "'str' object is not iterable");
-    }
-
-    #[test]
-    fn comparison_not_in() {
-        let text = "4 not in [1,2,3,4]";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4 not in [1,2,3,5]";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = r#""a" not in ["a"]"#;
-        assert_eval_eq!(text, bool!(false));
-
-        let text = r#""a" not in "a""#;
-        let e = eval_expect_error(text);
-        // TODO this shouldn't actually fail
-        assert_type_error!(e.exception, "'str' object is not iterable");
-    }
-
-    #[test]
-    fn comparison_is() {
-        let text = "4 is None";
-        assert_eval_eq!(text, bool!(false));
-    }
-
-    #[test]
-    fn comparison_is_not() {
-        let text = "4 is not None";
-        assert_eval_eq!(text, bool!(true));
-    }
-
-    #[test]
-    fn comparison_eq() {
-        let text = "4 == 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4 == 4";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4.1 == 4.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4 == 4.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4 == 4.0";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4.0 == 4";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = r#""a" == "a""#;
-        assert_eval_eq!(text, bool!(true));
-
-        let text = r#""a" == "b""#;
-        assert_eval_eq!(text, bool!(false));
-    }
-
-    #[test]
-    fn comparison_ne() {
-        let text = "4 != 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4 != 4";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4.1 != 4.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4 != 4.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4 != 4.0";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4.0 != 4";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = r#""a" != "a""#;
-        assert_eval_eq!(text, bool!(false));
-
-        let text = r#""a" != "b""#;
-        assert_eval_eq!(text, bool!(true));
-    }
-
-    #[test]
-    fn comparison_less_than() {
-        let text = "4 < 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6 < 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "5 < 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4.1 < 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6.1 < 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4 < 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6 < 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4.1 < 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6.1 < 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6.1 < 6.1";
-        assert_eval_eq!(text, bool!(false));
-    }
-
-    #[test]
-    fn comparison_less_than_or_equal() {
-        let text = "4 <= 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6 <= 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "5 <= 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4.1 <= 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6.1 <= 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4 <= 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6 <= 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4.1 <= 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6.1 <= 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6.1 <= 6.1";
-        assert_eval_eq!(text, bool!(true));
-    }
-
-    #[test]
-    fn comparison_greater_than() {
-        let text = "4 > 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6 > 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "5 > 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "4.1 > 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6.1 > 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4 > 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6 > 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4.1 > 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6.1 > 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6.1 > 6.1";
-        assert_eval_eq!(text, bool!(false));
-    }
-
-    #[test]
-    fn comparison_greater_than_or_equal() {
-        let text = "4 >= 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6 >= 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "5 >= 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4.1 >= 5";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6.1 >= 5";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4 >= 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6 >= 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "4.1 >= 5.1";
-        assert_eval_eq!(text, bool!(false));
-
-        let text = "6.1 >= 5.1";
-        assert_eval_eq!(text, bool!(true));
-
-        let text = "6.1 >= 6.1";
-        assert_eval_eq!(text, bool!(true));
-    }
-
-    #[test]
-    fn operator_chaining() {
-        // Equal chains
-        let input = "2 == 2 == 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 == 2 == 3";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 == 2 == 3 == 3";
-        assert_eval_eq!(input, bool!(false));
-
-        // Increasing chain
-        let input = "1 < 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 < 2 < 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "1 < 3 < 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "1 < 2 < 3 < 4";
-        assert_eval_eq!(input, bool!(true));
-
-        // Mixed increasing / equality
-        let input = "1 < 2 == 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 < 2 == 3 < 4";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed with >= and <=
-        let input = "3 >= 2 > 1";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "3 >= 2 > 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 <= 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 <= 1 < 3";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed equality and less-than
-        let input = "2 == 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 == 3 < 4";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 < 3 == 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 < 3 == 4";
-        assert_eval_eq!(input, bool!(false));
-
-        // Descending chain
-        let input = "5 > 4 > 3 > 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "5 > 4 > 5";
-        assert_eval_eq!(input, bool!(false));
-
-        // With floats mixed in
-        let input = "1 < 2.0 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1.0 < 2 < 1.5";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2.0 == 2 < 3.0";
-        assert_eval_eq!(input, bool!(true));
-
-        // Not-equals chain
-        let input = "1 != 2 != 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 != 1 != 2";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mix of == and !=
-        let input = "1 == 1 != 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 == 2 != 3";
-        assert_eval_eq!(input, bool!(false));
-
-        // Chained in — both true
-        let input = "2 in [1,2,3] in [[1,2,3],[4,5,6]]";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 in [1,2,3] in [[2,3,4],[4,5,6]]";
-        assert_eval_eq!(input, bool!(false));
-
-        // Chained not in
-        let input = "4 not in [1,2,3] not in [[1,2,3],[4,5,6]]";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed in / not in
-        let input = "2 in [1,2,3] not in [[1,2,3],[4,5,6]]";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed not in / in
-        let input = "4 not in [1,2,3] in [[4,5,6],[7,8,9]]";
-        assert_eval_eq!(input, bool!(false));
-    }
-
-    #[test]
-    fn unary_expression_negative() {
-        let input = "-2";
-        assert_eval_eq!(input, int!(-2));
-
-        let input = "-2.5";
-        assert_eval_eq!(input, float!(-2.5));
-
-        let input = "-(-2)";
-        assert_eval_eq!(input, int!(2));
-
-        let input = "-(-2.5)";
-        assert_eval_eq!(input, float!(2.5));
-    }
-
-    #[test]
-    fn binary_logical_and() {
-        let input = "False and False";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "True and False";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "False and True";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "True and True";
-        assert_eval_eq!(input, bool!(true));
-    }
-
-    #[test]
-    fn binary_logical_or() {
-        let input = "False or False";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "True or False";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "False or True";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "True or True";
-        assert_eval_eq!(input, bool!(true));
-    }
-
-    #[test]
-    fn unary_expression_not() {
-        let input = "not True";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "not False";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not None";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not 1";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "not 0";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not 1.0";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "not 0.0";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not [1]";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "not []";
-        assert_eval_eq!(input, bool!(true));
-    }
-
-    #[test]
-    fn unary_expression_invert() {
-        let input = "~0b1101";
-        assert_eval_eq!(input, int!(-14));
     }
 
     #[test]
@@ -630,56 +124,6 @@ mod tests_vm_interpreter {
         let text = "range(1,1,1,1)";
         let e = eval_expect_error(text);
         assert_type_error!(e.exception, "range expected at most 3 arguments, got 4");
-    }
-
-    #[test]
-    fn assignment_int() {
-        let text = r#"
-a = 5 - 3
-a
-"#;
-        assert_eval_eq!(text, int!(2));
-    }
-
-    #[test]
-    fn assignment_str() {
-        let text = r#"
-a = "Hello World"
-a
-"#;
-        assert_eval_eq!(text, str!("Hello World"));
-    }
-
-    #[test]
-    fn assignment_none() {
-        let text = r#"
-c = None
-c
-"#;
-        assert_eval_eq!(text, none!());
-    }
-
-    #[test]
-    fn assignment_var() {
-        let text = r#"
-a = 5 - 3
-b = 10 + a
-b
-"#;
-        assert_eval_eq!(text, int!(12));
-    }
-
-    #[test]
-    fn while_loop() {
-        let text = r#"
-i = 0
-n = 4
-while i < n:
-    i = i + 1
-
-i
-"#;
-        assert_eval_eq!(text, int!(4));
     }
 
     #[test]
@@ -813,48 +257,6 @@ test()
     }
 
     #[test]
-    fn next_builtin_generator() {
-        let text = r#"
-def gen():
-    yield 1
-    yield 2
-
-g = gen()
-a = next(g)
-b = next(g)
-a, b
-"#;
-        assert_eval_eq!(text, tuple![int!(1), int!(2)]);
-
-        let text = r#"
-def gen():
-    yield 1
-
-g = gen()
-a = next(g)
-b = next(g)
-"#;
-        let e = eval_expect_error(text);
-        assert_stop_iteration!(e.exception);
-    }
-
-    #[test]
-    fn for_in_loop_generator() {
-        let text = r#"
-def gen():
-    yield 1
-    yield 2
-
-s = 11
-for i in gen():
-    s = s + i
-
-i, s
-"#;
-        assert_eval_eq!(text, tuple![int!(2), int!(14)]);
-    }
-
-    #[test]
     fn list_builtin_generator() {
         let text = r#"
 def gen():
@@ -864,174 +266,6 @@ def gen():
 list(gen())
 "#;
         assert_eval_eq!(text, list![int!(1), int!(2)]);
-    }
-
-    #[test]
-    fn yield_from_list_builtin_list_iterable() {
-        let text = r#"
-def gen():
-    yield from [1, 2, 3]
-
-list(gen())
-"#;
-        assert_eval_eq!(text, list![int!(1), int!(2), int!(3)]);
-    }
-
-    #[test]
-    fn yield_from_list_builtin_generator_iterable() {
-        let text = r#"
-def subgen():
-    yield 1
-    yield 2
-    yield 4
-
-def gen():
-    yield from subgen()
-
-list(gen())
-"#;
-        assert_eval_eq!(text, list![int!(1), int!(2), int!(4)]);
-    }
-
-    #[test]
-    fn function_call_with_parameters() {
-        let text = r#"
-def foo(a, b):
-    return a + b
-
-foo(2, 9)
-"#;
-        assert_eval_eq!(text, int!(11));
-    }
-
-    #[test]
-    fn function_call_with_local_var() {
-        let text = r#"
-def foo(a, b):
-    c = 9
-    return a + b + c
-
-foo(2, 9)
-"#;
-        assert_eval_eq!(text, int!(20));
-    }
-
-    #[test]
-    fn function_call_with_no_return() {
-        let text = r#"
-def hello():
-    print("Hello")
-
-def world():
-    print("World")
-
-hello()
-world()
-"#;
-        assert_eval_eq!(text, none!());
-    }
-
-    #[test]
-    fn function_call_with_nested_function() {
-        let text = r#"
-def foo(a, b):
-    def inner(c, d):
-        return c * d
-    return a + b + inner(a, b)
-
-foo(2, 9)
-"#;
-        assert_eval_eq!(text, int!(29));
-    }
-
-    #[test]
-    fn function_call_with_callee() {
-        let text = r#"
-def test_decorator(func):
-    def wrapper():
-        return func() * 2.5
-    return wrapper
-
-def get_val_undecorated():
-    return 2
-
-test_decorator(get_val_undecorated)()
-"#;
-        assert_eval_eq!(text, float!(5.0));
-    }
-
-    #[test]
-    fn function_call_with_decorator() {
-        let text = r#"
-def test_decorator(func):
-    def wrapper():
-        return func() * 2
-    return wrapper
-
-@test_decorator
-def once_decorated():
-    return 2
-
-once_decorated()
-"#;
-        assert_eval_eq!(text, int!(4));
-    }
-
-    #[test]
-    fn function_call_with_multiple_decorators() {
-        let text = r#"
-def test_decorator(func):
-    def wrapper():
-        return func() * 2
-    return wrapper
-
-@test_decorator
-@test_decorator
-def twice_decorated():
-    return 2
-
-twice_decorated()
-"#;
-        assert_eval_eq!(text, int!(8));
-    }
-
-    #[test]
-    fn function_call_with_two_stage_decorators() {
-        let text = r#"
-def multiply(factor):
-    def decorator(func):
-        def wrapper():
-            return func() * factor
-        return wrapper
-    return decorator
-
-@multiply(3)
-def get_val():
-    return 2
-
-@multiply(4)
-def get_larger_val():
-    return 2
-
-a = get_val()
-b = get_larger_val()
-a, b
-"#;
-        assert_eval_eq!(text, tuple![int!(6), int!(8)]);
-    }
-
-    #[test]
-    fn closures() {
-        let text = r#"
-def make_adder(x):
-    def inner_adder(y):
-        return x + y
-    return inner_adder
-
-adder = make_adder(10)
-adder(5)
-"#;
-        assert_eval_eq!(text, int!(15));
     }
 
     #[test]
@@ -1060,23 +294,11 @@ f = Foo()
     fn class_with_method_call() {
         let text = r#"
 class Foo:
-    def bar(self):
-        return 4
-
-f = Foo()
-b = f.bar()
-b
-"#;
-        assert_eval_eq!(text, int!(4));
-
-        let text = r#"
-class Foo:
     def bar(self, val):
         return 4 + val
 
 f = Foo()
-b = f.bar(11)
-b
+f.bar(11)
 "#;
         assert_eval_eq!(text, int!(15));
     }
@@ -1143,56 +365,39 @@ f.x
     }
 
     #[test]
-    fn class_instantiation_with_method_call() {
-        let text = r#"
-class Foo:
-    def __init__(self, val):
-        self.val = val
-
-    def bar(self):
-        return self.val
-
-f = Foo(10)
-b = f.bar()
-b
-"#;
-        assert_eval_eq!(text, int!(10));
-    }
-
-    #[test]
     fn regular_import_same_file() {
-        let ctx = run_path("src/bytecode_vm/fixtures/imports/one/main.py");
-        assert_read_eq!(ctx, "x", int!(5));
+        let output = run_script("src/bytecode_vm/fixtures/imports/one/main.py");
+        assert_eq!(output, "5\n");
     }
 
     #[test]
     fn regular_import_function_in_other_file() {
-        let ctx = run_path("src/bytecode_vm/fixtures/imports/two/main.py");
-        assert_read_eq!(ctx, "x", int!(33));
+        let output = run_script("src/bytecode_vm/fixtures/imports/two/main.py");
+        assert_eq!(output, "33\n");
     }
 
     #[test]
     fn selective_import_relative() {
-        let ctx = run_path("src/fixtures/imports/relative/main_a.py");
-        assert_read_eq!(ctx, "x", int!(2));
+        let output = run_script("src/fixtures/imports/relative/main_a.py");
+        assert_eq!(output, "2\n");
     }
 
     #[test]
     fn regular_import_relative_parent_package() {
-        let ctx = run_path("src/fixtures/imports/relative/main_b.py");
-        assert_read_eq!(ctx, "x", int!(2));
+        let output = run_script("src/fixtures/imports/relative/main_b.py");
+        assert_eq!(output, "2\n");
     }
 
     #[test]
     fn regular_import_relative_alias() {
-        let ctx = run_path("src/fixtures/imports/relative/main_c.py");
-        assert_read_eq!(ctx, "x", int!(2));
+        let output = run_script("src/fixtures/imports/relative/main_c.py");
+        assert_eq!(output, "2\n");
     }
 
     #[test]
     fn relative_import_from_package() {
-        let ctx = run_path("src/fixtures/imports/pkg_test/test_app.py");
-        assert_read_eq!(ctx, "a", int!(111));
+        let output = run_script("src/fixtures/imports/pkg_test/test_app.py");
+        assert_eq!(output, "111\n");
     }
 
     #[test]
@@ -1293,13 +498,8 @@ middle_call()
 
     #[test]
     fn exception_classes() {
-        let text = r#"
-a = ZeroDivisionError
-"#;
-        // TODO we could eventually assert against __name__ here, for now just confirm this does
-        // not fail
-        assert_eval_eq!(text, none!());
-        // assert_eval_eq!(text, str!("ZeroDivisionError"));
+        let text = r#"ZeroDivisionError.__name__"#;
+        assert_eval_eq!(text, str!("ZeroDivisionError"));
     }
 
     #[test]

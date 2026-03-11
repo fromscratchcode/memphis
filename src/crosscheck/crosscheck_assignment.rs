@@ -3,38 +3,40 @@ use crate::domain::test_utils::*;
 use super::macros::*;
 
 #[test]
-fn assignment() {
-    let mut session = crosscheck_eval!(
-        r#"
+fn assignment_int() {
+    let input = r#"
 a = 5 - 3
-"#
-    );
-    assert_crosscheck_eq!(session, "a", int!(2));
+a
+"#;
+    assert_crosscheck_return!(input, int!(2));
+}
 
-    let mut session = crosscheck_eval!(
-        r#"
+#[test]
+fn assignment_str() {
+    let input = r#"
 a = "Hello World"
-"#
-    );
-    assert_crosscheck_eq!(session, "a", str!("Hello World"));
+a
+"#;
+    assert_crosscheck_return!(input, str!("Hello World"));
+}
 
-    let mut session = crosscheck_eval!(
-        r#"
+#[test]
+fn assignment_multiple() {
+    let input = r#"
 a = 5 - 3
 b = 10
 c = None
-"#
-    );
-    assert_crosscheck_eq!(session, "a", int!(2));
-    assert_crosscheck_eq!(session, "b", int!(10));
-    assert_crosscheck_eq!(session, "c", none!());
+a,b,c
+"#;
+    assert_crosscheck_return!(input, tuple![int!(2), int!(10), none!()]);
+}
 
-    let mut session = crosscheck_eval!(
-        r#"
+#[test]
+fn assignment_var() {
+    let input = r#"
 a = 5 - 3
 b = 10 + a
-"#
-    );
-    assert_crosscheck_eq!(session, "a", int!(2));
-    assert_crosscheck_eq!(session, "b", int!(12));
+b
+"#;
+    assert_crosscheck_return!(input, int!(12));
 }

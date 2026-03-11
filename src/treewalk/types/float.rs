@@ -136,7 +136,7 @@ impl Callable for MulBuiltin {
     }
 
     fn name(&self) -> String {
-        Dunder::Sub.into()
+        Dunder::Mul.into()
     }
 }
 

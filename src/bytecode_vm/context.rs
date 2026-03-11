@@ -4,11 +4,12 @@ use crate::{
     bytecode_vm::{
         compiler::CodeObject, Compiler, CompilerError, Runtime, VirtualMachine, VmResult, VmValue,
     },
-    core::{Container, Interpreter},
+    core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     lexer::Lexer,
     parser::Parser,
     runtime::MemphisState,
+    Interpreter,
 };
 
 pub struct VmContext {
@@ -20,22 +21,21 @@ pub struct VmContext {
 }
 
 impl VmContext {
-    pub fn new(text: Text, origin: ModuleOrigin) -> Self {
+    pub fn new(origin: ModuleOrigin) -> Self {
         let state = Container::new(MemphisState::init(origin.clone()));
         let runtime = Container::new(Runtime::new());
-        Self::from_state(ModuleName::main(), None, text, origin, state, runtime)
+        Self::from_state(ModuleName::main(), None, origin, state, runtime)
     }
 
     pub fn from_state(
         module_name: ModuleName,
         package: Option<ModuleName>,
-        text: Text,
         origin: ModuleOrigin,
         state: Container<MemphisState>,
         runtime: Container<Runtime>,
     ) -> Self {
         Self {
-            lexer: Lexer::new(&text),
+            lexer: Lexer::new(),
             module_name,
             package,
             path_str: origin.path_str(),
@@ -43,7 +43,12 @@ impl VmContext {
         }
     }
 
-    pub fn run_inner(&mut self) -> VmResult<VmValue> {
+    pub fn eval_inner(&mut self, text: Text) -> VmResult<VmValue> {
+        self.add_text(text);
+        self.run()
+    }
+
+    fn run(&mut self) -> VmResult<VmValue> {
         let code = self.compile().map_err(|e| {
             let exc = e.into_exception(&mut self.vm);
             self.vm
@@ -63,11 +68,7 @@ impl VmContext {
         compiler.compile(&ast)
     }
 
-    pub fn read_inner(&self, name: &str) -> Option<VmValue> {
-        self.vm.read_global(name)
-    }
-
-    pub fn add_text_inner(&mut self, line: Text) {
+    pub fn add_text(&mut self, line: Text) {
         self.lexer.add_text(&line);
     }
 
@@ -86,32 +87,30 @@ impl VmContext {
         self.package = Some(name);
     }
 
-    #[cfg(any(test, feature = "wasm"))]
-    pub fn from_text(text: Text) -> Self {
-        Self::new(text, ModuleOrigin::Stdin)
+    #[cfg(test)]
+    pub fn enable_capture(&mut self) {
+        self.vm.state.borrow_mut().io.enable_capture();
     }
 
     #[cfg(test)]
-    pub fn from_source(source: Source) -> Self {
-        Self::new(
-            source.text().clone(),
-            ModuleOrigin::File(source.path().to_path_buf()),
-        )
+    pub fn take_output(&mut self) -> Option<String> {
+        self.vm.state.borrow_mut().io.take_output()
+    }
+
+    #[cfg(any(test, feature = "wasm"))]
+    pub fn stdin() -> Self {
+        Self::new(ModuleOrigin::Stdin)
+    }
+
+    #[cfg(test)]
+    pub fn script(source: Source) -> Self {
+        Self::new(ModuleOrigin::File(source.path().to_path_buf()))
     }
 }
 
 impl Interpreter for VmContext {
-    fn run(&mut self) -> MemphisResult<MemphisValue> {
-        let value = self.run_inner().map_err(|e| e.normalize(&self.vm))?;
+    fn eval(&mut self, text: Text) -> MemphisResult<MemphisValue> {
+        let value = self.eval_inner(text).map_err(|e| e.normalize(&self.vm))?;
         Ok(self.vm.normalize_vm_value(value))
-    }
-
-    fn read(&self, name: &str) -> Option<MemphisValue> {
-        let value = self.read_inner(name)?;
-        Some(self.vm.normalize_vm_value(value))
-    }
-
-    fn add_text(&mut self, line: Text) {
-        self.add_text_inner(line);
     }
 }

@@ -9,8 +9,8 @@ use crossterm::{
 
 use crate::{
     domain::{RaisedMemphisError, Text},
-    repl::{CrosstermIO, IncrementalContext, TerminalIO},
-    Engine,
+    repl::{CrosstermIO, TerminalIO},
+    Engine, MemphisContext,
 };
 
 type ExitCode = i32;
@@ -50,8 +50,11 @@ fn install_custom_panic_hook() {
 }
 
 /// The Memphis Read-Evaluate-Print-Loop (REPL).
-#[derive(Default)]
 pub struct Repl {
+    engine: Engine,
+
+    context: MemphisContext,
+
     /// `in_block` may need to become a state for a FSM, but a `bool` seems to be working fine for
     /// now.
     in_block: bool,
@@ -77,14 +80,28 @@ pub struct Repl {
 }
 
 impl Repl {
+    pub fn new(engine: Engine) -> Self {
+        Self {
+            engine,
+            context: MemphisContext::stdin(engine),
+            in_block: false,
+            errors: Vec::new(),
+            line: String::new(),
+            line_index: 0,
+            input: String::new(),
+            history: Vec::new(),
+            history_index: None,
+        }
+    }
+
     /// The primary entrypoint to the REPL, which uses a real terminal in raw mode and will exit
     /// loudly when terminated. For virtual terminals, use `run_inner`.
-    pub fn run(&mut self, engine: Engine) {
+    pub fn start(&mut self) {
         let terminal_io = &mut CrosstermIO;
         let _ = terminal_io.writeln(format!(
             "memphis {} REPL (engine: {}) (Type 'exit()' to quit)",
             env!("CARGO_PKG_VERSION"),
-            engine
+            self.engine
         ));
 
         // Enable raw mode to handle individual keypresses. This must be disabled during all
@@ -93,8 +110,7 @@ impl Repl {
         let _ = terminal::enable_raw_mode();
         self.initialize_prompt(terminal_io);
 
-        let mut context = IncrementalContext::new(engine);
-        let exit_code = self.run_inner(terminal_io, &mut context);
+        let exit_code = self.run_inner(terminal_io);
 
         let _ = terminal::disable_raw_mode();
         let _ = panic::take_hook();
@@ -102,14 +118,10 @@ impl Repl {
         process::exit(exit_code);
     }
 
-    fn run_inner<T: TerminalIO>(
-        &mut self,
-        terminal_io: &mut T,
-        context: &mut IncrementalContext,
-    ) -> ExitCode {
+    fn run_inner<T: TerminalIO>(&mut self, terminal_io: &mut T) -> ExitCode {
         loop {
             match terminal_io.read_event() {
-                Ok(Event::Key(event)) => match self.handle_key_event(terminal_io, context, event) {
+                Ok(Event::Key(event)) => match self.handle_key_event(terminal_io, event) {
                     ReplControl::Continue => {}
                     ReplControl::Exit(code) => break code,
                 },
@@ -123,7 +135,6 @@ impl Repl {
     fn handle_key_event<T: TerminalIO>(
         &mut self,
         terminal_io: &mut T,
-        context: &mut IncrementalContext,
         event: KeyEvent,
     ) -> ReplControl {
         match (event.code, event.modifiers) {
@@ -162,7 +173,7 @@ impl Repl {
                 // We must virtually hit Enter before processing the line so any results will be
                 // displayed on the next line.
                 let _ = terminal_io.enter();
-                let control = self.process_line(terminal_io, context, &self.line.clone());
+                let control = self.process_line(terminal_io, &self.line.clone());
                 if matches!(control, ReplControl::Exit(_)) {
                     return control;
                 }
@@ -270,12 +281,7 @@ impl Repl {
     }
 
     /// Append the provided line to the constructed statement and evaluate it.
-    fn process_line<T: TerminalIO>(
-        &mut self,
-        terminal_io: &mut T,
-        context: &mut IncrementalContext,
-        line: &str,
-    ) -> ReplControl {
+    fn process_line<T: TerminalIO>(&mut self, terminal_io: &mut T, line: &str) -> ReplControl {
         if line.trim_end() == "exit()" {
             let code = if self.errors.is_empty() { 0 } else { 1 };
             return ReplControl::Exit(code);
@@ -285,10 +291,7 @@ impl Repl {
 
         if self.end_of_statement(line) {
             let text = Text::new(&self.input);
-            context.add_text(text);
-            self.input.clear();
-
-            match context.run() {
+            match self.context.eval(text) {
                 Ok(result) => {
                     if !result.is_none() {
                         let _ = terminal_io.writeln(&result);
@@ -300,6 +303,7 @@ impl Repl {
                 }
             }
 
+            self.input.clear();
             self.in_block = false;
         } else {
             // This wasn't the end of a statement, so add a newline. We could do this in the
@@ -319,45 +323,34 @@ mod tests {
 
     use super::*;
 
-    fn run_inner(
-        terminal: &mut MockTerminalIO,
-        context: &mut IncrementalContext,
-    ) -> (ExitCode, String) {
-        let exit_code = Repl::default().run_inner(terminal, context);
+    fn run_inner(engine: Engine, terminal: &mut MockTerminalIO) -> (ExitCode, String) {
+        let exit_code = Repl::new(engine).run_inner(terminal);
         (exit_code, terminal.return_val())
-    }
-
-    fn tw() -> IncrementalContext {
-        IncrementalContext::new(Engine::Treewalk)
-    }
-
-    fn vm() -> IncrementalContext {
-        IncrementalContext::new(Engine::BytecodeVm)
     }
 
     /// Run the complete flow, from input code string to return value string. If you need any Ctrl
     /// modifiers, do not use this!
     fn run(input: &str) -> String {
         let mut terminal = MockTerminalIO::from_str(input);
-        let (_, return_val) = run_inner(&mut terminal, &mut tw());
+        let (_, return_val) = run_inner(Engine::Treewalk, &mut terminal);
         return_val
     }
 
     fn run_vm(input: &str) -> String {
         let mut terminal = MockTerminalIO::from_str(input);
-        let (_, return_val) = run_inner(&mut terminal, &mut vm());
+        let (_, return_val) = run_inner(Engine::BytecodeVm, &mut terminal);
         return_val
     }
 
     fn run_events(events: Vec<Event>) -> String {
         let mut terminal = MockTerminalIO::new(events);
-        let (_, return_val) = run_inner(&mut terminal, &mut tw());
+        let (_, return_val) = run_inner(Engine::Treewalk, &mut terminal);
         return_val
     }
 
     fn run_and_exit_code(events: Vec<Event>) -> ExitCode {
         let mut terminal = MockTerminalIO::new(events);
-        let (exit_code, _) = run_inner(&mut terminal, &mut tw());
+        let (exit_code, _) = run_inner(Engine::Treewalk, &mut terminal);
         exit_code
     }
 

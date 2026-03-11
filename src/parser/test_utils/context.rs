@@ -9,14 +9,15 @@ pub struct ParseContext {
 }
 
 impl ParseContext {
-    pub fn new(text: &Text) -> Self {
+    pub fn new() -> Self {
         Self {
-            lexer: Lexer::new(&text),
+            lexer: Lexer::new(),
         }
     }
 
     /// This cannot be used for multiple parse calls.
-    pub fn parse_oneshot(&mut self) -> Result<Ast, ParserError> {
+    pub fn parse_oneshot(&mut self, text: &Text) -> Result<Ast, ParserError> {
+        self.lexer.add_text(text);
         let mut parser = Parser::new(&mut self.lexer);
         parser.parse()
     }

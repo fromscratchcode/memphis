@@ -6,6 +6,7 @@ mod core;
 mod crosscheck;
 mod domain;
 mod engine;
+mod interpreter;
 mod lexer;
 #[cfg(feature = "llvm_backend")]
 mod llvm_backend;
@@ -20,4 +21,5 @@ mod wasm;
 
 pub use context::MemphisContext;
 pub use engine::Engine;
+pub use interpreter::Interpreter;
 pub use memphis::Memphis;
