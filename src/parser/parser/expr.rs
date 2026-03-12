@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     core::{log, LogLevel},
     domain::Identifier,
@@ -673,7 +671,7 @@ impl Parser<'_> {
     fn parse_set(&mut self) -> Result<Expr, ParserError> {
         log(LogLevel::Trace, || "parse_set".to_string());
         let mut pairs = vec![];
-        let mut set = HashSet::new();
+        let mut set = vec![];
 
         self.consume(&Token::LBrace)?;
         while self.current_token() != &Token::RBrace {
@@ -692,7 +690,7 @@ impl Parser<'_> {
                             pairs.push(DictOperation::Unpack(*right));
                         }
                         _ => {
-                            set.insert(key);
+                            set.push(key);
                         }
                     };
                     self.consume_optional(&Token::Comma);

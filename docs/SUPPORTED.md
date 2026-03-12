@@ -124,7 +124,7 @@
 |`set`|✅||
 |`setattr`|✅||
 |`slice`|✅||
-|`sorted`|||
+|`sorted`|✅||
 |`staticmethod`|✅||
 |`str`|✅||
 |`sum`|||

@@ -14,9 +14,10 @@ use crate::{
     },
 };
 
-#[derive(Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct Dict {
     items: HashMap<HashKey, (TreewalkValue, TreewalkValue)>,
+    order: Vec<HashKey>,
 }
 
 impl_typed!(Dict, Type::Dict);
@@ -42,8 +43,11 @@ impl Dict {
     }
 
     pub fn insert(&mut self, key: TreewalkValue, value: TreewalkValue) -> DomainResult<()> {
-        let hashed_key = key.as_hash_key()?;
-        self.items.insert(hashed_key, (key, value));
+        let hash = key.as_hash_key()?;
+        if !self.items.contains_key(&hash) {
+            self.order.push(hash.clone());
+        }
+        self.items.insert(hash, (key, value));
         Ok(())
     }
 
@@ -66,28 +70,28 @@ impl Dict {
     /// Python's implementation, but makes our lives way easier.
     pub fn items(&self) -> DictItems {
         let mut items = Vec::with_capacity(self.items.len());
-
-        for (key, value) in self.items.values() {
-            items.push((key.clone(), value.clone()));
+        for key in &self.order {
+            let (k, v) = self.items.get(key).unwrap();
+            items.push((k.clone(), v.clone()));
         }
-
-        items.sort();
         DictItems::new(items)
     }
 
     pub fn keys(&self) -> DictKeys {
-        let mut keys: Vec<_> = self.items.values().map(|(key, _)| key.clone()).collect();
-        keys.sort();
+        let mut keys = Vec::with_capacity(self.items.len());
+        for key in &self.order {
+            let (k, _) = self.items.get(key).unwrap();
+            keys.push(k.clone());
+        }
         DictKeys::new(keys)
     }
 
     pub fn values(&self) -> DictValues {
-        let mut values: Vec<_> = self
-            .items
-            .values()
-            .map(|(_, value)| value.clone())
-            .collect();
-        values.sort();
+        let mut values = Vec::with_capacity(self.items.len());
+        for key in &self.order {
+            let (_, v) = self.items.get(key).unwrap();
+            values.push(v.clone());
+        }
         DictValues::new(values)
     }
 
@@ -107,10 +111,17 @@ impl Dict {
         Ok(table)
     }
 
-    pub fn extend(&mut self, other: &Dict) {
-        for (key, value) in &other.items {
-            self.items.insert(key.clone(), value.clone());
+    pub fn extend(&mut self, other: &Dict) -> DomainResult<()> {
+        for key in &other.order {
+            let (k, v) = other.items.get(key).unwrap();
+            self.insert(k.clone(), v.clone())?;
         }
+        Ok(())
+    }
+
+    pub fn equals(&self, other: &Dict) -> bool {
+        // Insertion order does not affect dict equality
+        self.items == other.items
     }
 }
 
@@ -296,12 +307,15 @@ impl Callable for InitBuiltin {
 
         if let Some(pos_arg) = args.get_arg_optional(0) {
             let input = Container::<Dict>::try_eval_from(pos_arg, interpreter)?;
-            output.borrow_mut().extend(&input.borrow());
+            output
+                .borrow_mut()
+                .extend(&input.borrow())
+                .raise(interpreter)?;
         }
 
         if args.has_kwargs() {
             let kwargs = args.kwargs_as_runtime_dict();
-            output.borrow_mut().extend(&kwargs);
+            output.borrow_mut().extend(&kwargs).raise(interpreter)?;
         }
 
         Ok(TreewalkValue::None)

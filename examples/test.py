@@ -61,13 +61,6 @@ for i in a:
     print(i)
 print(list(range(5,10)))
 
-# Sets
-b = {1,2}
-print(b)
-b = set({2,3})
-for i in b:
-    print(i)
-
 # Tuples
 c = (1, 2)
 print(c)

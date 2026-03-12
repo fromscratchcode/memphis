@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::{
     core::Container,
@@ -7,14 +7,14 @@ use crate::{
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{check_args, Args, HashKey},
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, PartialEq, Clone)]
 pub struct Set {
-    items: HashSet<TreewalkValue>,
+    items: HashMap<HashKey, TreewalkValue>,
 }
 
 impl_typed!(Set, Type::Set);
@@ -22,26 +22,21 @@ impl_method_provider!(Set, [AddBuiltin, LeBuiltin, NewBuiltin]);
 impl_iterable!(SetIter);
 
 impl Set {
-    #[allow(clippy::mutable_key_type)]
-    pub fn new(items: HashSet<TreewalkValue>) -> Self {
-        Self { items }
+    pub fn from_items(items: Vec<TreewalkValue>) -> DomainResult<Self> {
+        let mut set = Set::default();
+        for item in items {
+            set.add(item)?;
+        }
+        Ok(set)
     }
 
-    pub fn add(&mut self, item: TreewalkValue) -> bool {
-        self.items.insert(item)
+    pub fn add(&mut self, item: TreewalkValue) -> DomainResult<bool> {
+        let key = item.as_hash_key()?;
+        Ok(self.items.insert(key, item).is_none())
     }
 
-    pub fn subset(&self, other: Set) -> bool {
-        self.items.is_subset(&other.items)
-    }
-
-    #[allow(clippy::mutable_key_type)]
-    pub fn cloned_items(&self) -> HashSet<TreewalkValue> {
-        self.items.clone()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &TreewalkValue> {
-        self.items.iter()
+    pub fn subset(&self, other: &Set) -> bool {
+        self.items.keys().all(|k| other.items.contains_key(k))
     }
 }
 
@@ -50,8 +45,9 @@ impl TryEvalFrom for Set {
         value: TreewalkValue,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Self> {
-        let iter = value.as_iterator().raise(interpreter)?;
-        Ok(Set::new(iter.collect()))
+        let items: Vec<_> = value.as_iterator().raise(interpreter)?.collect();
+        let set = Set::from_items(items).raise(interpreter)?;
+        Ok(set)
     }
 }
 
@@ -60,8 +56,7 @@ impl IntoIterator for Container<Set> {
     type IntoIter = SetIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        let mut items: Vec<TreewalkValue> = self.borrow().cloned_items().into_iter().collect();
-        items.sort();
+        let items: Vec<TreewalkValue> = self.borrow().items.values().cloned().collect();
         SetIter::new(items)
     }
 }
@@ -128,7 +123,7 @@ impl Callable for AddBuiltin {
             .raise(interpreter)?
             .as_set()
             .raise(interpreter)?;
-        let result = set.borrow_mut().add(args.get_arg(0));
+        let result = set.borrow_mut().add(args.get_arg(0)).raise(interpreter)?;
 
         Ok(TreewalkValue::Bool(result))
     }
@@ -151,7 +146,7 @@ impl Callable for LeBuiltin {
         let l = left_set.borrow().clone();
         let r = right_set.borrow().clone();
 
-        Ok(TreewalkValue::Bool(l.subset(r)))
+        Ok(TreewalkValue::Bool(l.subset(&r)))
     }
 
     fn name(&self) -> String {

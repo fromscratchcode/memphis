@@ -22,6 +22,7 @@ fn builtins() -> Vec<Box<dyn CloneableCallable>> {
         Box::new(IsinstanceBuiltin),
         Box::new(IssubclassBuiltin),
         Box::new(IterBuiltin),
+        Box::new(SortedBuiltin),
         Box::new(LenBuiltin),
         Box::new(NextBuiltin),
         Box::new(PrintBuiltin),
@@ -65,6 +66,8 @@ pub struct IsinstanceBuiltin;
 pub struct IssubclassBuiltin;
 #[derive(Clone)]
 pub struct IterBuiltin;
+#[derive(Clone)]
+pub struct SortedBuiltin;
 #[derive(Clone)]
 pub struct LenBuiltin;
 #[derive(Clone)]
@@ -318,6 +321,50 @@ impl Callable for IterBuiltin {
     }
 }
 
+impl Callable for SortedBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+        let mut items: Vec<_> = args.get_arg(0).as_iterator().raise(interpreter)?.collect();
+        python_sort(&mut items).raise(interpreter)?;
+        Ok(TreewalkValue::List(Container::new(List::new(items))))
+    }
+
+    fn name(&self) -> String {
+        "sorted".into()
+    }
+}
+
 fn has_overlap<T: PartialEq>(vec1: &[T], vec2: &[T]) -> bool {
     vec1.iter().any(|item| vec2.contains(item))
+}
+
+fn python_sort(items: &mut [TreewalkValue]) -> DomainResult<()> {
+    for i in 1..items.len() {
+        let mut j = i;
+
+        while j > 0 {
+            let left = items[j - 1].clone();
+            let right = items[j].clone();
+
+            if !compare_lt(right, left)? {
+                break;
+            }
+
+            items.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+
+    Ok(())
+}
+
+fn compare_lt(left: TreewalkValue, right: TreewalkValue) -> DomainResult<bool> {
+    match (left, right) {
+        (TreewalkValue::Int(a), TreewalkValue::Int(b)) => Ok(a < b),
+        (TreewalkValue::Float(a), TreewalkValue::Float(b)) => Ok(a < b),
+        (TreewalkValue::Str(a), TreewalkValue::Str(b)) => Ok(*a < *b),
+        _ => Err(Exception::type_error(
+            "'<' not supported between these types".to_string(),
+        )),
+    }
 }

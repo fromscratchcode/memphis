@@ -1,8 +1,6 @@
 use std::{
     cell::{Ref, RefMut},
-    cmp::Ordering,
     fmt::{Debug, Error, Formatter},
-    hash::{Hash, Hasher},
     ptr,
 };
 
@@ -106,7 +104,7 @@ impl PartialEq for TreewalkValue {
             (TreewalkValue::Set(a), TreewalkValue::Set(b)) => a == b,
             (TreewalkValue::FrozenSet(a), TreewalkValue::FrozenSet(b)) => a == b,
             (TreewalkValue::Complex(a), TreewalkValue::Complex(b)) => a == b,
-            (TreewalkValue::Dict(a), TreewalkValue::Dict(b)) => a == b,
+            (TreewalkValue::Dict(a), TreewalkValue::Dict(b)) => a.borrow().equals(&b.borrow()),
             (TreewalkValue::MappingProxy(a), TreewalkValue::MappingProxy(b)) => a == b,
             (TreewalkValue::DictItems(a), TreewalkValue::DictItems(b)) => a == b,
             (TreewalkValue::DictKeys(a), TreewalkValue::DictKeys(b)) => a == b,
@@ -131,44 +129,11 @@ impl PartialEq for TreewalkValue {
     }
 }
 
-// This is a marker trait. We are confirming that PartialEq fully satisfies equality semantics.
-// We cannot derive Eq because it is not implemented for f64 because of NaN weirdness.
-impl Eq for TreewalkValue {}
-
-impl Hash for TreewalkValue {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        if let TreewalkValue::Set(set) = self {
-            for i in set.borrow().iter() {
-                i.as_int().unwrap().hash(state)
-            }
-        }
-    }
-}
-
-impl Ord for TreewalkValue {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (TreewalkValue::Str(s1), TreewalkValue::Str(s2)) => s1.cmp(s2),
-            (TreewalkValue::Int(n1), TreewalkValue::Int(n2)) => n1.cmp(n2),
-            _ => todo!(),
-        }
-    }
-}
-
-// Implement the PartialOrd trait, required by Ord
-impl PartialOrd for TreewalkValue {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl TreewalkValue {
     pub fn as_hash_key(&self) -> DomainResult<HashKey> {
         match self {
             TreewalkValue::Int(i) => Ok(HashKey::Int(*i)),
+            TreewalkValue::Float(f) => Ok(HashKey::Float(f.to_bits())),
             TreewalkValue::Str(s) => Ok(HashKey::Str(s.to_string())),
             TreewalkValue::Tuple(t) => {
                 let mut items = Vec::with_capacity(t.len());

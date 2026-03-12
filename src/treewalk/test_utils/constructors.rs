@@ -50,17 +50,21 @@ macro_rules! tuple {
 
 macro_rules! set {
     ($($expr:expr),* $(,)?) => {
-        crate::treewalk::TreewalkValue::Set(crate::core::Container::new(crate::treewalk::types::Set::new(std::collections::HashSet::from([
-            $($expr),*
-        ]))))
+        crate::treewalk::TreewalkValue::Set(crate::core::Container::new(crate::treewalk::types::Set::from_items(
+            vec![
+                $($expr),*
+            ]
+        ).expect("Failed to create Set")))
     };
 }
 
 macro_rules! frozenset {
     ($($expr:expr),* $(,)?) => {
-        crate::treewalk::TreewalkValue::FrozenSet(crate::treewalk::types::FrozenSet::new(std::collections::HashSet::from([
-            $($expr),*
-        ])))
+        crate::treewalk::TreewalkValue::FrozenSet(crate::treewalk::types::FrozenSet::from_items(
+            vec![
+                $($expr),*
+            ]
+        ).expect("Failed to create FrozenSet"))
     };
 }
 

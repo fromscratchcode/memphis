@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     core::Container,
     domain::{Identifier, MemphisValue},
@@ -84,14 +82,13 @@ impl TreewalkInterpreter {
             .map(|l| TreewalkValue::List(Container::new(List::new(l))))
     }
 
-    fn evaluate_set(&self, items: &HashSet<Expr>) -> TreewalkResult<TreewalkValue> {
-        items
-            .iter()
-            .map(|arg| self.evaluate_expr(arg))
-            .collect::<Result<HashSet<_>, _>>()
-            .map(Set::new)
-            .map(Container::new)
-            .map(TreewalkValue::Set)
+    fn evaluate_set(&self, items: &[Expr]) -> TreewalkResult<TreewalkValue> {
+        let mut set = Set::default();
+        for item in items {
+            let value = self.evaluate_expr(item)?;
+            set.add(value).raise(self)?;
+        }
+        Ok(TreewalkValue::Set(Container::new(set)))
     }
 
     fn evaluate_dict(&self, ops: &[DictOperation]) -> TreewalkResult<TreewalkValue> {

@@ -1021,7 +1021,7 @@ a = [1,2,3]
 print(a)
 b = [1,2.1]
 c = list([1,2])
-d = list({1,2})
+d = sorted(list({1,2}))
 e = list((1,2))
 f = list(range(2))
 g = [
@@ -1133,7 +1133,9 @@ l = {1} <= {2}
         let input = r#"tuple([1,2])"#;
         assert_eval_eq!(input, tuple![int!(1), int!(2)]);
 
-        let input = r#"tuple({1,2})"#;
+        // Ensure tuple() can consume a set iterable and that the result
+        // can flow through sorted() and back into tuple(). We must sort for order.
+        let input = r#"tuple(sorted(tuple({1,2})))"#;
         assert_eval_eq!(input, tuple![int!(1), int!(2)]);
 
         let input = r#"tuple((1,2))"#;
@@ -1188,8 +1190,6 @@ c = True
 for i in a:
     b = b + i
     c = False
-    print(b)
-print(b)
 "#;
         let ctx = run(input);
 
@@ -1204,13 +1204,10 @@ c = True
 for i in a:
     b = b + i
     c = False
-    print(b)
-print(b)
 "#;
         let ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(20));
-        assert_read_eq!(ctx, "i", int!(8));
         assert_read_eq!(ctx, "c", bool!(false));
 
         let input = r#"
@@ -1220,8 +1217,6 @@ c = True
 for i in a:
     b = b + i
     c = False
-    print(b)
-print(b)
 "#;
         let ctx = run(input);
 
@@ -1233,7 +1228,6 @@ print(b)
 b = 0
 for i in range(5):
     b = b + i
-print(b)
 "#;
         let ctx = run(input);
 
@@ -1300,7 +1294,7 @@ c = b()
 d = [1,2,3]
 e = type(d)
 f = e([1,2,3])
-g = e({4,5})
+g = sorted(e({4,5}))
 
 h = {1,2}
 i = type(h)
@@ -1923,13 +1917,13 @@ dict((k, k*k) for k in range(3))
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
-v = [ val for val in a ]
-w = { key for key, value in a.items() }
+v = sorted([ val for val in a ])
+w = sorted({ key for key, value in a.items() })
 "#;
         let ctx = run(input);
 
         assert_read_eq!(ctx, "v", list![str!("b"), str!("c"),]);
-        assert_read_eq!(ctx, "w", set![str!("b"), str!("c"),]);
+        assert_read_eq!(ctx, "w", list![str!("b"), str!("c"),]);
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
@@ -2059,37 +2053,31 @@ g = a == b == c == d == e == f
             "a",
             dict!({ str!("one") => int!(1), str!("two") => int!(2), str!("three") => int!(3) })
         );
-
         assert_read_eq!(
             ctx,
             "b",
             dict!({ str!("one") => int!(1), str!("two") => int!(2), str!("three") => int!(3) })
         );
-
         assert_read_eq!(
             ctx,
             "c",
             dict!({ str!("one") => int!(1), str!("two") => int!(2), str!("three") => int!(3) })
         );
-
         assert_read_eq!(
             ctx,
             "d",
             dict!({ str!("one") => int!(1), str!("two") => int!(2), str!("three") => int!(3) })
         );
-
         assert_read_eq!(
             ctx,
             "e",
             dict!({ str!("one") => int!(1), str!("two") => int!(2), str!("three") => int!(3) })
         );
-
         assert_read_eq!(
             ctx,
             "f",
             dict!({ str!("one") => int!(1), str!("two") => int!(2), str!("three") => int!(3) })
         );
-
         assert_read_eq!(ctx, "g", bool!(true));
 
         let input = r#"dict([('a',)])"#;
@@ -4107,7 +4095,6 @@ a, b, c = [2, 3]
         let input = r#"
 b, c = (1, 2)
 d, e = [1, 2]
-f, g = {1, 2}
 h, i, j = range(1, 4)
 "#;
 
@@ -4117,11 +4104,15 @@ h, i, j = range(1, 4)
         assert_read_eq!(ctx, "c", int!(2));
         assert_read_eq!(ctx, "d", int!(1));
         assert_read_eq!(ctx, "e", int!(2));
-        assert_read_eq!(ctx, "f", int!(1));
-        assert_read_eq!(ctx, "g", int!(2));
         assert_read_eq!(ctx, "h", int!(1));
         assert_read_eq!(ctx, "i", int!(2));
         assert_read_eq!(ctx, "j", int!(3));
+
+        let input = r#"
+f, g = {1, 2}
+{ f, g } == { 1, 2 }
+"#;
+        assert_eval_eq!(input, bool!(true));
 
         let input = r#"
 l = [1,2]
@@ -4325,7 +4316,7 @@ f = list(d)
 a = frozenset([1,2,2])
 b = frozenset()
 c = type(b)
-d = [ i for i in a ]
+d = sorted([ i for i in a ])
 
 e = frozenset().__contains__
 "#;

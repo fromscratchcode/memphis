@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::{
     domain::{Dunder, Type},
@@ -7,28 +7,31 @@ use crate::{
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         types::iterators::SetIter,
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{check_args, Args, HashKey},
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, PartialEq, Clone)]
 pub struct FrozenSet {
-    items: HashSet<TreewalkValue>,
+    items: HashMap<HashKey, TreewalkValue>,
 }
 
 impl_typed!(FrozenSet, Type::FrozenSet);
 impl_method_provider!(FrozenSet, [NewBuiltin, ContainsBuiltin]);
 
 impl FrozenSet {
-    #[allow(clippy::mutable_key_type)]
-    pub fn new(items: HashSet<TreewalkValue>) -> Self {
-        Self { items }
+    pub fn from_items(items: Vec<TreewalkValue>) -> DomainResult<Self> {
+        let mut set = FrozenSet::default();
+        for item in items {
+            set.add(item)?;
+        }
+        Ok(set)
     }
 
-    #[allow(clippy::mutable_key_type)]
-    pub fn cloned_items(&self) -> HashSet<TreewalkValue> {
-        self.items.clone()
+    fn add(&mut self, item: TreewalkValue) -> DomainResult<bool> {
+        let key = item.as_hash_key()?;
+        Ok(self.items.insert(key, item).is_none())
     }
 }
 
@@ -37,8 +40,9 @@ impl TryEvalFrom for FrozenSet {
         value: TreewalkValue,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Self> {
-        let iter = value.as_iterator().raise(interpreter)?;
-        Ok(FrozenSet::new(iter.collect()))
+        let items: Vec<_> = value.as_iterator().raise(interpreter)?.collect();
+        let set = FrozenSet::from_items(items).raise(interpreter)?;
+        Ok(set)
     }
 }
 
@@ -47,8 +51,7 @@ impl IntoIterator for FrozenSet {
     type IntoIter = SetIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        let mut items: Vec<TreewalkValue> = self.cloned_items().into_iter().collect();
-        items.sort();
+        let items: Vec<TreewalkValue> = self.items.values().cloned().collect();
         SetIter::new(items)
     }
 }

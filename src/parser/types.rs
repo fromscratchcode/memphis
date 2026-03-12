@@ -1,8 +1,4 @@
-use std::{
-    collections::HashSet,
-    hash::{Hash, Hasher},
-    slice::Iter,
-};
+use std::slice::Iter;
 
 use crate::{
     analysis::{AcceptsVisitor, FunctionAnalysisVisitor, YieldDetector},
@@ -130,7 +126,7 @@ pub struct RegularImport {
     pub alias: Option<Identifier>,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum BinOp {
     Add,
     Sub,
@@ -161,7 +157,7 @@ pub enum CompareOp {
     NotEquals,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum UnaryOp {
     Not,
     Minus,
@@ -171,7 +167,7 @@ pub enum UnaryOp {
     DictUnpack, // double asterisk **
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum LogicalOp {
     And,
     Or,
@@ -281,7 +277,7 @@ pub enum Expr {
     StringLiteral(String),
     BytesLiteral(Vec<u8>),
     List(Vec<Expr>),
-    Set(HashSet<Expr>),
+    Set(Vec<Expr>),
     Dict(Vec<DictOperation>),
     Tuple(Vec<Expr>),
     FString(Vec<FStringPart>),
@@ -364,19 +360,6 @@ impl Expr {
             Expr::StringLiteral(name) => Some(name.to_string()),
             _ => None,
         }
-    }
-}
-
-// For some reason, we have to create this here for the Eq trait to be
-// satisfied for f64.
-impl Eq for Expr {}
-
-// Is the empty function body going to cause weirdness on HashSet?
-impl Hash for Expr {
-    fn hash<H>(&self, _state: &mut H)
-    where
-        H: Hasher,
-    {
     }
 }
 
