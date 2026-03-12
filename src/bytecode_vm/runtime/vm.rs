@@ -9,6 +9,7 @@ use crate::{
             CallStack, Completion, Frame, FrameExit, HeapObject, Reference, StepResult, Suspension,
             VmExecutor,
         },
+        utils::HashKey,
         DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
     },
     core::{log, log_impure, Container, LogLevel},
@@ -83,8 +84,18 @@ impl VirtualMachine {
     }
 
     pub fn intern_string(&mut self, val: &str) -> Reference {
+        if let Some(r) = self.runtime.borrow().string_table.get(val) {
+            return *r;
+        }
+
         let type_ = self.runtime.borrow().builtin_types.str;
-        self.new_object(type_, VmValue::Str(val.to_string()))
+        let r = self.new_object(type_, VmValue::Str(val.to_string()));
+
+        self.runtime
+            .borrow_mut()
+            .string_table
+            .insert(val.to_string(), r);
+        r
     }
 
     fn current_module(&self) -> Container<Module> {
@@ -148,17 +159,29 @@ impl VirtualMachine {
             .code_object
             .constants
             .get(*index)
+            .cloned()
             .expect("Invalid constant index");
 
-        let payload = VmValue::from(constant);
+        if let Constant::String(ref s) = constant {
+            return self.intern_string(s);
+        }
+
+        let payload = match constant {
+            Constant::None => VmValue::None,
+            Constant::Boolean(i) => VmValue::Bool(i),
+            Constant::Int(i) => VmValue::Int(i),
+            Constant::Float(i) => VmValue::Float(i),
+            Constant::Code(ref i) => VmValue::Code(i.clone()),
+            Constant::String(_) => unreachable!(),
+        };
 
         let class_ref = match constant {
             Constant::None => self.runtime.borrow().builtin_types.none,
             Constant::Int(_) => self.runtime.borrow().builtin_types.int,
             Constant::Boolean(_) => self.runtime.borrow().builtin_types.bool,
             Constant::Float(_) => self.runtime.borrow().builtin_types.float,
-            Constant::String(_) => self.runtime.borrow().builtin_types.str,
             Constant::Code(_) => self.runtime.borrow().builtin_types.code,
+            Constant::String(_) => unreachable!(),
         };
 
         self.new_object(class_ref, payload)
@@ -298,6 +321,25 @@ impl VirtualMachine {
                     .to_string()
             }
             _ => obj.get_type().to_string(),
+        }
+    }
+
+    pub fn as_hash_key(&mut self, reference: Reference) -> DomainResult<HashKey> {
+        let value = self.deref(reference);
+        match value {
+            VmValue::Int(i) => Ok(HashKey::Int(i)),
+            VmValue::Str(_) => Ok(HashKey::Str(reference)),
+            VmValue::Tuple(t) => {
+                let mut items = Vec::with_capacity(t.len());
+                for i in t.iter() {
+                    items.push(self.as_hash_key(i)?);
+                }
+                Ok(HashKey::Tuple(items))
+            }
+            _ => {
+                let msg = self.intern_string(&format!("unhashable type: {}", value.get_type(),));
+                Err(Exception::type_error(msg))
+            }
         }
     }
 

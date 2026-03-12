@@ -18,7 +18,7 @@ impl HeapObject {
 
 /// Primitive values live directly on the stack.
 /// [`Reference::ObjectRef`] items reference an object in the object table.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 pub struct Reference(ObjectTableIndex);
 
 impl Reference {

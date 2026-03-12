@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::bytecode_vm::{
+    result::Raise,
     runtime::{types::Exception, Reference},
     utils::HashKey,
     VirtualMachine, VmResult,
@@ -22,7 +23,7 @@ impl Dict {
     }
 
     pub fn getitem(&self, vm: &mut VirtualMachine, index: Reference) -> VmResult<Reference> {
-        let key = vm.deref(index).as_hash_key().expect("Unhashable key");
+        let key = vm.as_hash_key(index).raise(vm)?;
         if let Some((_, val)) = self.items.get(&key) {
             Ok(*val)
         } else {

@@ -8,7 +8,7 @@ use std::{
 /// An unsigned integer wrapper which provides type safety. This is particularly useful when
 /// dealing with indices used across the bytecode compiler and the VM as common integer values such
 /// as 0, 1, etc, can be interpreted many different ways.
-#[derive(Copy, Clone, PartialEq, Hash, Eq)]
+#[derive(Copy, Clone, PartialEq, Hash, Eq, PartialOrd, Ord)]
 pub struct Index<T> {
     value: usize,
     _marker: PhantomData<T>,
@@ -45,15 +45,15 @@ impl<T> Debug for Index<T> {
     }
 }
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct LocalMarker;
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct FreeMarker;
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct NonlocalMarker;
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct ObjectTableMarker;
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct ConstantMarker;
 
 pub type LocalIndex = Index<LocalMarker>;

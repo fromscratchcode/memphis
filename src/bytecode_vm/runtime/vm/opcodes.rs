@@ -276,9 +276,9 @@ impl VirtualMachine {
                 let mut items = Vec::with_capacity(n);
                 for _ in 0..n {
                     let value = self.pop();
-                    let key = self.pop();
-                    let hash_key = self.deref(key).as_hash_key().expect("Unhashable key");
-                    items.push((hash_key, (key, value)));
+                    let key_ref = self.pop();
+                    let hash_key = step!(self, self.as_hash_key(key_ref));
+                    items.push((hash_key, (key_ref, value)));
                 }
                 items.reverse(); // to preserve left-to-right source order
                 let type_ = self.runtime.borrow().builtin_types.dict;

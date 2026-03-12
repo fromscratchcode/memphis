@@ -170,6 +170,13 @@ impl TreewalkValue {
         match self {
             TreewalkValue::Int(i) => Ok(HashKey::Int(*i)),
             TreewalkValue::Str(s) => Ok(HashKey::Str(s.to_string())),
+            TreewalkValue::Tuple(t) => {
+                let mut items = Vec::with_capacity(t.len());
+                for i in t.clone().into_iter() {
+                    items.push(i.as_hash_key()?);
+                }
+                Ok(HashKey::Tuple(items))
+            }
             _ => Err(Exception::type_error("unhashable type")),
         }
     }

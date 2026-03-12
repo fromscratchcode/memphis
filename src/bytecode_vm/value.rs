@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     bytecode_vm::{
-        compiler::{CodeObject, Constant},
+        compiler::CodeObject,
         runtime::{
             types::{
                 Class, Coroutine, Dict, Exception, FunctionObject, Generator, List, ListIter,
@@ -10,7 +10,6 @@ use crate::{
             },
             BuiltinFunction,
         },
-        utils::HashKey,
     },
     core::{floats_equal, Container},
     domain::Type,
@@ -43,16 +42,6 @@ pub enum VmValue {
     Exception(Exception),
 }
 
-impl VmValue {
-    pub fn as_hash_key(&self) -> Option<HashKey> {
-        match self {
-            VmValue::Int(i) => Some(HashKey::Int(*i)),
-            VmValue::Str(s) => Some(HashKey::Str(s.to_string())),
-            _ => None,
-        }
-    }
-}
-
 impl PartialEq for VmValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -71,19 +60,6 @@ impl PartialEq for VmValue {
             (VmValue::Range(a), VmValue::Range(b)) => a == b,
             // Add Class/Object/Code/Function/etc handling later if needed
             _ => false,
-        }
-    }
-}
-
-impl From<&Constant> for VmValue {
-    fn from(value: &Constant) -> Self {
-        match value {
-            Constant::None => VmValue::None,
-            Constant::Boolean(i) => VmValue::Bool(*i),
-            Constant::Int(i) => VmValue::Int(*i),
-            Constant::Float(i) => VmValue::Float(*i),
-            Constant::String(i) => VmValue::Str(i.to_string()),
-            Constant::Code(i) => VmValue::Code(i.clone()),
         }
     }
 }

@@ -133,11 +133,10 @@ a["10"] = 10
 }
 
 #[test]
-#[ignore]
 fn index_access_tuple_key() {
     let input = r#"
 a = { (4,2): False }
 a[(4, 2)]
 "#;
-    assert_crosscheck_return!(input, list![int!(10), int!(2), int!(3),]);
+    assert_crosscheck_return!(input, bool!(false));
 }

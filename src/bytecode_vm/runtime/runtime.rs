@@ -6,6 +6,7 @@ use crate::{
             modules::{asyncio, builtins},
             types::Module,
             BuiltinFn, BuiltinFunction, BuiltinInstances, BuiltinTypes, Heap, HeapObject,
+            Reference,
         },
         VmValue,
     },
@@ -21,6 +22,8 @@ pub struct Runtime {
     pub builtin_types: BuiltinTypes,
 
     pub builtin_instances: BuiltinInstances,
+
+    pub string_table: HashMap<String, Reference>,
 }
 
 impl Runtime {
@@ -35,6 +38,7 @@ impl Runtime {
             builtin_types,
             builtin_instances,
             module_store: HashMap::new(),
+            string_table: HashMap::new(),
         };
 
         runtime.init_modules();
