@@ -173,7 +173,7 @@ impl TreewalkInterpreter {
                 }
 
                 if let Some(condition) = first_clause.condition.as_ref() {
-                    if !self.evaluate_expr(condition)?.coerce_to_boolean() {
+                    if !self.evaluate_expr(condition)?.coerce_to_bool() {
                         continue;
                     }
                 }
@@ -265,7 +265,7 @@ impl TreewalkInterpreter {
             let right = self.evaluate_expr(right)?;
             // is cloning really necessary here?
             let result = self.invoke_compare_op(left, op, right.clone())?;
-            if !result.coerce_to_boolean() {
+            if !result.coerce_to_bool() {
                 return Ok(TreewalkValue::Bool(false));
             }
             left = right;
@@ -323,7 +323,7 @@ impl TreewalkInterpreter {
         if_value: &Expr,
         else_value: &Expr,
     ) -> TreewalkResult<TreewalkValue> {
-        if self.evaluate_expr(condition)?.coerce_to_boolean() {
+        if self.evaluate_expr(condition)?.coerce_to_bool() {
             self.evaluate_expr(if_value)
         } else {
             self.evaluate_expr(else_value)

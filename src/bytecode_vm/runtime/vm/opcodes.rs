@@ -503,19 +503,14 @@ impl VirtualMachine {
             Opcode::ImportName(index) => {
                 let name = self.resolve_name(index).to_owned();
                 let module_name = ModuleName::from_dotted(&name);
-                let inner_module = step_raised!(self.read_or_load_module(&module_name));
-                let type_ = self.runtime.borrow().builtin_types.module;
-                let inner_module_ref = self.new_object(type_, VmValue::Module(inner_module));
-
+                let inner_module_ref = step_raised!(self.read_or_load_module(&module_name));
                 let outer_module_ref = build_module_chain(self, &module_name, inner_module_ref);
                 self.push(outer_module_ref);
             }
             Opcode::ImportFrom(index) => {
                 let name = self.resolve_name(index).to_owned();
                 let module_name = ModuleName::from_dotted(&name);
-                let inner_module = step_raised!(self.read_or_load_module(&module_name));
-                let type_ = self.runtime.borrow().builtin_types.module;
-                let inner_module_ref = self.new_object(type_, VmValue::Module(inner_module));
+                let inner_module_ref = step_raised!(self.read_or_load_module(&module_name));
                 self.push(inner_module_ref);
             }
             Opcode::PushExcInfo => {

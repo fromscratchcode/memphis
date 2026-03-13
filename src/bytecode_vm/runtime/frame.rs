@@ -3,12 +3,8 @@ use std::collections::HashMap;
 use crate::{
     bytecode_vm::{
         compiler::Opcode,
-        runtime::{
-            types::{FunctionObject, Module},
-            Reference,
-        },
+        runtime::{types::FunctionObject, Reference},
     },
-    core::Container,
     domain::{DebugStackFrame, ToDebugStackFrame},
 };
 
@@ -27,7 +23,7 @@ pub struct Frame {
     pub function: FunctionObject,
 
     /// We must associate this Frame with its Module in order to read and write global variables.
-    pub module: Container<Module>,
+    pub module: Reference,
 
     /// The program counter indicating the current point of execution for the immutable block of
     /// bytecode held by this [`Frame`].
@@ -44,7 +40,7 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(function: FunctionObject, args: Vec<Reference>, module: Container<Module>) -> Self {
+    pub fn new(function: FunctionObject, args: Vec<Reference>, module: Reference) -> Self {
         Frame {
             function,
             pc: 0,

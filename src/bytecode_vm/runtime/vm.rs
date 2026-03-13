@@ -98,11 +98,7 @@ impl VirtualMachine {
         r
     }
 
-    fn current_module(&self) -> Container<Module> {
-        self.current_frame().module.clone()
-    }
-
-    pub fn read_module(&self, name: &ModuleName) -> Container<Module> {
+    pub fn read_module(&self, name: &ModuleName) -> Reference {
         if let Some(module) = self.runtime.borrow().read_module(name) {
             module
         } else {
@@ -111,7 +107,7 @@ impl VirtualMachine {
     }
 
     /// Check if the module is already present (e.g. Rust-backed or previously imported).
-    pub fn read_or_load_module(&mut self, module_name: &ModuleName) -> VmResult<Container<Module>> {
+    pub fn read_or_load_module(&mut self, module_name: &ModuleName) -> VmResult<Reference> {
         if let Some(module) = self.runtime.borrow().read_module(module_name) {
             return Ok(module);
         }
@@ -119,7 +115,7 @@ impl VirtualMachine {
         self.import_from_source(module_name)
     }
 
-    fn import_from_source(&mut self, module_name: &ModuleName) -> VmResult<Container<Module>> {
+    fn import_from_source(&mut self, module_name: &ModuleName) -> VmResult<Reference> {
         let (resolved, source) = self
             .state
             .load_source(module_name)
@@ -129,7 +125,10 @@ impl VirtualMachine {
             })
             .raise(self)?;
 
-        let module = self.runtime.borrow_mut().create_module(module_name);
+        let module_ref = self
+            .runtime
+            .borrow_mut()
+            .alloc_module(Module::new(module_name.clone()));
 
         let mut context = VmContext::from_state(
             resolved.name.clone(),
@@ -141,7 +140,7 @@ impl VirtualMachine {
 
         context.eval_inner(source.text().clone())?;
 
-        Ok(module)
+        Ok(module_ref)
     }
 
     fn current_frame(&self) -> &Frame {
@@ -198,7 +197,9 @@ impl VirtualMachine {
 
     fn store_global(&mut self, index: NonlocalIndex, value: Reference) {
         let name = self.resolve_name(index);
-        self.current_module().borrow_mut().write(name, value);
+        self.deref_module(self.current_frame().module)
+            .borrow_mut()
+            .write(name, value);
     }
 
     fn store_local(&mut self, index: LocalIndex, value: Reference) {
@@ -221,12 +222,16 @@ impl VirtualMachine {
     fn load_global(&mut self, index: NonlocalIndex) -> DomainResult<Reference> {
         let name = self.resolve_name(index).to_owned();
 
-        if let Some(val) = self.current_module().borrow().read(&name) {
+        if let Some(val) = self
+            .deref_module(self.current_frame().module)
+            .borrow()
+            .read(&name)
+        {
             return Ok(val);
         }
 
-        let builtins = self.read_module(&ModuleName::from_segments(&[Dunder::Builtins]));
-        if let Some(val) = builtins.borrow().read(&name) {
+        let builtins_ref = self.read_module(&ModuleName::from_segments(&[Dunder::Builtins]));
+        if let Some(val) = self.deref_module(builtins_ref).borrow().read(&name) {
             return Ok(val);
         }
 
@@ -296,6 +301,13 @@ impl VirtualMachine {
         self.deref_object(reference).payload
     }
 
+    pub fn deref_module(&self, reference: Reference) -> Container<Module> {
+        self.deref(reference)
+            .as_module()
+            .expect("Expected module")
+            .clone()
+    }
+
     pub fn deref_object(&self, reference: Reference) -> HeapObject {
         self.runtime
             .borrow()
@@ -303,11 +315,6 @@ impl VirtualMachine {
             .get(reference)
             .cloned()
             .expect("Invalid object reference in heap")
-    }
-
-    pub fn new_object(&mut self, class: Reference, payload: VmValue) -> Reference {
-        let obj = HeapObject::new(class, payload);
-        self.heapify(obj)
     }
 
     pub fn type_name(&self, obj: &VmValue) -> String {
@@ -461,34 +468,16 @@ impl VirtualMachine {
         }
     }
 
-    pub fn heapify(&mut self, value: HeapObject) -> Reference {
-        match value.payload {
-            // This case is only needed when we receive a generic `VmValue`, i.e. loading a
-            // constant. For cases where we know we have a boolean, it is preferred to use
-            // `to_heapified_bool` directly.
-            VmValue::Bool(bool_val) => self.to_heapified_bool(bool_val),
-            _ => self.runtime.borrow_mut().heap.allocate(value),
-        }
+    pub fn new_object(&mut self, class: Reference, payload: VmValue) -> Reference {
+        self.runtime.borrow_mut().new_object(class, payload)
+    }
+
+    pub fn to_heapified_bool(&self, value: bool) -> Reference {
+        self.runtime.borrow().to_heapified_bool(value)
     }
 
     pub fn none(&self) -> Reference {
         self.runtime.borrow().builtin_instances.none
-    }
-
-    pub fn true_(&self) -> Reference {
-        self.runtime.borrow().builtin_instances.true_obj
-    }
-
-    pub fn false_(&self) -> Reference {
-        self.runtime.borrow().builtin_instances.false_obj
-    }
-
-    pub fn to_heapified_bool(&self, value: bool) -> Reference {
-        if value {
-            self.true_()
-        } else {
-            self.false_()
-        }
     }
 
     /// Dereferences the top value on the stack.
@@ -803,8 +792,8 @@ impl VirtualMachine {
     }
 
     pub fn frame_for_function(&self, function: FunctionObject, args: Vec<Reference>) -> Frame {
-        let module = self.read_module(&function.code_object.module_name);
-        Frame::new(function, args, module)
+        let module_ref = self.read_module(&function.code_object.module_name);
+        Frame::new(function, args, module_ref)
     }
 
     pub fn frame_for_method(&self, method: Method, args: Vec<Reference>) -> Frame {

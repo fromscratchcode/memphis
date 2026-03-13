@@ -118,7 +118,7 @@ impl TreewalkInterpreter {
     }
 
     fn evaluate_assert(&self, expr: &Expr) -> TreewalkResult<()> {
-        if self.evaluate_expr(expr)?.coerce_to_boolean() {
+        if self.evaluate_expr(expr)?.coerce_to_bool() {
             Ok(())
         } else {
             Exception::assertion_error().raise(self)
@@ -312,14 +312,14 @@ impl TreewalkInterpreter {
         else_part: &Option<Ast>,
     ) -> TreewalkResult<()> {
         let if_condition_result = self.evaluate_expr(&if_part.condition)?;
-        if if_condition_result.coerce_to_boolean() {
+        if if_condition_result.coerce_to_bool() {
             self.execute_ast(&if_part.ast)?;
             return Ok(());
         }
 
         for elif_part in elif_parts {
             let elif_condition_result = self.evaluate_expr(&elif_part.condition)?;
-            if elif_condition_result.coerce_to_boolean() {
+            if elif_condition_result.coerce_to_bool() {
                 self.execute_ast(&elif_part.ast)?;
                 return Ok(());
             }
@@ -334,7 +334,7 @@ impl TreewalkInterpreter {
     }
 
     fn evaluate_while_loop(&self, cond_ast: &ConditionalAst) -> TreewalkResult<()> {
-        while self.evaluate_expr(&cond_ast.condition)?.coerce_to_boolean() {
+        while self.evaluate_expr(&cond_ast.condition)?.coerce_to_bool() {
             match self.execute_ast(&cond_ast.ast) {
                 Err(TreewalkDisruption::Signal(TreewalkSignal::Break)) => {
                     break;

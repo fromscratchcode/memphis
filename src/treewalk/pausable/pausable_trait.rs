@@ -99,7 +99,7 @@ pub trait Pausable {
             StatementKind::WhileLoop(cond_ast) => {
                 if interpreter
                     .evaluate_expr(&cond_ast.condition)?
-                    .coerce_to_boolean()
+                    .coerce_to_bool()
                 {
                     self.context_mut().push(PausableFrame::new(
                         Frame::new(cond_ast.ast.clone()),
@@ -116,7 +116,7 @@ pub trait Pausable {
             } => {
                 if interpreter
                     .evaluate_expr(&if_part.condition)?
-                    .coerce_to_boolean()
+                    .coerce_to_bool()
                 {
                     self.context_mut().push(PausableFrame::new(
                         Frame::new(if_part.ast.clone()),
@@ -129,7 +129,7 @@ pub trait Pausable {
                 for elif_part in elif_parts {
                     if interpreter
                         .evaluate_expr(&elif_part.condition)?
-                        .coerce_to_boolean()
+                        .coerce_to_bool()
                     {
                         self.context_mut().push(PausableFrame::new(
                             Frame::new(elif_part.ast.clone()),
@@ -294,7 +294,7 @@ pub trait Pausable {
                     };
 
                     if self.context().current_frame().is_finished()
-                        && interpreter.evaluate_expr(&condition)?.coerce_to_boolean()
+                        && interpreter.evaluate_expr(&condition)?.coerce_to_bool()
                     {
                         self.context_mut().restart_frame();
                     }

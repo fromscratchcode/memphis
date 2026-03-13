@@ -22,6 +22,7 @@ impl_method_provider!(
     [
         AddBuiltin,
         MulBuiltin,
+        LtBuiltin,
         ContainsBuiltin,
         JoinBuiltin,
         SplitBuiltin,
@@ -163,6 +164,8 @@ struct AddBuiltin;
 #[derive(Clone)]
 struct MulBuiltin;
 #[derive(Clone)]
+struct LtBuiltin;
+#[derive(Clone)]
 struct ContainsBuiltin;
 #[derive(Clone)]
 struct JoinBuiltin;
@@ -209,6 +212,24 @@ impl Callable for MulBuiltin {
 
     fn name(&self) -> String {
         Dunder::Mul.into()
+    }
+}
+
+impl Callable for LtBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let a = args
+            .get_self()
+            .raise(interpreter)?
+            .as_str()
+            .raise(interpreter)?;
+        let b = args.get_arg(0).as_str().raise(interpreter)?;
+        Ok(TreewalkValue::Bool(a < b))
+    }
+
+    fn name(&self) -> String {
+        Dunder::Lt.into()
     }
 }
 

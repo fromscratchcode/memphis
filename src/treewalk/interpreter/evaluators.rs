@@ -14,7 +14,7 @@ impl TreewalkInterpreter {
         op: &LogicalOp,
         right: TreewalkValue,
     ) -> TreewalkResult<TreewalkValue> {
-        let left_truthy = left.coerce_to_boolean();
+        let left_truthy = left.coerce_to_bool();
 
         match op {
             LogicalOp::And => {
@@ -130,5 +130,32 @@ impl TreewalkInterpreter {
                 todo!()
             }
         }
+    }
+
+    /// We cannot use Rust's builtin sort methods because our sort can throw an Exception. It can
+    /// run real code!
+    pub fn python_sort(&self, items: &mut [TreewalkValue]) -> TreewalkResult<()> {
+        for i in 1..items.len() {
+            let mut j = i;
+
+            while j > 0 {
+                let left = items[j - 1].clone();
+                let right = items[j].clone();
+
+                if !self.compare_lt(right, left)? {
+                    break;
+                }
+
+                items.swap(j - 1, j);
+                j -= 1;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn compare_lt(&self, left: TreewalkValue, right: TreewalkValue) -> TreewalkResult<bool> {
+        let result = self.invoke_compare_op(left, &CompareOp::LessThan, right)?;
+        Ok(result.coerce_to_bool())
     }
 }

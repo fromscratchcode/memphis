@@ -296,7 +296,7 @@ impl TreewalkValue {
         }
     }
 
-    pub fn coerce_to_boolean(&self) -> bool {
+    pub fn coerce_to_bool(&self) -> bool {
         match self {
             TreewalkValue::Bool(i) => *i,
             TreewalkValue::List(i) => !i.borrow().is_empty(),
@@ -459,7 +459,7 @@ impl TreewalkValue {
     }
 
     pub fn not(&self) -> Self {
-        TreewalkValue::Bool(!self.coerce_to_boolean())
+        TreewalkValue::Bool(!self.coerce_to_bool())
     }
 }
 
