@@ -4,7 +4,10 @@ use crate::{
         Compiler, CompilerError, CompilerResult,
     },
     domain::Identifier,
-    parser::types::{BinOp, CallArgs, Callee, CompareOp, DictOperation, Expr, LogicalOp, UnaryOp},
+    parser::types::{
+        BinOp, CallArgs, Callee, CompareOp, DictOperation, Expr, FStringPart, FormatOption,
+        LogicalOp, UnaryOp,
+    },
 };
 
 impl Compiler {
@@ -47,6 +50,7 @@ impl Compiler {
             Expr::Yield(value) => self.compile_yield(value),
             Expr::YieldFrom(value) => self.compile_yield_from(value),
             Expr::Await(expr) => self.compile_await(expr),
+            Expr::FString(parts) => self.compile_f_string(parts),
             _ => Err(CompilerError::Unsupported(format!(
                 "Expression type: {expr:?}"
             ))),
@@ -265,6 +269,28 @@ impl Compiler {
     fn compile_await(&mut self, expr: &Expr) -> CompilerResult<()> {
         self.compile_expr(expr)?;
         self.emit(Opcode::Await);
+        Ok(())
+    }
+
+    fn compile_f_string(&mut self, parts: &[FStringPart]) -> CompilerResult<()> {
+        for part in parts {
+            match part {
+                FStringPart::String(s) => {
+                    self.compile_string_literal(s);
+                }
+                FStringPart::Expr(expr) => {
+                    if expr.format != FormatOption::Str {
+                        return Err(CompilerError::Unsupported(
+                            "Non-str formats not yet supported in bytecode VM.".to_string(),
+                        ));
+                    }
+                    self.compile_expr(&expr.expr)?;
+                    self.emit(Opcode::Format);
+                }
+            }
+        }
+
+        self.emit(Opcode::BuildString(parts.len()));
         Ok(())
     }
 
@@ -690,6 +716,29 @@ mod tests_bytecode_expr {
                 Opcode::LoadGlobal(Index::new(1)),
                 Opcode::Call(1),
                 Opcode::Call(0),
+            ]
+        );
+    }
+
+    #[test]
+    fn f_strings() {
+        let expr = f_str_list![
+            f_str_str!("hello "),
+            f_str_expr!(var!("x")),
+            f_str_str!(" world "),
+            f_str_expr!(var!("y")),
+        ];
+        let bytecode = compile_expr(expr);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::Format,
+                Opcode::LoadConst(Index::new(1)),
+                Opcode::LoadGlobal(Index::new(1)),
+                Opcode::Format,
+                Opcode::BuildString(4),
             ]
         );
     }

@@ -3,7 +3,7 @@ use crate::{
     domain::{Identifier, MemphisValue},
     parser::types::{
         Ast, BinOp, CallArgs, Callee, CompareOp, DictOperation, Expr, FStringPart, ForClause,
-        LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
+        FormatOption, LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
         protocols::TryEvalFrom,
@@ -364,6 +364,9 @@ impl TreewalkInterpreter {
                     result.push_str(s);
                 }
                 FStringPart::Expr(e) => {
+                    if e.format != FormatOption::Str {
+                        unimplemented!("Non-str format option in treewalk interpreter");
+                    }
                     let r = self.evaluate_expr(&e.expr)?;
                     result.push_str(&MemphisValue::from(r).to_string());
                 }

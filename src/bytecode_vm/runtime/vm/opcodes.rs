@@ -557,6 +557,31 @@ impl VirtualMachine {
                 };
                 return self.raise_step(exc);
             }
+            Opcode::Format => {
+                let val = self.pop();
+                let str_val = self.normalize_vm_ref(val).to_string();
+                let str_ref = self.intern_string(&str_val);
+                self.push(str_ref);
+            }
+            Opcode::BuildString(n) => {
+                let mut parts = Vec::with_capacity(n);
+
+                for _ in 0..n {
+                    parts.push(self.pop());
+                }
+
+                parts.reverse();
+
+                let mut result = String::new();
+                for part in parts {
+                    let part_val = self.deref(part);
+                    let part_str = part_val.as_str().expect("BUILD_STRING expects strings");
+                    result.push_str(part_str);
+                }
+
+                let result_ref = self.intern_string(&result);
+                self.push(result_ref);
+            }
             // This is in an internal error that indicates a jump offset was not properly set
             // by the compiler. This opcode should not leak into the VM.
             Opcode::Placeholder => panic!("Placeholder emitted in bytecode"),

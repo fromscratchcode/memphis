@@ -168,6 +168,12 @@ pub enum Opcode {
     Reraise,
     /// This represents user usage of the "raise" keyword.
     RaiseVarargs(usize),
+    /// Pop a value off the stack, format it as a string, and push the resulting string onto the
+    /// stack.
+    Format,
+    /// Pop the specified number of values off the stack, concatenate them into a string, and push
+    /// the result onto the stack.
+    BuildString(usize),
     /// Used internally to the compiler when constructing jump offsets.
     Placeholder,
 }
@@ -275,6 +281,8 @@ impl Display for Opcode {
             Opcode::PopExcept => write!(f, "POP_EXCEPT"),
             Opcode::Reraise => write!(f, "RERAISE"),
             Opcode::RaiseVarargs(i) => write!(f, "RAISE_VARARGS {i}"),
+            Opcode::Format => write!(f, "FORMAT"),
+            Opcode::BuildString(i) => write!(f, "BUILD_STRING {i}"),
             Opcode::Placeholder => unreachable!(),
         }
     }

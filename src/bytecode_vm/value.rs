@@ -113,6 +113,13 @@ impl VmValue {
         }
     }
 
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            VmValue::Str(i) => Some(i),
+            _ => None,
+        }
+    }
+
     pub fn to_boolean(&self) -> bool {
         match self {
             VmValue::None => false,

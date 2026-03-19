@@ -3292,15 +3292,6 @@ for i in iter([1,2,3]):
     }
 
     #[test]
-    fn f_strings() {
-        let input = r#"
-name = "John"
-f"Hello {name}"
-"#;
-        assert_eval_eq!(input, str!("Hello John"));
-    }
-
-    #[test]
     fn reversed() {
         let input = r#"
 a = reversed([])

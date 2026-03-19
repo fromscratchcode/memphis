@@ -31,7 +31,7 @@
 |Ranges|✅|✅|
 |Generator functions|✅|✅|
 |`yield from`|✅|✅|
-|Index access|✅|🔄|
+|Index access|✅|✅|
 |Slices|✅||
 |Inheritance|✅||
 |Operator overloading|✅||
@@ -48,9 +48,10 @@
 |Comparison operator chaining|✅|✅|
 |Unpacking assignment|✅||
 |Multiple assignment|✅||
-|f-strings (without escape characters)|✅||
+|f-strings (without escape characters)|✅|✅|
 |Class variables, class methods, and static methods|✅||
 |Type hints (without enforcement)|✅||
+|Exception groups|✅||
 |Assignment expressions (`:=`)|||
 |`async with` and `async for`|||
 |Async generators|||

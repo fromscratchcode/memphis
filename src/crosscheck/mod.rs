@@ -4,6 +4,7 @@ mod crosscheck_closures;
 mod crosscheck_compare_op;
 mod crosscheck_control_flow;
 mod crosscheck_expressions;
+mod crosscheck_f_strings;
 mod crosscheck_function_call;
 mod crosscheck_generators;
 mod crosscheck_import;
