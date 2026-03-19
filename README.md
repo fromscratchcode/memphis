@@ -43,7 +43,11 @@ memphis 0.1.0 REPL (engine: treewalk) (Type 'exit()' to quit)
 See [DEVELOPING.md](docs/DEVELOPING.md) for instructions on local development.
 
 ## Contributing
-Obviously there's a lot left to do here. If you want to help or use one of the pieces here to explore your own curiosity in interpreter/compiler development, reach out to us [on Discord](https://discord.com/invite/W3AEHyEh4G).
+Memphis is a personal lab where I explore how Python works under the hood.
+
+The code is open to explore and learn from, but I’m not actively seeking external contributions.
+
+If you’re building something similar or just want to chat, feel free to reach out [on Discord](https://discord.com/invite/W3AEHyEh4G).
 
 ## Disclaimer
 **Important Notice:** This project is currently in active development and is still considered experimental. As such, it is not recommended for use in production environments.
