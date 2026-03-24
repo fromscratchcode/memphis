@@ -19,9 +19,7 @@ jobs:
         # Each feature flag combination. GitHub will run these in parallel because magic.
         features:
           - ""
-          - "stdlib"
           - "repl"
-          - "stdlib repl"
 
     steps:
     - uses: actions/checkout@v4
