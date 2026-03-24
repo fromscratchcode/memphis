@@ -10,7 +10,9 @@ mod crosscheck_generators;
 mod crosscheck_import;
 mod crosscheck_index_access;
 mod crosscheck_method_call;
+mod crosscheck_multiple_return;
 mod crosscheck_unary_expression;
+mod crosscheck_unpacking;
 mod macros;
 mod session;
 

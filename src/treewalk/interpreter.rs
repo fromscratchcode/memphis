@@ -4107,12 +4107,9 @@ f, g = {1, 2}
 
         let input = r#"
 l = [1,2]
-a = (*l,)
+(*l,)
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", tuple![int!(1), int!(2)]);
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
 
         let input = r#"(*5)"#;
         let e = eval_expect_error(input);

@@ -237,8 +237,8 @@ impl VirtualMachine {
                 self.push(bound_attr);
             }
             Opcode::SetAttr(index) => {
-                let value = self.pop();
                 let obj_ref = self.pop();
+                let value = self.pop();
 
                 let name = self.resolve_name(index).to_owned();
                 self.update_fn(obj_ref, |object_value| {
@@ -581,6 +581,40 @@ impl VirtualMachine {
 
                 let result_ref = self.intern_string(&result);
                 self.push(result_ref);
+            }
+            Opcode::UnpackSequence(n) => {
+                let iterable_ref = self.pop();
+                let iter_ref = step_raised!(builtins::iter_internal(self, iterable_ref));
+
+                let mut items = Vec::with_capacity(n);
+                for _ in 0..n {
+                    let next = step_raised!(builtins::next_internal(self, iter_ref));
+
+                    match next {
+                        Some(value) => items.push(value),
+                        None => {
+                            let msg = self.intern_string(&format!(
+                                "not enough values to unpack (expected {}, got {})",
+                                n,
+                                items.len()
+                            ));
+                            let exc = Exception::value_error(msg);
+                            return self.raise_step(exc);
+                        }
+                    }
+                }
+
+                let extra = step_raised!(builtins::next_internal(self, iter_ref));
+                if extra.is_some() {
+                    let msg =
+                        self.intern_string(&format!("too many values to unpack (expected {})", n));
+                    let exc = Exception::value_error(msg);
+                    return self.raise_step(exc);
+                }
+
+                for item in items {
+                    self.push(item);
+                }
             }
             // This is in an internal error that indicates a jump offset was not properly set
             // by the compiler. This opcode should not leak into the VM.

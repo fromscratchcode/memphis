@@ -174,6 +174,7 @@ pub enum Opcode {
     /// Pop the specified number of values off the stack, concatenate them into a string, and push
     /// the result onto the stack.
     BuildString(usize),
+    UnpackSequence(usize),
     /// Used internally to the compiler when constructing jump offsets.
     Placeholder,
 }
@@ -283,6 +284,7 @@ impl Display for Opcode {
             Opcode::RaiseVarargs(i) => write!(f, "RAISE_VARARGS {i}"),
             Opcode::Format => write!(f, "FORMAT"),
             Opcode::BuildString(i) => write!(f, "BUILD_STRING {i}"),
+            Opcode::UnpackSequence(i) => write!(f, "UNPACK_SEQUENCE {i}"),
             Opcode::Placeholder => unreachable!(),
         }
     }

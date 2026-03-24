@@ -68,6 +68,9 @@ impl Compiler {
                 else_block,
                 finally_block,
             } => self.compiler_try_except(try_block, handlers, else_block, finally_block)?,
+            StatementKind::UnpackingAssignment { left, right } => {
+                self.compile_unpacking_assignment(left, right)?
+            }
             _ => {
                 return Err(CompilerError::Unsupported(format!(
                     "Statement type: {stmt:?}"
@@ -79,12 +82,10 @@ impl Compiler {
     }
 
     fn compile_return(&mut self, expr: &[Expr]) -> CompilerResult<()> {
-        if expr.len() > 1 {
-            return Err(CompilerError::Unsupported(
-                "Multiple return values not yet supported in the bytecode VM.".to_string(),
-            ));
-        } else if expr.len() == 1 {
-            self.compile_expr(&expr[0])?;
+        match expr.len() {
+            0 => self.compile_none(),
+            1 => self.compile_expr(&expr[0])?,
+            _ => self.compile_tuple(expr)?,
         }
 
         self.emit(Opcode::ReturnValue);
@@ -104,19 +105,22 @@ impl Compiler {
     }
 
     fn compile_assignment(&mut self, left: &Expr, right: &Expr) -> CompilerResult<()> {
+        self.compile_expr(right)?;
+        self.compile_assignment_lhs(left)?;
+        Ok(())
+    }
+
+    fn compile_assignment_lhs(&mut self, left: &Expr) -> CompilerResult<()> {
         match left {
             Expr::Variable(name) => {
-                self.compile_expr(right)?;
                 self.compile_store(name);
             }
             Expr::MemberAccess { object, field } => {
                 self.compile_expr(object)?;
-                self.compile_expr(right)?;
                 let attr_index = self.get_or_set_nonlocal_index(field.as_str());
                 self.emit(Opcode::SetAttr(attr_index));
             }
             Expr::IndexAccess { object, index } => {
-                self.compile_expr(right)?;
                 self.compile_expr(object)?;
                 self.compile_expr(index)?;
                 self.emit(Opcode::StoreSubscr);
@@ -127,7 +131,6 @@ impl Compiler {
                 ))
             }
         };
-
         Ok(())
     }
 
@@ -496,6 +499,15 @@ impl Compiler {
         Ok(())
     }
 
+    fn compile_unpacking_assignment(&mut self, left: &[Expr], right: &Expr) -> CompilerResult<()> {
+        self.compile_expr(right)?;
+        self.emit(Opcode::UnpackSequence(left.len()));
+        for lhs in left.iter().rev() {
+            self.compile_assignment_lhs(lhs)?;
+        }
+        Ok(())
+    }
+
     /// Load a CodeObject and turn it into a function or closure.
     fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
         let free_vars = code.freevars.clone();
@@ -590,8 +602,8 @@ mod tests_bytecode_stmt {
         assert_eq!(
             bytecode,
             &[
-                Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
+                Opcode::LoadGlobal(Index::new(0)),
                 Opcode::SetAttr(Index::new(1))
             ]
         );
@@ -921,8 +933,10 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::Div,
                 Opcode::PopTop,
-                Opcode::Jump(5),
+                Opcode::Jump(6),
                 Opcode::PushExcInfo,
+                // Const for None
+                Opcode::LoadConst(Index::new(2)),
                 Opcode::ReturnValue,
                 Opcode::PopExcept,
                 Opcode::Jump(1),
@@ -954,5 +968,23 @@ mod tests_bytecode_stmt {
         let stmt = stmt_raise!();
         let bytecode = compile_stmt(stmt);
         assert_eq!(bytecode, &[Opcode::RaiseVarargs(0)]);
+    }
+
+    #[test]
+    fn unpacking_assignment() {
+        let stmt = stmt_unpacking!(vec![var!("a"), var!("b")], tuple![var!("b"), var!("a"),]);
+        let bytecode = compile_stmt(stmt);
+        assert_eq!(
+            bytecode,
+            &[
+                // in this test, because RHS is evaluated first "b" is index 0
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::LoadGlobal(Index::new(1)),
+                Opcode::BuildTuple(2),
+                Opcode::UnpackSequence(2),
+                Opcode::StoreGlobal(Index::new(0)),
+                Opcode::StoreGlobal(Index::new(1)),
+            ]
+        );
     }
 }

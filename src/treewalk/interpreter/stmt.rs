@@ -99,17 +99,16 @@ impl TreewalkInterpreter {
     }
 
     fn evaluate_return(&self, exprs: &[Expr]) -> TreewalkResult<TreewalkValue> {
-        assert!(!exprs.is_empty());
-
         let results = exprs
             .iter()
             .map(|arg| self.evaluate_expr(arg))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let return_val = if results.len() > 1 {
-            TreewalkValue::Tuple(Tuple::new(results))
-        } else {
-            results[0].clone()
+        let return_val = match results.len() {
+            0 => TreewalkValue::None,
+            // Consume the results Vec
+            1 => results.into_iter().next().unwrap(),
+            _ => TreewalkValue::Tuple(Tuple::new(results)),
         };
 
         Err(TreewalkDisruption::Signal(TreewalkSignal::Return(

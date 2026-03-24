@@ -1556,27 +1556,14 @@ def foo(data=None):
     #[test]
     fn unpacking_assignment() {
         let input = r#"
-if True:
-    a, b = b, a
+a, b = b, a
 "#;
-        let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: bool!(true),
-                ast: ast![stmt!(StatementKind::UnpackingAssignment {
-                    left: vec![var!("a"), var!("b")],
-                    right: tuple![var!("b"), var!("a"),],
-                })],
-            },
-            elif_parts: vec![],
-            else_part: None,
-        });
+        let expected_ast =
+            stmt_unpacking!(vec![var!("a"), var!("b")], tuple![var!("b"), var!("a"),]);
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a, = b,";
-        let expected_ast = stmt!(StatementKind::UnpackingAssignment {
-            left: vec![var!("a")],
-            right: tuple![var!("b")],
-        });
+        let expected_ast = stmt_unpacking!(vec![var!("a")], tuple![var!("b")]);
         assert_stmt_eq!(input, expected_ast);
     }
 

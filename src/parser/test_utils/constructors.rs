@@ -181,6 +181,17 @@ macro_rules! stmt_from_import {
     };
 }
 
+macro_rules! stmt_unpacking {
+    ($left:expr, $right:expr) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::UnpackingAssignment {
+                left: $left,
+                right: $right,
+            }
+        )
+    };
+}
+
 macro_rules! bin_op {
     ($left:expr, $op:ident, $right:expr) => {
         $crate::parser::types::Expr::BinaryOperation {
@@ -470,6 +481,7 @@ pub(crate) use stmt_pass;
 pub(crate) use stmt_raise;
 pub(crate) use stmt_reg_import;
 pub(crate) use stmt_return;
+pub(crate) use stmt_unpacking;
 pub(crate) use str;
 pub(crate) use ternary_op;
 pub(crate) use tuple;

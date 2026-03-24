@@ -57,7 +57,7 @@ impl Compiler {
         }
     }
 
-    fn compile_none(&mut self) {
+    pub fn compile_none(&mut self) {
         self.compile_constant(Constant::None);
     }
 
@@ -83,7 +83,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_tuple(&mut self, items: &[Expr]) -> CompilerResult<()> {
+    pub fn compile_tuple(&mut self, items: &[Expr]) -> CompilerResult<()> {
         self.compile_expr_slice(items)?;
         self.emit(Opcode::BuildTuple(items.len()));
         Ok(())

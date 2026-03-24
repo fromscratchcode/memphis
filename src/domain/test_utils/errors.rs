@@ -46,6 +46,54 @@ macro_rules! assert_type_error {
     }};
 }
 
+macro_rules! assert_value_error {
+    ($exc:expr) => {{
+        match &$exc {
+            $crate::domain::MemphisException {
+                kind: $crate::domain::ExceptionKind::ValueError,
+                payload,
+            } => {
+                assert!(
+                    payload.is_empty(),
+                    "Expected ValueError with no message, got payload: {:?}",
+                    payload
+                );
+            }
+            _ => panic!("Expected ValueError, got: {:?}", &$exc),
+        }
+    }};
+    ($exc:expr, $expected_message:expr) => {{
+        match &$exc {
+            $crate::domain::MemphisException {
+                kind: $crate::domain::ExceptionKind::ValueError,
+                payload,
+            } => {
+                assert_eq!(
+                    payload.len(),
+                    1,
+                    "Expected ValueError with one argument, got payload: {:?}",
+                    payload
+                );
+
+                match &payload[0] {
+                    $crate::domain::MemphisValue::Str(s) => {
+                        assert_eq!(
+                            s.as_str(),
+                            $expected_message,
+                            "Unexpected ValueError message"
+                        );
+                    }
+                    other => panic!(
+                        "Expected ValueError message to be a string, got: {:?}",
+                        other
+                    ),
+                }
+            }
+            _ => panic!("Expected ValueError, got: {:?}", &$exc),
+        }
+    }};
+}
+
 macro_rules! assert_index_error {
     ($exc:expr) => {{
         match &$exc {
@@ -357,3 +405,4 @@ pub(crate) use assert_runtime_error;
 pub(crate) use assert_stop_iteration;
 pub(crate) use assert_syntax_error;
 pub(crate) use assert_type_error;
+pub(crate) use assert_value_error;
