@@ -1,10 +1,6 @@
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "stdlib")]
-use super::stdlib::Stdlib;
-
-/// A store of directories searched during each import. This will be seeded with the location
-/// of the Python stdlib present on the host system.
+/// A store of directories searched during each import.
 #[derive(Default)]
 pub struct ImportResolver {
     search_paths: Vec<PathBuf>,
@@ -13,10 +9,8 @@ pub struct ImportResolver {
 impl ImportResolver {
     pub fn new() -> Self {
         Self {
-            #[cfg(feature = "stdlib")]
-            search_paths: Stdlib::load_from_host().paths().to_vec(),
-            #[cfg(not(feature = "stdlib"))]
-            search_paths: vec![],
+            // treat the lib directory as a Memphis-compatible Python stdlib
+            search_paths: vec![PathBuf::from("./lib")],
         }
     }
 

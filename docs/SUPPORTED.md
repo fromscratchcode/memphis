@@ -42,11 +42,10 @@
 |Closures|✅|✅|
 |Decorators|✅|✅|
 |Descriptor protocol|✅||
-|Interface to Python stdlib written in C|✅||
 |Context managers|✅||
 |Compound assignment (`+=`) for integers|✅||
 |Comparison operator chaining|✅|✅|
-|Unpacking assignment|✅||
+|Unpacking assignment|✅|✅|
 |Multiple assignment|✅||
 |f-strings (without escape characters)|✅|✅|
 |Class variables, class methods, and static methods|✅||

@@ -7,16 +7,13 @@ cargo test
 cargo run examples/test.py
 ```
 ## REPL
-The REPL is useful for interactive mode.
+The REPL is useful for interactive mode. It is currently gated behind a feature flag because it pulls in crossterm.
 ```bash
 cargo run --features repl
 ```
 ## Feature Flags
-Feature flags are needed to enable stdlib or REPL support (or the experimental LLVM backend).
+Feature flags are needed to enable REPL support or the experimental LLVM backend.
 ```bash
-# if examples/test.py depends on stdlib features
-cargo run --features stdlib examples/api.py
-
 # script to run all combinations of feature flags
 ./test_features.sh
 ```
