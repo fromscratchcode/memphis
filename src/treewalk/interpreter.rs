@@ -3653,6 +3653,8 @@ c = Foo().make()
     #[test]
     fn new_method() {
         let input = r#"
+# This class shares a single instance under the hood and the __init__ method will only run
+# for the first time.
 class SingletonA:
     _instance = None
     _initialized = False
@@ -3681,6 +3683,8 @@ c = singleton1 is singleton2
         assert_read_eq!(ctx, "c", bool!(true));
 
         let input = r#"
+# This class shares a single instance under the hood, but the __init__ method will run for
+# each instance.
 class SingletonB:
     _instance = None
 
@@ -4700,7 +4704,7 @@ d = c(g)
     }
 
     #[test]
-    fn descriptor_protocol() {
+    fn descriptor_protocol_get() {
         let input = r#"
 class MyDescriptor:
     def __get__(self, instance, owner):
@@ -4713,12 +4717,30 @@ class MyClass:
         self.val = 11
 
 obj = MyClass()
-a = obj.attribute
+obj.attribute
 "#;
+        assert_eval_eq!(input, int!(44));
+    }
 
-        let ctx = run(input);
+    #[test]
+    fn descriptor_protocol_override_nondata() {
+        let input = r#"
+class MyNonDataDescriptor:
+    def __get__(self, instance, _):
+        return 4 * instance.val
 
-        assert_read_eq!(ctx, "a", int!(44));
+class MyClass:
+    non_data = MyNonDataDescriptor()
+
+    def __init__(self):
+        self.val = 11
+
+a = MyClass()
+# Because this is a non-data descriptor, this will remove the descriptor entirely.
+a.non_data = 33
+a.non_data
+"#;
+        assert_eval_eq!(input, int!(33));
     }
 
     #[test]
@@ -5052,5 +5074,39 @@ b = 2; c = 3
         assert_read_eq!(ctx, "c", int!(3));
 
         assert_eval_eq!("a = 10; 4 + a", int!(14));
+    }
+
+    #[test]
+    // These used to be integration tests (ran the binary), but that was unnecessary.
+    fn stdout_tests() {
+        let output = run_script("examples/test.py");
+        assert_eq!(output, include_str!("../../examples/test.stdout"));
+
+        let output = run_script("examples/async/a.py");
+        assert_eq!(output, include_str!("../../examples/async/a.stdout"));
+
+        let output = run_script("examples/async/b.py");
+        assert_eq!(output, include_str!("../../examples/async/b.stdout"));
+
+        let output = run_script("examples/async/c.py");
+        assert_eq!(output, include_str!("../../examples/async/c.stdout"));
+
+        let output = run_script("examples/async/d.py");
+        assert_eq!(output, include_str!("../../examples/async/d.stdout"));
+
+        let output = run_script("examples/async/simple.py");
+        assert_eq!(output, include_str!("../../examples/async/simple.stdout"));
+
+        let output = run_script("examples/exceptions.py");
+        assert_eq!(output, include_str!("../../examples/exceptions.stdout"));
+
+        let output = run_script("examples/context_manager.py");
+        assert_eq!(
+            output,
+            include_str!("../../examples/context_manager.stdout")
+        );
+
+        let output = run_script("examples/builtins.py");
+        assert_eq!(output, include_str!("../../examples/builtins.stdout"));
     }
 }

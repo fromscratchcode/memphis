@@ -36,6 +36,15 @@ pub fn run(text: &str) -> TreewalkContext {
     context
 }
 
+pub fn run_script(path: &str) -> String {
+    let (mut context, text) = init_path(path);
+    context.enable_capture();
+    context
+        .eval_inner(text)
+        .expect("Treewalk evaluation failed");
+    context.take_output().expect("Output not captured")
+}
+
 pub fn run_path(path: &str) -> TreewalkContext {
     let (mut context, text) = init_path(path);
     context

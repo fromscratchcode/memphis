@@ -665,4 +665,14 @@ b, c
         let text = r#"type(type([1]).__name__).__name__"#;
         assert_eval_eq!(text, str!("str"));
     }
+
+    #[test]
+    // These used to be integration tests (ran the binary), but that was unnecessary.
+    fn stdout_tests() {
+        let output = run_script("examples/test_vm.py");
+        assert_eq!(output, include_str!("../../examples/test_vm.stdout"));
+
+        let output = run_script("examples/async/simple.py");
+        assert_eq!(output, include_str!("../../examples/async/simple.stdout"));
+    }
 }

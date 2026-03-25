@@ -1,0 +1,30 @@
+<class 'bool'>
+<class 'bytearray'>
+<built-in function callable>
+<class 'classmethod'>
+<class 'complex'>
+<class 'dict'>
+<class 'frozenset'>
+<built-in function getattr>
+<built-in function globals>
+<class 'int'>
+<built-in function isinstance>
+<built-in function issubclass>
+<built-in function iter>
+<built-in function len>
+<class 'list'>
+<class 'memoryview'>
+<built-in function next>
+<class 'object'>
+<built-in function print>
+<class 'property'>
+<class 'range'>
+<class 'reversed'>
+<class 'set'>
+<class 'slice'>
+<class 'staticmethod'>
+<class 'super'>
+<class 'str'>
+<class 'tuple'>
+<class 'type'>
+<class 'zip'>

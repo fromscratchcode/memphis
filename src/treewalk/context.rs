@@ -69,6 +69,26 @@ impl TreewalkContext {
     }
 
     #[cfg(test)]
+    pub fn enable_capture(&mut self) {
+        self.interpreter
+            .state
+            .memphis_state()
+            .borrow_mut()
+            .io
+            .enable_capture();
+    }
+
+    #[cfg(test)]
+    pub fn take_output(&mut self) -> Option<String> {
+        self.interpreter
+            .state
+            .memphis_state()
+            .borrow_mut()
+            .io
+            .take_output()
+    }
+
+    #[cfg(test)]
     pub fn stdin() -> Self {
         Self::new(ModuleOrigin::Stdin)
     }
