@@ -11,7 +11,7 @@ pub struct ParseContext {
 impl ParseContext {
     pub fn new() -> Self {
         Self {
-            lexer: Lexer::new(),
+            lexer: Lexer::script(),
         }
     }
 

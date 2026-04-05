@@ -13,6 +13,20 @@ impl ParserError {
     pub fn syntax_error(msg: impl Into<String>) -> Self {
         Self::SyntaxError(msg.into())
     }
+
+    pub fn is_unexpected_eof(&self) -> bool {
+        matches!(
+            self,
+            ParserError::UnexpectedToken(Token::Eof) | ParserError::ExpectedToken(_, Token::Eof)
+        )
+    }
+
+    pub fn expected_token_at_eof(&self) -> Option<Token> {
+        match self {
+            ParserError::ExpectedToken(expected, Token::Eof) => Some(expected.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl Display for ParserError {

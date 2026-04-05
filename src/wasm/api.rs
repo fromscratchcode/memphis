@@ -46,7 +46,7 @@ fn actually_compile(text: &str) -> CompilerResult<CodeObject> {
 }
 
 fn actually_lex(text: &str) -> Vec<Token> {
-    let mut l = Lexer::new();
+    let mut l = Lexer::script();
     l.add_text(&Text::new(text));
     l.collect()
 }

@@ -4,19 +4,19 @@ use std::{
 };
 
 use crossterm::{
+    cursor::MoveToColumn,
     event::{self, Event},
-    terminal,
+    execute,
+    terminal::{self, Clear, ClearType},
 };
 
 pub trait TerminalIO {
     fn read_event(&mut self) -> Result<Event, io::Error>;
     fn write<T: Display>(&mut self, output: T) -> io::Result<()>;
     fn writeln<T: Display>(&mut self, output: T) -> io::Result<()>;
+    fn redraw<T: Display>(&mut self, output: T, col: usize) -> io::Result<()>;
     fn enter(&mut self) -> io::Result<()> {
         self.writeln("")
-    }
-    fn is_real_terminal(&self) -> bool {
-        true
     }
 }
 
@@ -37,6 +37,16 @@ impl TerminalIO for CrosstermIO {
     /// Same as `write_output` but with a `\n` char at the end.
     fn writeln<T: Display>(&mut self, output: T) -> io::Result<()> {
         self.write(format!("{output}\n"))
+    }
+
+    fn redraw<T: Display>(&mut self, output: T, col: usize) -> io::Result<()> {
+        // Redraw
+        execute!(io::stdout(), Clear(ClearType::CurrentLine))?;
+        let _ = self.write(output);
+
+        // Position
+        let cursor_col = col as u16;
+        execute!(io::stdout(), MoveToColumn(cursor_col))
     }
 }
 

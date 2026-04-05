@@ -1,6 +1,9 @@
-#[allow(clippy::module_inception)]
-mod repl;
-mod terminal_io;
+#[cfg(any(feature = "repl", feature = "wasm"))]
+pub mod core;
+#[cfg(any(feature = "repl", feature = "wasm"))]
+mod parser;
+#[cfg(feature = "repl")]
+mod terminal;
 
-pub use repl::Repl;
-pub use terminal_io::{CrosstermIO, TerminalIO};
+#[cfg(feature = "repl")]
+pub use terminal::TerminalRepl;

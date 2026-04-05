@@ -35,7 +35,7 @@ impl VmContext {
         runtime: Container<Runtime>,
     ) -> Self {
         Self {
-            lexer: Lexer::new(),
+            lexer: Lexer::script(),
             module_name,
             package,
             path_str: origin.path_str(),

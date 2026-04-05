@@ -3,7 +3,7 @@ use std::process;
 #[cfg(feature = "llvm_backend")]
 use crate::llvm_backend::compile_ast_to_llvm;
 #[cfg(feature = "repl")]
-use crate::repl::Repl;
+use crate::repl::TerminalRepl;
 use crate::{core::memphis_utils, domain::Source, Engine, MemphisContext};
 
 /// The entrypoint to the Memphis executable. Supports script mode or REPL mode.
@@ -32,6 +32,6 @@ impl Memphis {
 
     #[cfg(feature = "repl")]
     pub fn repl(engine: Engine) {
-        Repl::new(engine).start();
+        TerminalRepl::new(engine).start();
     }
 }

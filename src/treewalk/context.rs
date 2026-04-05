@@ -23,7 +23,7 @@ impl TreewalkContext {
 
     pub fn from_state(treewalk_state: Container<TreewalkState>) -> Self {
         Self {
-            lexer: Lexer::new(),
+            lexer: Lexer::script(),
             interpreter: TreewalkInterpreter::new(treewalk_state),
         }
     }

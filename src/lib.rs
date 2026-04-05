@@ -12,7 +12,6 @@ mod lexer;
 mod llvm_backend;
 mod memphis;
 mod parser;
-#[cfg(feature = "repl")]
 mod repl;
 mod runtime;
 mod treewalk;

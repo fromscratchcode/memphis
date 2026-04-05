@@ -1,17 +1,18 @@
-use std::{io, panic, process};
+use std::{panic, process};
 
 use crossterm::{
-    cursor,
     event::{Event, KeyCode, KeyEvent, KeyModifiers},
-    execute,
-    terminal::{self, Clear, ClearType},
+    terminal,
 };
 
 use crate::{
-    domain::{RaisedMemphisError, Text},
-    repl::{CrosstermIO, TerminalIO},
-    Engine, MemphisContext,
+    repl::core::{ReplCore, ReplResult},
+    Engine,
 };
+
+mod io;
+
+use io::{CrosstermIO, TerminalIO};
 
 type ExitCode = i32;
 
@@ -49,28 +50,19 @@ fn install_custom_panic_hook() {
     }));
 }
 
+const INDENT_WIDTH: usize = 4;
+
 /// The Memphis Read-Evaluate-Print-Loop (REPL).
-pub struct Repl {
+pub struct TerminalRepl {
     engine: Engine,
 
-    context: MemphisContext,
-
-    /// `in_block` may need to become a state for a FSM, but a `bool` seems to be working fine for
-    /// now.
-    in_block: bool,
-
-    /// Track any interpreter errors so that we can properly emit an useful exit code.
-    errors: Vec<RaisedMemphisError>,
+    core: ReplCore,
 
     /// The current line being manipulated by the user.
     line: String,
 
     /// The current cursor position on the current line. This _excludes_ the `marker`.
     line_index: usize,
-
-    /// The current statement being constructed. This will consist of the last 1 or more `line`
-    /// values.
-    input: String,
 
     /// A list of all the lines (_not_ statements) recording during this REPL session.
     history: Vec<String>,
@@ -79,16 +71,13 @@ pub struct Repl {
     history_index: Option<usize>,
 }
 
-impl Repl {
+impl TerminalRepl {
     pub fn new(engine: Engine) -> Self {
         Self {
             engine,
-            context: MemphisContext::stdin(engine),
-            in_block: false,
-            errors: Vec::new(),
+            core: ReplCore::new(engine),
             line: String::new(),
             line_index: 0,
-            input: String::new(),
             history: Vec::new(),
             history_index: None,
         }
@@ -108,8 +97,8 @@ impl Repl {
         // expected or unexpected exits!
         install_custom_panic_hook();
         let _ = terminal::enable_raw_mode();
-        self.initialize_prompt(terminal_io);
 
+        self.redraw(terminal_io);
         let exit_code = self.run_inner(terminal_io);
 
         let _ = terminal::disable_raw_mode();
@@ -137,16 +126,17 @@ impl Repl {
         terminal_io: &mut T,
         event: KeyEvent,
     ) -> ReplControl {
-        match (event.code, event.modifiers) {
-            (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+        match (event.modifiers, event.code) {
+            (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                 // CPython emits a `KeyboardInterrupt` here. We could do that and then
                 // probably handle it one level up? That could help for the other
                 // panics as well.
                 let _ = terminal_io.enter();
-                self.initialize_prompt(terminal_io);
+                self.reset_input();
+                self.redraw(terminal_io);
                 return ReplControl::Continue;
             }
-            (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
+            (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
                 let _ = terminal_io.enter();
                 return ReplControl::Exit(0);
             }
@@ -157,28 +147,28 @@ impl Repl {
             KeyCode::Char(c) => {
                 self.line.insert(self.line_index, c);
                 self.line_index += 1;
-                self.redraw_and_position(terminal_io);
             }
             KeyCode::Backspace => {
                 if self.line_index > 0 {
                     self.line_index -= 1;
                     self.line.remove(self.line_index);
-                    self.redraw_and_position(terminal_io);
                 }
             }
             KeyCode::Enter => {
                 self.history.push(self.line.clone());
                 self.history_index = None;
 
+                let line = format!("{}\n", self.line);
+
                 // We must virtually hit Enter before processing the line so any results will be
                 // displayed on the next line.
                 let _ = terminal_io.enter();
-                let control = self.process_line(terminal_io, &self.line.clone());
+                let control = self.process_line(terminal_io, &line);
                 if matches!(control, ReplControl::Exit(_)) {
                     return control;
                 }
 
-                self.initialize_prompt(terminal_io);
+                self.reset_input();
             }
             KeyCode::Up => {
                 if let Some(index) = self.history_index {
@@ -192,7 +182,6 @@ impl Repl {
                 if let Some(index) = self.history_index {
                     self.line = self.history[index].clone();
                     self.line_index = self.line.len();
-                    self.redraw_and_position(terminal_io);
                 }
             }
             KeyCode::Down => {
@@ -211,107 +200,65 @@ impl Repl {
                     }
 
                     self.line_index = self.line.len();
-                    self.redraw_and_position(terminal_io);
                 }
             }
             KeyCode::Right => {
                 if self.line_index < self.line.len() {
                     self.line_index += 1;
-                    self.redraw_and_position(terminal_io);
                 }
             }
             KeyCode::Left => {
                 if self.line_index > 0 {
                     self.line_index -= 1;
-                    self.redraw_and_position(terminal_io);
                 }
             }
             _ => {}
         }
 
+        self.redraw(terminal_io);
         ReplControl::Continue
     }
 
     /// Gives the indicator for the start of the given line, based on whether or not the most
     /// recent line provided by the user completed a statement or not.
     fn prompt(&self) -> &str {
-        match self.in_block {
+        match self.core.is_incomplete() {
             false => ">>> ",
             true => "... ",
         }
     }
 
-    /// Check if the provided input str indicates the end of a statement.
-    fn end_of_statement(&self, input: &str) -> bool {
-        if let Some(last_char) = input.chars().last() {
-            match self.in_block {
-                // The start of blocks always begin with : and a newline
-                false => last_char != ':',
-
-                // The end of blocks are indicated by an empty line
-                true => last_char == '\n',
-            }
-        } else {
-            // empty string
-            true
-        }
-    }
-
     /// Clear the REPL prompt to prepare for user input.
-    fn initialize_prompt<T: TerminalIO>(&mut self, terminal_io: &mut T) {
-        self.line.clear();
-        self.line_index = 0;
-        let _ = terminal_io.write(format!("\r{}", self.prompt()));
+    fn reset_input(&mut self) {
+        self.line = " ".repeat(self.core.indent_level() * INDENT_WIDTH);
+        self.line_index = self.line.len();
     }
 
     /// Clear the current input, redraw it, and align the cursor to the proper column.
-    fn redraw_and_position<T: TerminalIO>(&self, terminal_io: &mut T) {
-        if terminal_io.is_real_terminal() {
-            // Redraw
-            execute!(io::stdout(), Clear(ClearType::CurrentLine)).unwrap();
-            let _ = terminal_io.write(format!("\r{}{}", self.prompt(), self.line));
-
-            // Position
-            let cursor_col = (self.line_index + self.prompt().len()) as u16;
-            execute!(io::stdout(), cursor::MoveToColumn(cursor_col)).unwrap();
-        } else {
-            // Simpler fallback for tests
-            let _ = terminal_io.write(format!("{}{}", self.prompt(), self.line));
-        }
+    fn redraw<T: TerminalIO>(&self, terminal_io: &mut T) {
+        let output = format!("\r{}{}", self.prompt(), self.line);
+        // The cursor position depends on where in the current input we are, not its length.
+        let cursor_col = self.line_index + self.prompt().len();
+        let _ = terminal_io.redraw(output, cursor_col);
     }
 
     /// Append the provided line to the constructed statement and evaluate it.
     fn process_line<T: TerminalIO>(&mut self, terminal_io: &mut T, line: &str) -> ReplControl {
         if line.trim_end() == "exit()" {
-            let code = if self.errors.is_empty() { 0 } else { 1 };
-            return ReplControl::Exit(code);
+            return ReplControl::Exit(0);
         }
 
-        self.input.push_str(line);
+        let output = self.core.input_line(line);
 
-        if self.end_of_statement(line) {
-            let text = Text::new(&self.input);
-            match self.context.eval(text) {
-                Ok(result) => {
-                    if !result.is_none() {
-                        let _ = terminal_io.writeln(&result);
-                    }
-                }
-                Err(err) => {
-                    self.errors.push(err.clone());
-                    let _ = terminal_io.writeln(&err);
-                }
+        match output.result {
+            ReplResult::Ok(val) => {
+                let _ = terminal_io.writeln(val);
             }
-
-            self.input.clear();
-            self.in_block = false;
-        } else {
-            // This wasn't the end of a statement, so add a newline. We could do this in the
-            // handling for `KeyEvent::Enter` above, but that would add complexity to
-            // `end_of_statement`. Trade-offs!
-            self.input.push('\n');
-            self.in_block = true;
-        }
+            ReplResult::Err(err) => {
+                let _ = terminal_io.writeln(err);
+            }
+            ReplResult::None => {}
+        };
 
         ReplControl::Continue
     }
@@ -319,12 +266,12 @@ impl Repl {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Display;
+    use std::{fmt::Display, io};
 
     use super::*;
 
     fn run_inner(engine: Engine, terminal: &mut MockTerminalIO) -> (ExitCode, String) {
-        let exit_code = Repl::new(engine).run_inner(terminal);
+        let exit_code = TerminalRepl::new(engine).run_inner(terminal);
         (exit_code, terminal.return_val())
     }
 
@@ -411,10 +358,6 @@ mod tests {
     }
 
     impl TerminalIO for MockTerminalIO {
-        fn is_real_terminal(&self) -> bool {
-            false
-        }
-
         fn read_event(&mut self) -> Result<Event, io::Error> {
             if self.events.is_empty() {
                 Err(io::Error::new(io::ErrorKind::Other, "No more events"))
@@ -431,8 +374,11 @@ mod tests {
 
         fn writeln<T: Display>(&mut self, output: T) -> io::Result<()> {
             self.write(output)?;
-            self.write("\n")?;
-            Ok(())
+            self.write("\n")
+        }
+
+        fn redraw<T: Display>(&mut self, output: T, _col: usize) -> io::Result<()> {
+            self.write(output)
         }
     }
 
@@ -473,6 +419,17 @@ foo()
 "#;
         let return_val = run(code);
         assert_eq!(return_val, "20");
+    }
+
+    #[test]
+    fn test_multiline_grouping() {
+        let code = r#"
+x = (1 +
+2)
+x
+"#;
+        let return_val = run(code);
+        assert_eq!(return_val, "3");
     }
 
     #[test]
@@ -517,10 +474,26 @@ foo()
     }
 
     #[test]
-    fn test_repl_exit_function_after_error() {
+    fn test_repl_exit_function_ignores_prior_errors() {
         let events = string_to_events("undefined_var\nexit()\n");
         let exit_code = run_and_exit_code(events);
-        assert_eq!(exit_code, 1);
+        assert_eq!(exit_code, 0);
+    }
+
+    #[test]
+    fn test_function_call_with_long_body() {
+        let code = r#"
+def foo():
+    a = 10
+    b = 11
+    c = 12
+    d = 13
+    return a + b + c + d
+
+foo()
+"#;
+        let return_val = run(code);
+        assert_eq!(return_val, "46");
     }
 
     #[test]

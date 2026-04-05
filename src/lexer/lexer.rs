@@ -10,8 +10,17 @@ use crate::{
     lexer::{MultilineString, Token},
 };
 
-#[derive(Default)]
+#[derive(PartialEq)]
+pub enum LexerMode {
+    Script,
+    Interactive,
+}
+
 pub struct Lexer {
+    /// Is the lexer being used in script mode or interactively? This affects block indent/dedent
+    /// handling.
+    mode: LexerMode,
+
     // Tokens we have produced but which have yet to be consumed
     pending_tokens: VecDeque<Token>,
 
@@ -30,6 +39,11 @@ pub struct Lexer {
     /// Internal `Lexer` state indicating whether we are tokenizing an expression between `{..}` in
     /// an f-string.
     in_f_string_expr: bool,
+
+    /// Each element here indicates the number of spaces at the beginning of the column for this
+    /// indentation block. Python does not enforce a particular number of spaces, only that for
+    /// a given indentation, you are consistent with the number of spaces.
+    indentation_stack: Vec<usize>,
 }
 
 impl Iterator for Lexer {
@@ -55,8 +69,24 @@ impl Iterator for Lexer {
 }
 
 impl Lexer {
-    pub fn new() -> Lexer {
-        Lexer::default()
+    pub fn new(mode: LexerMode) -> Lexer {
+        Lexer {
+            mode,
+            indentation_stack: vec![0],
+            pending_tokens: VecDeque::new(),
+            source_lines: VecDeque::new(),
+            multiline_string: None,
+            multiline_context: 0,
+            in_f_string_expr: false,
+        }
+    }
+
+    pub fn interactive() -> Lexer {
+        Lexer::new(LexerMode::Interactive)
+    }
+
+    pub fn script() -> Lexer {
+        Lexer::new(LexerMode::Script)
     }
 
     pub fn add_text(&mut self, text: &Text) {
@@ -79,33 +109,59 @@ impl Lexer {
 
     /// Are we inside a multi-line string or a multi-line context (indicated by {}, (), or []). If
     /// so, our rules for checking and emitting Indent and Dedent tokens are different/disabled.
-    fn check_in_block(&self) -> bool {
+    fn should_emit_indentation_tokens(&self) -> bool {
         self.multiline_context == 0 && self.multiline_string.is_none()
     }
 
-    fn tokenize(&mut self, input: &str) {
-        // Each element here indicates the number of spaces at the beginning of the column for this
-        // indentation block. Python does not enforce a particular number of spaces, only that for
-        // a given indentation, you are consistent with the number of spaces.
-        let mut indentation_stack = vec![0];
+    fn in_indented_block(&self) -> bool {
+        self.indentation_stack.len() > 1
+    }
 
+    fn flush_dedents(&mut self) {
+        while self.in_indented_block() {
+            self.dedent();
+        }
+    }
+
+    fn dedent(&mut self) {
+        self.indentation_stack.pop();
+        self.pending_tokens.push_back(Token::Dedent);
+    }
+
+    fn indent(&mut self, num_spaces: usize) {
+        self.indentation_stack.push(num_spaces);
+        self.pending_tokens.push_back(Token::Indent);
+    }
+
+    fn current_indent(&self) -> usize {
+        *self
+            .indentation_stack
+            .last()
+            .expect("Invalid indentation stack")
+    }
+
+    pub fn num_indents(&self) -> usize {
+        self.indentation_stack.len() - 1
+    }
+
+    fn tokenize(&mut self, input: &str) {
         for line in input.lines() {
-            if line.is_empty() {
+            if line.trim().is_empty() {
+                if self.mode == LexerMode::Interactive && self.in_indented_block() {
+                    self.flush_dedents();
+                }
+
                 self.emit_newline();
                 continue;
             }
 
-            let num_spaces = count_leading_spaces(line);
-
-            if self.check_in_block() {
-                if num_spaces > *indentation_stack.last().expect("Invalid indentation stack") {
-                    indentation_stack.push(num_spaces);
-                    self.pending_tokens.push_back(Token::Indent);
+            if self.should_emit_indentation_tokens() {
+                let num_spaces = count_leading_spaces(line);
+                if num_spaces > self.current_indent() {
+                    self.indent(num_spaces);
                 } else {
-                    while num_spaces < *indentation_stack.last().expect("Invalid indentation stack")
-                    {
-                        indentation_stack.pop();
-                        self.pending_tokens.push_back(Token::Dedent);
+                    while num_spaces < self.current_indent() {
+                        self.dedent();
                     }
                 }
             }
@@ -114,9 +170,8 @@ impl Lexer {
             self.emit_newline();
         }
 
-        while indentation_stack.len() > 1 {
-            indentation_stack.pop();
-            self.pending_tokens.push_back(Token::Dedent);
+        if self.mode == LexerMode::Script {
+            self.flush_dedents();
         }
     }
 
@@ -575,14 +630,14 @@ mod tests {
     fn tokenize(input: &str) -> Vec<Token> {
         let trimmed = input.trim_matches('\n');
 
-        let mut lexer = Lexer::default();
+        let mut lexer = Lexer::script();
         lexer.add_text(&Text::new(trimmed));
         lexer.collect()
     }
 
     macro_rules! tokenize_incremental {
         ( $( $line:expr ),* ) => {{
-            let mut lexer = Lexer::default();
+            let mut lexer = Lexer::interactive();
             $(
                 lexer.add_text(&Text::new($line));
             )*
@@ -591,7 +646,7 @@ mod tests {
     }
 
     #[test]
-    fn incremental_tokenizing() {
+    fn interactive_mode_no_empty_line() {
         let first = r#"
 def add(x, y):
 "#;
@@ -621,7 +676,45 @@ def add(x, y):
                 Token::Plus,
                 Token::Identifier(ident("y")),
                 Token::Newline,
+            ]
+        );
+    }
+
+    #[test]
+    fn interactive_mode_empty_line_emits_dedent() {
+        let first = r#"
+def add(x, y):
+"#;
+        let second = r#"
+    return x + y
+"#;
+        let third = r#"
+"#;
+
+        let tokens = tokenize_incremental![first, second, third];
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Newline,
+                Token::Def,
+                Token::Identifier(ident("add")),
+                Token::LParen,
+                Token::Identifier(ident("x")),
+                Token::Comma,
+                Token::Identifier(ident("y")),
+                Token::RParen,
+                Token::Colon,
+                Token::Newline,
+                Token::Newline,
+                Token::Indent,
+                Token::Return,
+                Token::Identifier(ident("x")),
+                Token::Plus,
+                Token::Identifier(ident("y")),
+                Token::Newline,
                 Token::Dedent,
+                Token::Newline,
             ]
         );
     }

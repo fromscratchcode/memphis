@@ -120,14 +120,13 @@ impl Display for MemphisException {
                     write!(f, "object has no attribute")
                 }
             },
-            ExceptionKind::SyntaxError | ExceptionKind::TypeError | ExceptionKind::ImportError => {
+            _ => {
                 if let Some(MemphisValue::Str(msg)) = self.payload.first() {
                     write!(f, "{}", msg)
                 } else {
                     Ok(())
                 }
             }
-            _ => todo!(),
         }
     }
 }

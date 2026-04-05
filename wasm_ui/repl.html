@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>Memphis WASM REPL</title>
+</head>
+
+<body>
+  <h3>Memphis WASM REPL</h3>
+
+  <pre id="output"></pre>
+
+  <input id="input" placeholder="Type code and press Enter" style="width: 400px;" />
+
+  <script type="module">
+    import init, {WasmRepl} from "./pkg/memphis.js"; // adjust if needed
+
+    const outputEl = document.getElementById("output");
+    const inputEl = document.getElementById("input");
+
+    await init();
+
+    const repl = new WasmRepl();
+
+    function print(line) {
+      outputEl.textContent += line + "\n";
+    }
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const line = inputEl.value;
+        inputEl.value = "";
+
+        const res = repl.input_line(line + "\n");
+
+        // print input
+        print(">>> " + line);
+
+        // print response (next line only)
+        if (res.result.type === "Ok" || res.result.type === "Err") {
+          print(res.result.value);
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>
