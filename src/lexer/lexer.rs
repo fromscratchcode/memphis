@@ -81,12 +81,18 @@ impl Lexer {
         }
     }
 
+    pub fn script() -> Lexer {
+        Lexer::new(LexerMode::Script)
+    }
+
+    #[cfg(any(test, feature = "repl"))]
     pub fn interactive() -> Lexer {
         Lexer::new(LexerMode::Interactive)
     }
 
-    pub fn script() -> Lexer {
-        Lexer::new(LexerMode::Script)
+    #[cfg(feature = "repl")]
+    pub fn num_indents(&self) -> usize {
+        self.indentation_stack.len() - 1
     }
 
     pub fn add_text(&mut self, text: &Text) {
@@ -138,10 +144,6 @@ impl Lexer {
             .indentation_stack
             .last()
             .expect("Invalid indentation stack")
-    }
-
-    pub fn num_indents(&self) -> usize {
-        self.indentation_stack.len() - 1
     }
 
     fn tokenize(&mut self, input: &str) {

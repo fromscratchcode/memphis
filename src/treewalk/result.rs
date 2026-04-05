@@ -41,7 +41,7 @@ pub trait Raise<T> {
 impl<T> Raise<T> for DomainResult<T> {
     /// Convert an `ExecutionError` into a raised runtime error
     fn raise(self, interpreter: &TreewalkInterpreter) -> TreewalkResult<T> {
-        self.map_err(|kind| interpreter.raise(kind))
+        self.map_err(|kind| interpreter.raise_and_disrupt(kind))
     }
 }
 
@@ -49,6 +49,6 @@ impl<T> Raise<T> for Exception {
     /// Raise this `ExecutionError` in the given interpreter, returning it as a
     /// `TreewalkResult<T>`.
     fn raise(self, interpreter: &TreewalkInterpreter) -> TreewalkResult<T> {
-        Err(interpreter.raise(self))
+        Err(interpreter.raise_and_disrupt(self))
     }
 }

@@ -42,12 +42,6 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    pub fn consume_statement_separators(&mut self) {
-        while self.is_statement_separator() {
-            self.consume_current();
-        }
-    }
-
     pub fn consume_newlines(&mut self) {
         while self.current_token() == &Token::Newline {
             self.consume_current();

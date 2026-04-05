@@ -6,7 +6,10 @@ use crate::{
     lexer::Lexer,
     parser::Parser,
     runtime::MemphisState,
-    treewalk::{types::Module, RaisedException, TreewalkInterpreter, TreewalkState, TreewalkValue},
+    treewalk::{
+        types::{Exception, Module},
+        RaisedException, TreewalkInterpreter, TreewalkState, TreewalkValue,
+    },
     Interpreter,
 };
 
@@ -40,7 +43,11 @@ impl TreewalkContext {
         } = self;
 
         let mut parser = Parser::new(lexer);
-        interpreter.execute(&mut parser)
+        let ast = parser
+            .parse()
+            .map_err(|e| interpreter.raise(Exception::syntax_error(e.to_string())))?;
+
+        interpreter.execute(ast)
     }
 
     fn add_text(&mut self, line: Text) {

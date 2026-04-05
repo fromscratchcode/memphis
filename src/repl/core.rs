@@ -10,7 +10,9 @@ pub enum ReplResult {
 #[derive(Debug)]
 pub struct ReplOutput {
     pub result: ReplResult,
+    #[allow(unused)]
     pub is_complete: bool,
+    #[allow(unused)]
     pub indent_level: usize,
 }
 

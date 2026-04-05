@@ -1,7 +1,7 @@
 use crate::{
     core::Container,
     domain::ModuleName,
-    parser::{types::Ast, Parser},
+    parser::types::Ast,
     runtime::MemphisState,
     treewalk::{
         types::{Exception, Module},
@@ -48,12 +48,12 @@ impl TreewalkInterpreter {
         f(executor)
     }
 
-    pub fn raise(&self, error: Exception) -> TreewalkDisruption {
-        self.state.save_line_number();
-        TreewalkDisruption::Error(RaisedException::new(self.state.debug_call_stack(), error))
+    pub fn raise_and_disrupt(&self, error: Exception) -> TreewalkDisruption {
+        let raised = self.raise(error);
+        TreewalkDisruption::Error(raised)
     }
 
-    fn raise_at_boundary(&self, error: Exception) -> RaisedException {
+    pub fn raise(&self, error: Exception) -> RaisedException {
         self.state.save_line_number();
         RaisedException::new(self.state.debug_call_stack(), error)
     }
@@ -63,25 +63,12 @@ impl TreewalkInterpreter {
             .try_fold(TreewalkValue::None, |_, stmt| self.evaluate_statement(stmt))
     }
 
-    pub fn execute(&mut self, parser: &mut Parser) -> Result<TreewalkValue, RaisedException> {
-        parser.consume_newlines();
-
-        let mut result = TreewalkValue::None;
-        while !parser.is_finished() {
-            let stmt = parser
-                .parse_statement()
-                .map_err(|e| self.raise_at_boundary(Exception::syntax_error(e.to_string())))?;
-            result = match self.evaluate_statement(&stmt) {
-                Ok(result) => result,
-                Err(TreewalkDisruption::Error(e)) => return Err(e),
-                Err(TreewalkDisruption::Signal(_)) => {
-                    return Err(self.raise_at_boundary(Exception::runtime_error()))
-                }
-            };
-            parser.consume_statement_separators();
+    pub fn execute(&mut self, ast: Ast) -> Result<TreewalkValue, RaisedException> {
+        match self.execute_ast(&ast) {
+            Ok(result) => Ok(result),
+            Err(TreewalkDisruption::Error(e)) => Err(e),
+            Err(TreewalkDisruption::Signal(_)) => Err(self.raise(Exception::runtime_error())),
         }
-
-        Ok(result)
     }
 }
 
