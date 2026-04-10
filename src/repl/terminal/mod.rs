@@ -132,6 +132,7 @@ impl TerminalRepl {
                 // probably handle it one level up? That could help for the other
                 // panics as well.
                 let _ = terminal_io.enter();
+                self.core.reset();
                 self.reset_input();
                 self.redraw(terminal_io);
                 return ReplControl::Continue;

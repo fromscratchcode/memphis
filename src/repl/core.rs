@@ -34,6 +34,11 @@ impl ReplCore {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.input.clear();
+        self.parser = ReplParser::new();
+    }
+
     pub fn input_line(&mut self, line: &str) -> ReplOutput {
         self.input.push_str(line);
 
