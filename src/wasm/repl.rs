@@ -2,12 +2,12 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    repl::core::{ReplCore, ReplResult},
+    repl::core::{ReplCore, ReplResult, ReplStep},
     Engine,
 };
 
 #[derive(Serialize)]
-#[serde(tag = "type", content = "value")]
+#[serde(tag = "type", content = "data", rename_all = "lowercase")]
 pub enum WasmReplResult {
     None,
     Ok(String),
@@ -25,10 +25,19 @@ impl From<ReplResult> for WasmReplResult {
 }
 
 #[derive(Serialize)]
-pub struct WasmReplOutput {
-    is_complete: bool,
-    indent_level: usize,
-    result: WasmReplResult,
+#[serde(tag = "type", content = "data", rename_all = "lowercase")]
+pub enum WasmReplStep {
+    Complete(WasmReplResult),
+    Incomplete(usize),
+}
+
+impl From<ReplStep> for WasmReplStep {
+    fn from(value: ReplStep) -> Self {
+        match value {
+            ReplStep::Complete { result } => WasmReplStep::Complete(result.into()),
+            ReplStep::Incomplete { indent } => WasmReplStep::Incomplete(indent),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -48,11 +57,7 @@ impl WasmRepl {
     #[wasm_bindgen]
     pub fn input_line(&mut self, line: &str) -> JsValue {
         let result = self.core.input_line(line);
-        let output = WasmReplOutput {
-            result: result.result.into(),
-            is_complete: result.is_complete,
-            indent_level: result.indent_level,
-        };
+        let output: WasmReplStep = result.into();
         serde_wasm_bindgen::to_value(&output).expect("Bad WasmReplOutput")
     }
 }
