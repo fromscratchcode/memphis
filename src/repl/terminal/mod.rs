@@ -6,7 +6,7 @@ use crossterm::{
 };
 
 use crate::{
-    repl::core::{ReplCore, ReplResult},
+    repl::core::{ReplCore, ReplResult, ReplStep},
     Engine,
 };
 
@@ -58,6 +58,8 @@ pub struct TerminalRepl {
 
     core: ReplCore,
 
+    last_step: ReplStep,
+
     /// The current line being manipulated by the user.
     line: String,
 
@@ -76,6 +78,7 @@ impl TerminalRepl {
         Self {
             engine,
             core: ReplCore::new(engine),
+            last_step: ReplStep::initial(),
             line: String::new(),
             line_index: 0,
             history: Vec::new(),
@@ -132,7 +135,10 @@ impl TerminalRepl {
                 // probably handle it one level up? That could help for the other
                 // panics as well.
                 let _ = terminal_io.enter();
+
                 self.core.reset();
+                self.last_step = ReplStep::initial();
+
                 self.reset_input();
                 self.redraw(terminal_io);
                 return ReplControl::Continue;
@@ -223,15 +229,15 @@ impl TerminalRepl {
     /// Gives the indicator for the start of the given line, based on whether or not the most
     /// recent line provided by the user completed a statement or not.
     fn prompt(&self) -> &str {
-        match self.core.is_incomplete() {
-            false => ">>> ",
-            true => "... ",
+        match self.last_step.is_complete() {
+            true => ">>> ",
+            false => "... ",
         }
     }
 
     /// Clear the REPL prompt to prepare for user input.
     fn reset_input(&mut self) {
-        self.line = " ".repeat(self.core.indent_level() * INDENT_WIDTH);
+        self.line = " ".repeat(self.last_step.indent_level() * INDENT_WIDTH);
         self.line_index = self.line.len();
     }
 
@@ -249,16 +255,19 @@ impl TerminalRepl {
             return ReplControl::Exit(0);
         }
 
-        let output = self.core.input_line(line);
+        self.last_step = self.core.input_line(line);
 
-        match output.result {
-            ReplResult::Ok(val) => {
-                let _ = terminal_io.writeln(val);
-            }
-            ReplResult::Err(err) => {
-                let _ = terminal_io.writeln(err);
-            }
-            ReplResult::None => {}
+        match &self.last_step {
+            ReplStep::Complete { result } => match result {
+                ReplResult::Ok(val) => {
+                    let _ = terminal_io.writeln(val);
+                }
+                ReplResult::Err(err) => {
+                    let _ = terminal_io.writeln(err);
+                }
+                ReplResult::None => {}
+            },
+            ReplStep::Incomplete { .. } => {}
         };
 
         ReplControl::Continue
