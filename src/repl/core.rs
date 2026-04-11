@@ -29,6 +29,13 @@ impl ReplStep {
     pub fn is_complete(&self) -> bool {
         matches!(self, ReplStep::Complete { .. })
     }
+
+    pub fn output(&self) -> Option<&ReplResult> {
+        match self {
+            ReplStep::Complete { result } => Some(result),
+            ReplStep::Incomplete { .. } => None,
+        }
+    }
 }
 
 pub struct ReplCore {

@@ -255,10 +255,10 @@ impl TerminalRepl {
             return ReplControl::Exit(0);
         }
 
-        self.last_step = self.core.input_line(line);
+        let step = self.core.input_line(line);
 
-        match &self.last_step {
-            ReplStep::Complete { result } => match result {
+        if let Some(result) = step.output() {
+            match result {
                 ReplResult::Ok(val) => {
                     let _ = terminal_io.writeln(val);
                 }
@@ -266,10 +266,10 @@ impl TerminalRepl {
                     let _ = terminal_io.writeln(err);
                 }
                 ReplResult::None => {}
-            },
-            ReplStep::Incomplete { .. } => {}
-        };
+            }
+        }
 
+        self.last_step = step;
         ReplControl::Continue
     }
 }
