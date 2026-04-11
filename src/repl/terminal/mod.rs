@@ -63,8 +63,8 @@ pub struct TerminalRepl {
     /// The current line being manipulated by the user.
     line: String,
 
-    /// The current cursor position on the current line. This _excludes_ the `marker`.
-    line_index: usize,
+    /// The current cursor position on the current line. This _excludes_ the prompt.
+    cursor_index: usize,
 
     /// A list of all the lines (_not_ statements) recording during this REPL session.
     history: Vec<String>,
@@ -80,7 +80,7 @@ impl TerminalRepl {
             core: ReplCore::new(engine),
             last_step: ReplStep::initial(),
             line: String::new(),
-            line_index: 0,
+            cursor_index: 0,
             history: Vec::new(),
             history_index: None,
         }
@@ -152,13 +152,13 @@ impl TerminalRepl {
 
         match event.code {
             KeyCode::Char(c) => {
-                self.line.insert(self.line_index, c);
-                self.line_index += 1;
+                self.line.insert(self.cursor_index, c);
+                self.cursor_index += 1;
             }
             KeyCode::Backspace => {
-                if self.line_index > 0 {
-                    self.line_index -= 1;
-                    self.line.remove(self.line_index);
+                if self.cursor_index > 0 {
+                    self.cursor_index -= 1;
+                    self.line.remove(self.cursor_index);
                 }
             }
             KeyCode::Enter => {
@@ -188,7 +188,7 @@ impl TerminalRepl {
 
                 if let Some(index) = self.history_index {
                     self.line = self.history[index].clone();
-                    self.line_index = self.line.len();
+                    self.cursor_index = self.line.len();
                 }
             }
             KeyCode::Down => {
@@ -206,17 +206,17 @@ impl TerminalRepl {
                         self.line.clear();
                     }
 
-                    self.line_index = self.line.len();
+                    self.cursor_index = self.line.len();
                 }
             }
             KeyCode::Right => {
-                if self.line_index < self.line.len() {
-                    self.line_index += 1;
+                if self.cursor_index < self.line.len() {
+                    self.cursor_index += 1;
                 }
             }
             KeyCode::Left => {
-                if self.line_index > 0 {
-                    self.line_index -= 1;
+                if self.cursor_index > 0 {
+                    self.cursor_index -= 1;
                 }
             }
             _ => {}
@@ -238,14 +238,14 @@ impl TerminalRepl {
     /// Clear the REPL prompt to prepare for user input.
     fn reset_input(&mut self) {
         self.line = " ".repeat(self.last_step.indent_level() * INDENT_WIDTH);
-        self.line_index = self.line.len();
+        self.cursor_index = self.line.len();
     }
 
     /// Clear the current input, redraw it, and align the cursor to the proper column.
     fn redraw<T: TerminalIO>(&self, terminal_io: &mut T) {
         let output = format!("\r{}{}", self.prompt(), self.line);
         // The cursor position depends on where in the current input we are, not its length.
-        let cursor_col = self.line_index + self.prompt().len();
+        let cursor_col = self.cursor_index + self.prompt().len();
         let _ = terminal_io.redraw(output, cursor_col);
     }
 

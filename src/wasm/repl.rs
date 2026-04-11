@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Serialize)]
-#[serde(tag = "type", content = "data", rename_all = "lowercase")]
+#[serde(tag = "type", content = "value", rename_all = "lowercase")]
 pub enum WasmReplResult {
     None,
     Ok(String),

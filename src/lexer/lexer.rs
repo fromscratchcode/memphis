@@ -85,12 +85,12 @@ impl Lexer {
         Lexer::new(LexerMode::Script)
     }
 
-    #[cfg(any(test, feature = "repl"))]
+    #[cfg(any(test, feature = "repl", feature = "wasm"))]
     pub fn interactive() -> Lexer {
         Lexer::new(LexerMode::Interactive)
     }
 
-    #[cfg(feature = "repl")]
+    #[cfg(any(feature = "repl", feature = "wasm"))]
     pub fn num_indents(&self) -> usize {
         self.indentation_stack.len() - 1
     }
