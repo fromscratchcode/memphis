@@ -1,9 +1,11 @@
-#[cfg(any(feature = "repl", feature = "wasm"))]
-pub mod core;
-#[cfg(any(feature = "repl", feature = "wasm"))]
+#[cfg(feature = "interactive")]
+mod core;
+#[cfg(feature = "interactive")]
 mod parser;
+#[cfg(feature = "interactive")]
+pub use core::{ReplCore, ReplResult, ReplStep};
+
 #[cfg(feature = "repl")]
 mod terminal;
-
 #[cfg(feature = "repl")]
 pub use terminal::TerminalRepl;

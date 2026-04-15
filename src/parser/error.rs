@@ -14,22 +14,6 @@ impl ParserError {
         Self::SyntaxError(msg.into())
     }
 
-    #[cfg(feature = "repl")]
-    pub fn is_unexpected_eof(&self) -> bool {
-        matches!(
-            self,
-            ParserError::UnexpectedToken(Token::Eof) | ParserError::ExpectedToken(_, Token::Eof)
-        )
-    }
-
-    #[cfg(feature = "repl")]
-    pub fn expected_token_at_eof(&self) -> Option<Token> {
-        match self {
-            ParserError::ExpectedToken(expected, Token::Eof) => Some(expected.clone()),
-            _ => None,
-        }
-    }
-
     #[allow(dead_code)]
     pub fn debug_message(&self) -> String {
         match self {

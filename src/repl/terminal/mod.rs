@@ -6,7 +6,7 @@ use crossterm::{
 };
 
 use crate::{
-    repl::core::{ReplCore, ReplResult},
+    repl::{ReplCore, ReplResult, ReplStep},
     Engine,
 };
 
@@ -19,6 +19,33 @@ type ExitCode = i32;
 enum ReplControl {
     Continue,
     Exit(ExitCode),
+}
+
+/// These are ergonomic helpers specific to the terminal REPL.
+impl ReplStep {
+    pub fn initial() -> Self {
+        Self::Complete {
+            result: ReplResult::None,
+        }
+    }
+
+    pub fn indent_level(&self) -> usize {
+        match self {
+            ReplStep::Complete { .. } => 0,
+            ReplStep::Incomplete { indent } => *indent,
+        }
+    }
+
+    pub fn is_complete(&self) -> bool {
+        matches!(self, ReplStep::Complete { .. })
+    }
+
+    pub fn output(&self) -> Option<&ReplResult> {
+        match self {
+            ReplStep::Complete { result } => Some(result),
+            ReplStep::Incomplete { .. } => None,
+        }
+    }
 }
 
 /// Install a panic hook to ensure raw mode is disabled on panic.
@@ -58,11 +85,13 @@ pub struct TerminalRepl {
 
     core: ReplCore,
 
-    /// The current line being manipulated by the user.
-    line: String,
+    last_step: ReplStep,
 
-    /// The current cursor position on the current line. This _excludes_ the `marker`.
-    line_index: usize,
+    /// The current line being manipulated by the user.
+    current_line: String,
+
+    /// The current cursor position on the current line. This _excludes_ the prompt.
+    cursor_index: usize,
 
     /// A list of all the lines (_not_ statements) recording during this REPL session.
     history: Vec<String>,
@@ -76,8 +105,9 @@ impl TerminalRepl {
         Self {
             engine,
             core: ReplCore::new(engine),
-            line: String::new(),
-            line_index: 0,
+            last_step: ReplStep::initial(),
+            current_line: String::new(),
+            cursor_index: 0,
             history: Vec::new(),
             history_index: None,
         }
@@ -132,7 +162,10 @@ impl TerminalRepl {
                 // probably handle it one level up? That could help for the other
                 // panics as well.
                 let _ = terminal_io.enter();
+
                 self.core.reset();
+                self.last_step = ReplStep::initial();
+
                 self.reset_input();
                 self.redraw(terminal_io);
                 return ReplControl::Continue;
@@ -146,20 +179,20 @@ impl TerminalRepl {
 
         match event.code {
             KeyCode::Char(c) => {
-                self.line.insert(self.line_index, c);
-                self.line_index += 1;
+                self.current_line.insert(self.cursor_index, c);
+                self.cursor_index += 1;
             }
             KeyCode::Backspace => {
-                if self.line_index > 0 {
-                    self.line_index -= 1;
-                    self.line.remove(self.line_index);
+                if self.cursor_index > 0 {
+                    self.cursor_index -= 1;
+                    self.current_line.remove(self.cursor_index);
                 }
             }
             KeyCode::Enter => {
-                self.history.push(self.line.clone());
+                self.history.push(self.current_line.clone());
                 self.history_index = None;
 
-                let line = format!("{}\n", self.line);
+                let line = format!("{}\n", self.current_line);
 
                 // We must virtually hit Enter before processing the line so any results will be
                 // displayed on the next line.
@@ -181,8 +214,8 @@ impl TerminalRepl {
                 }
 
                 if let Some(index) = self.history_index {
-                    self.line = self.history[index].clone();
-                    self.line_index = self.line.len();
+                    self.current_line = self.history[index].clone();
+                    self.cursor_index = self.current_line.len();
                 }
             }
             KeyCode::Down => {
@@ -191,26 +224,26 @@ impl TerminalRepl {
                         self.history_index = Some(index + 1);
                     } else {
                         self.history_index = None;
-                        self.line.clear();
+                        self.current_line.clear();
                     }
 
                     if let Some(index) = self.history_index {
-                        self.line = self.history[index].clone();
+                        self.current_line = self.history[index].clone();
                     } else {
-                        self.line.clear();
+                        self.current_line.clear();
                     }
 
-                    self.line_index = self.line.len();
+                    self.cursor_index = self.current_line.len();
                 }
             }
             KeyCode::Right => {
-                if self.line_index < self.line.len() {
-                    self.line_index += 1;
+                if self.cursor_index < self.current_line.len() {
+                    self.cursor_index += 1;
                 }
             }
             KeyCode::Left => {
-                if self.line_index > 0 {
-                    self.line_index -= 1;
+                if self.cursor_index > 0 {
+                    self.cursor_index -= 1;
                 }
             }
             _ => {}
@@ -223,23 +256,23 @@ impl TerminalRepl {
     /// Gives the indicator for the start of the given line, based on whether or not the most
     /// recent line provided by the user completed a statement or not.
     fn prompt(&self) -> &str {
-        match self.core.is_incomplete() {
-            false => ">>> ",
-            true => "... ",
+        match self.last_step.is_complete() {
+            true => ">>> ",
+            false => "... ",
         }
     }
 
     /// Clear the REPL prompt to prepare for user input.
     fn reset_input(&mut self) {
-        self.line = " ".repeat(self.core.indent_level() * INDENT_WIDTH);
-        self.line_index = self.line.len();
+        self.current_line = " ".repeat(self.last_step.indent_level() * INDENT_WIDTH);
+        self.cursor_index = self.current_line.len();
     }
 
     /// Clear the current input, redraw it, and align the cursor to the proper column.
     fn redraw<T: TerminalIO>(&self, terminal_io: &mut T) {
-        let output = format!("\r{}{}", self.prompt(), self.line);
+        let output = format!("\r{}{}", self.prompt(), self.current_line);
         // The cursor position depends on where in the current input we are, not its length.
-        let cursor_col = self.line_index + self.prompt().len();
+        let cursor_col = self.cursor_index + self.prompt().len();
         let _ = terminal_io.redraw(output, cursor_col);
     }
 
@@ -249,18 +282,21 @@ impl TerminalRepl {
             return ReplControl::Exit(0);
         }
 
-        let output = self.core.input_line(line);
+        let step = self.core.input_line(line);
 
-        match output.result {
-            ReplResult::Ok(val) => {
-                let _ = terminal_io.writeln(val);
+        if let Some(result) = step.output() {
+            match result {
+                ReplResult::Ok(val) => {
+                    let _ = terminal_io.writeln(val);
+                }
+                ReplResult::Err(err) => {
+                    let _ = terminal_io.writeln(err);
+                }
+                ReplResult::None => {}
             }
-            ReplResult::Err(err) => {
-                let _ = terminal_io.writeln(err);
-            }
-            ReplResult::None => {}
-        };
+        }
 
+        self.last_step = step;
         ReplControl::Continue
     }
 }

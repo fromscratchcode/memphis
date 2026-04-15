@@ -85,13 +85,11 @@ impl Lexer {
         Lexer::new(LexerMode::Script)
     }
 
-    #[cfg(any(test, feature = "repl"))]
-    pub fn interactive() -> Lexer {
-        Lexer::new(LexerMode::Interactive)
-    }
-
-    #[cfg(feature = "repl")]
-    pub fn num_indents(&self) -> usize {
+    /// When in interactive mode (i.e. a REPL), it helps the UI to know the current indentation
+    /// level so it can add the appropriate number of spaces to the start of the line. This
+    /// functionality is not necessary to expose in script mode.
+    #[cfg(feature = "interactive")]
+    pub fn indent_level(&self) -> usize {
         self.indentation_stack.len() - 1
     }
 
@@ -639,7 +637,7 @@ mod tests {
 
     macro_rules! tokenize_incremental {
         ( $( $line:expr ),* ) => {{
-            let mut lexer = Lexer::interactive();
+            let mut lexer = Lexer::new(LexerMode::Interactive);
             $(
                 lexer.add_text(&Text::new($line));
             )*

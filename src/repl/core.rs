@@ -1,71 +1,57 @@
-use crate::{domain::Text, repl::parser::ReplParser, Engine, MemphisContext};
+use crate::{
+    domain::Text,
+    repl::parser::{self, ParseStep},
+    Engine, MemphisContext,
+};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ReplResult {
     None,
     Ok(String),
     Err(String),
 }
 
-#[derive(Debug)]
-pub struct ReplOutput {
-    pub result: ReplResult,
-    #[allow(unused)]
-    pub is_complete: bool,
-    #[allow(unused)]
-    pub indent_level: usize,
+pub enum ReplStep {
+    Complete { result: ReplResult },
+    Incomplete { indent: usize },
 }
 
 pub struct ReplCore {
-    context: MemphisContext,
-
-    parser: ReplParser,
-
     /// The current statement being constructed.
     input: String,
+
+    context: MemphisContext,
 }
 
 impl ReplCore {
     pub fn new(engine: Engine) -> Self {
         Self {
-            context: MemphisContext::stdin(engine),
-            parser: ReplParser::new(),
             input: String::new(),
+            context: MemphisContext::stdin(engine),
         }
     }
 
     pub fn reset(&mut self) {
         self.input.clear();
-        self.parser = ReplParser::new();
     }
 
-    pub fn input_line(&mut self, line: &str) -> ReplOutput {
+    pub fn input_line(&mut self, line: &str) -> ReplStep {
         self.input.push_str(line);
 
         let text = Text::new(&self.input);
-        self.parser.analyze_text(&text);
+        let parse_step = parser::analyze(&text);
 
-        let result = if !self.is_incomplete() {
-            let result = self.eval(text);
-            self.input.clear();
-            result
-        } else {
-            ReplResult::None
-        };
+        match parse_step {
+            ParseStep::Incomplete { indent } => ReplStep::Incomplete { indent },
+            ParseStep::Complete | ParseStep::Error => {
+                // We still run parser errors through eval because that pipeline will generate the
+                // correct errors, some of which may be heap allocated.
+                let result = self.eval(text);
+                self.input.clear();
 
-        ReplOutput {
-            result,
-            is_complete: !self.is_incomplete(),
-            indent_level: self.indent_level(),
+                ReplStep::Complete { result }
+            }
         }
-    }
-
-    pub fn is_incomplete(&self) -> bool {
-        self.parser.is_incomplete()
-    }
-
-    pub fn indent_level(&self) -> usize {
-        self.parser.indent_level()
     }
 
     fn eval(&mut self, text: Text) -> ReplResult {
@@ -76,6 +62,112 @@ impl ReplCore {
                 false => ReplResult::Ok(result.to_string()),
             },
             Err(err) => ReplResult::Err(err.to_string()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expr() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out = core.input_line("1 + 2\n");
+
+        match out {
+            ReplStep::Complete { result } => {
+                assert_eq!(result, ReplResult::Ok("3".to_string()));
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_statement_has_no_output() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out = core.input_line("a = 5\n");
+
+        match out {
+            ReplStep::Complete { result } => {
+                assert_eq!(result, ReplResult::None);
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_multiline_block() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out1 = core.input_line("def foo():\n");
+        match out1 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out2 = core.input_line("    return 10\n");
+        match out2 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out3 = core.input_line("\n");
+        match out3 {
+            ReplStep::Complete { .. } => {}
+            _ => panic!("expected complete"),
+        }
+
+        let out4 = core.input_line("foo()\n");
+        match out4 {
+            ReplStep::Complete { result } => {
+                assert_eq!(result, ReplResult::Ok("10".to_string()));
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_reset_clears_incomplete_input() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out1 = core.input_line("if x:\n");
+        match out1 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        core.reset();
+
+        let out2 = core.input_line("123\n");
+        match out2 {
+            ReplStep::Complete { result } => {
+                assert_eq!(result, ReplResult::Ok("123".to_string()));
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_error_does_not_poison_future_input() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out1 = core.input_line("undefined_var\n");
+        match out1 {
+            ReplStep::Complete { result } => {
+                assert!(matches!(result, ReplResult::Err(_)));
+            }
+            _ => panic!("expected complete"),
+        }
+
+        let out2 = core.input_line("1 + 1\n");
+        match out2 {
+            ReplStep::Complete { result } => {
+                assert_eq!(result, ReplResult::Ok("2".to_string()));
+            }
+            _ => panic!("expected complete"),
         }
     }
 }

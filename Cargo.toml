@@ -32,8 +32,10 @@ serde-wasm-bindgen = { version = "0.6", optional = true }
 
 [features]
 llvm_backend = ["inkwell"]
-repl = ["crossterm"]
+interactive = []
+repl = ["interactive", "crossterm"]
 wasm = [
+  "interactive",
   "serde",
   "serde-wasm-bindgen",
   "wasm-bindgen",
