@@ -254,7 +254,7 @@ pub struct SliceParams {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ForClause {
-    pub indices: Vec<Identifier>,
+    pub index: LoopIndex,
     pub iterable: Expr,
     pub condition: Option<Expr>,
 }
@@ -410,6 +410,12 @@ impl ExceptHandler {
 pub struct ConditionalAst {
     pub condition: Expr,
     pub ast: Ast,
+}
+
+impl ConditionalAst {
+    pub fn new(condition: Expr, ast: Ast) -> Self {
+        Self { condition, ast }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

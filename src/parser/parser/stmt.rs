@@ -54,10 +54,9 @@ impl Parser<'_> {
                 let condition = self.parse_simple_expr()?;
                 self.consume(&Token::Colon)?;
                 let block = self.parse_block()?;
-                Ok(StatementKind::WhileLoop(ConditionalAst {
-                    condition,
-                    ast: block,
-                }))
+                Ok(StatementKind::WhileLoop(ConditionalAst::new(
+                    condition, block,
+                )))
             }
             Token::For => self.parse_for_in_loop(),
             Token::Import => self.parse_regular_import(),
@@ -243,20 +242,14 @@ impl Parser<'_> {
         self.consume(&Token::If)?;
         let condition = self.parse_simple_expr()?;
         self.consume(&Token::Colon)?;
-        let if_part = ConditionalAst {
-            condition,
-            ast: self.parse_block()?,
-        };
+        let if_part = ConditionalAst::new(condition, self.parse_block()?);
 
         let mut elif_parts = vec![];
         while self.current_token() == &Token::Elif {
             self.consume(&Token::Elif)?;
             let condition = self.parse_simple_expr()?;
             self.consume(&Token::Colon)?;
-            let elif_parts_part = ConditionalAst {
-                condition,
-                ast: self.parse_block()?,
-            };
+            let elif_parts_part = ConditionalAst::new(condition, self.parse_block()?);
 
             // We must use push because these will be evaluated in order
             elif_parts.push(elif_parts_part);
@@ -277,20 +270,37 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_for_in_loop(&mut self) -> Result<StatementKind, ParserError> {
-        self.consume(&Token::For)?;
+    pub fn parse_loop_index(&mut self) -> Result<LoopIndex, ParserError> {
+        // The parentheses are optional here, but if one is present, both must be present
+        let mut need_rparen = false;
+        if self.current_token() == &Token::LParen {
+            self.consume(&Token::LParen)?;
+            need_rparen = true;
+        }
 
-        let index_a = self.parse_identifier()?;
-        let index = if self.current_token() == &Token::Comma {
+        let mut identifiers = vec![self.parse_identifier()?];
+        while self.current_token() == &Token::Comma {
             self.consume(&Token::Comma)?;
-            let index_b = self.parse_identifier()?;
-            LoopIndex::Tuple(vec![index_a, index_b])
+            identifiers.push(self.parse_identifier()?);
+        }
+        let index = if identifiers.len() == 1 {
+            LoopIndex::Variable(identifiers.remove(0))
         } else {
-            LoopIndex::Variable(index_a)
+            LoopIndex::Tuple(identifiers)
         };
 
+        if need_rparen {
+            self.consume(&Token::RParen)?;
+        }
+
+        Ok(index)
+    }
+
+    fn parse_for_in_loop(&mut self) -> Result<StatementKind, ParserError> {
+        self.consume(&Token::For)?;
+        let index = self.parse_loop_index()?;
         self.consume(&Token::In)?;
-        let range = self.parse_simple_expr()?;
+        let iterable = self.parse_simple_expr()?;
         self.consume(&Token::Colon)?;
         let body = self.parse_block()?;
 
@@ -304,7 +314,7 @@ impl Parser<'_> {
 
         Ok(StatementKind::ForInLoop {
             index,
-            iterable: range,
+            iterable,
             body,
             else_block,
         })
@@ -535,9 +545,7 @@ mod tests {
 
     use crate::parser::{
         test_utils::*,
-        types::{
-            ast, CompoundOperator, ConditionalAst, ExceptHandler, LoopIndex, Params, StatementKind,
-        },
+        types::{ast, CompoundOperator, ExceptHandler, Params, StatementKind},
     };
 
     fn ident(input: &str) -> Identifier {
@@ -919,7 +927,7 @@ for i in a:
     print(i)
 "#;
         let expected_ast = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Variable(ident("i")),
+            index: loop_index!["i"],
             iterable: var!("a"),
             body: ast![stmt_expr!(func_call!("print", call_args![var!("i")]))],
             else_block: None,
@@ -931,9 +939,48 @@ for k, v in a.items():
     print(v)
 "#;
         let expected_ast = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Tuple(vec![ident("k"), ident("v")]),
+            index: loop_index!["k", "v"],
             iterable: method_call!(var!("a"), "items"),
             body: ast![stmt_expr!(func_call!("print", call_args![var!("v")]))],
+            else_block: None,
+        });
+        assert_stmt_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn for_in_loop_parentheses() {
+        let input = r#"
+for (i) in a:
+    print(i)
+"#;
+        let expected_ast = stmt!(StatementKind::ForInLoop {
+            index: loop_index!["i"],
+            iterable: var!("a"),
+            body: ast![stmt_expr!(func_call!("print", call_args![var!("i")]))],
+            else_block: None,
+        });
+        assert_stmt_eq!(input, expected_ast);
+
+        let input = r#"
+for (k, v) in a.items():
+    print(v)
+"#;
+        let expected_ast = stmt!(StatementKind::ForInLoop {
+            index: loop_index!["k", "v"],
+            iterable: method_call!(var!("a"), "items"),
+            body: ast![stmt_expr!(func_call!("print", call_args![var!("v")]))],
+            else_block: None,
+        });
+        assert_stmt_eq!(input, expected_ast);
+
+        let input = r#"
+for (i, j, k) in a:
+    print(i)
+"#;
+        let expected_ast = stmt!(StatementKind::ForInLoop {
+            index: loop_index!["i", "j", "k"],
+            iterable: var!("a"),
+            body: ast![stmt_expr!(func_call!("print", call_args![var!("i")]))],
             else_block: None,
         });
         assert_stmt_eq!(input, expected_ast);
@@ -1434,7 +1481,7 @@ for i in a:
     break
 "#;
         let expected_ast = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Variable(ident("i")),
+            index: loop_index!["i"],
             iterable: var!("a"),
             body: ast![stmt!(StatementKind::Break)],
             else_block: None,
@@ -1446,7 +1493,7 @@ for i in a:
     continue
 "#;
         let expected_ast = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Variable(ident("i")),
+            index: loop_index!["i"],
             iterable: var!("a"),
             body: ast![stmt!(StatementKind::Continue)],
             else_block: None,
@@ -1460,7 +1507,7 @@ else:
     pass
 "#;
         let expected_ast = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Variable(ident("i")),
+            index: loop_index!["i"],
             iterable: var!("a"),
             body: ast![stmt!(StatementKind::Break)],
             else_block: Some(ast![stmt_pass!()]),

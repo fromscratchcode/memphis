@@ -903,24 +903,7 @@ impl Parser<'_> {
 
     fn parse_comprehension_clause(&mut self) -> Result<ForClause, ParserError> {
         self.consume(&Token::For)?;
-
-        // The parentheses are optional here, but if one is present, both must be present
-        let mut need_rparen = false;
-        if self.current_token() == &Token::LParen {
-            self.consume(&Token::LParen)?;
-            need_rparen = true;
-        }
-
-        let mut indices = vec![self.parse_identifier()?];
-        while self.current_token() == &Token::Comma {
-            self.consume(&Token::Comma)?;
-            indices.push(self.parse_identifier()?);
-        }
-
-        if need_rparen {
-            self.consume(&Token::RParen)?;
-        }
-
+        let index = self.parse_loop_index()?;
         self.consume(&Token::In)?;
 
         // We do not use `parse_expr` here because it can think that an expression of the
@@ -937,7 +920,7 @@ impl Parser<'_> {
         };
 
         Ok(ForClause {
-            indices,
+            index,
             iterable,
             condition,
         })
@@ -1506,7 +1489,7 @@ tuple((1,
         let input = "{ key: val * 2 for key, val in d }";
         let expected_ast = Expr::DictComprehension {
             clauses: vec![ForClause {
-                indices: vec![ident("key"), ident("val")],
+                index: loop_index!["key", "val"],
                 iterable: var!("d"),
                 condition: None,
             }],
@@ -1518,7 +1501,7 @@ tuple((1,
         let input = "{ key: val * 2 for (key, val) in d }";
         let expected_ast = Expr::DictComprehension {
             clauses: vec![ForClause {
-                indices: vec![ident("key"), ident("val")],
+                index: loop_index!["key", "val"],
                 iterable: var!("d"),
                 condition: None,
             }],
@@ -1552,20 +1535,59 @@ tuple((1,
         let expected_ast = Expr::ListComprehension {
             body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
             clauses: vec![ForClause {
-                indices: vec![ident("i")],
+                index: loop_index!["i"],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension_conditional() {
+        let input = "[i*2 for i in a if True]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
+                iterable: var!("a"),
+                condition: Some(bool!(true)),
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension_parentheses() {
+        let input = "[ i * 2 for (i) in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
                 iterable: var!("a"),
                 condition: None,
             }],
         };
         assert_expr_eq!(input, expected_ast);
 
-        let input = "[i*2 for i in a if True]";
+        let input = "[ i * j for (i, j) in a ]";
         let expected_ast = Expr::ListComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            body: Box::new(bin_op!(var!("i"), Mul, var!("j"))),
             clauses: vec![ForClause {
-                indices: vec![ident("i")],
+                index: loop_index!["i", "j"],
                 iterable: var!("a"),
-                condition: Some(bool!(true)),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[ i * j for i, j in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, var!("j"))),
+            clauses: vec![ForClause {
+                index: loop_index!["i", "j"],
+                iterable: var!("a"),
+                condition: None,
             }],
         };
         assert_expr_eq!(input, expected_ast);
@@ -1577,7 +1599,7 @@ tuple((1,
         let expected_ast = Expr::GeneratorComprehension {
             body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
             clauses: vec![ForClause {
-                indices: vec![ident("i")],
+                index: loop_index!["i"],
                 iterable: var!("b"),
                 condition: None,
             }],
@@ -1590,7 +1612,7 @@ tuple((1,
             call_args![Expr::GeneratorComprehension {
                 body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
                 clauses: vec![ForClause {
-                    indices: vec![ident("i")],
+                    index: loop_index!["i"],
                     iterable: var!("b"),
                     condition: None,
                 }],

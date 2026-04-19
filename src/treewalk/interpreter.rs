@@ -1224,12 +1224,31 @@ for i in range(5):
 a = {"a": 1,"b": 2}
 b = 0
 for k, v in a.items():
-    b = b + v
-print(b)
+    b += v
 "#;
         let ctx = run(input);
 
         assert_read_eq!(ctx, "b", int!(3));
+    }
+
+    #[test]
+    fn for_in_loop_unpacking() {
+        let input = r#"
+for (a,b) in [(1,2,3)]:
+    pass
+"#;
+        let e = eval_expect_error(input);
+        assert_value_error!(e.exception, "too many values to unpack (expected 2)");
+
+        let input = r#"
+for (a,b,c,d) in [(1,2,3)]:
+    pass
+"#;
+        let e = eval_expect_error(input);
+        assert_value_error!(
+            e.exception,
+            "not enough values to unpack (expected 4, got 3)"
+        );
     }
 
     #[test]
@@ -1330,29 +1349,126 @@ t = type(slice)
     #[test]
     fn list_comprehension() {
         let input = r#"
-a = [1,2,3]
-b = [ i * 2 for i in a ]
-c = [ i * 2 for i in a if False ]
-d = [ j * 2 for j in a if j > 2 ]
-e = [x * y for x in range(1,3) for y in range(1,3)]
+[ i * 2 for i in range(1,4) ]
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, list![int!(2), int!(4), int!(6),]);
+    }
 
-        assert_read_eq!(ctx, "b", list![int!(2), int!(4), int!(6),]);
-        assert_read_eq!(ctx, "c", list![]);
-        assert_read_eq!(ctx, "d", list![int!(6),]);
-        assert_read_eq!(ctx, "e", list![int!(1), int!(2), int!(2), int!(4),]);
+    #[test]
+    fn list_comprehension_conditional() {
+        let input = r#"
+[ i * 2 for i in range(1,4) if False ]
+"#;
+        assert_eval_eq!(input, list![]);
+
+        let input = r#"
+[ j * 2 for j in range(1,4) if j > 2 ]
+"#;
+        assert_eval_eq!(input, list![int!(6),]);
+    }
+
+    #[test]
+    fn list_comprehension_multiple_clauses() {
+        let input = r#"
+[x * y for x in range(1,3) for y in range(1,3)]
+"#;
+        assert_eval_eq!(input, list![int!(1), int!(2), int!(2), int!(4),]);
+    }
+
+    #[test]
+    fn list_comprehension_tuple_unpacking() {
+        let input = r#"
+[x + y for (x, y) in [(1, 2), (3, 4)]]
+"#;
+
+        assert_eval_eq!(input, list![int!(3), int!(7)]);
     }
 
     #[test]
     fn set_comprehension() {
         let input = r#"
-a = [1,2,3]
-b = { i * 2 for i in a }
+{ i * 2 for i in range(1,4) }
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, set![int!(2), int!(4), int!(6),]);
+    }
 
-        assert_read_eq!(ctx, "b", set![int!(2), int!(4), int!(6),]);
+    #[test]
+    fn set_comprehension_conditional() {
+        let input = r#"
+{ i * 2 for i in range(1,4) if False }
+"#;
+        assert_eval_eq!(input, set![]);
+
+        let input = r#"
+{ j * 2 for j in range(1,4) if j > 2 }
+"#;
+        assert_eval_eq!(input, set![int!(6),]);
+    }
+
+    #[test]
+    fn set_comprehension_multiple_clauses() {
+        let input = r#"
+{x * y for x in range(1,3) for y in range(1,3)}
+"#;
+        assert_eval_eq!(input, set![int!(1), int!(2), int!(4),]);
+    }
+
+    #[test]
+    fn set_comprehension_tuple_unpacking() {
+        let input = r#"
+{x + y for (x, y) in [(1, 2), (3, 4)]}
+"#;
+
+        assert_eval_eq!(input, set![int!(3), int!(7)]);
+    }
+
+    #[test]
+    fn dict_comprehension() {
+        let input = r#"
+{ i * 2: i * 4 for i in range(1,4) }
+"#;
+        assert_eval_eq!(
+            input,
+            dict!({ int!(2) => int!(4), int!(4) => int!(8), int!(6) => int!(12) })
+        );
+    }
+
+    #[test]
+    fn dict_comprehension_conditional() {
+        let input = r#"
+{ i * 2: i * 4 for i in range(1,4) if i % 2 == 1 }
+"#;
+        assert_eval_eq!(input, dict!({ int!(2) => int!(4), int!(6) => int!(12) }));
+    }
+
+    #[test]
+    fn dict_comprehension_multiple_clauses() {
+        let input = r#"
+{i+j: j*4 for i in range(1,4) for j in range(10,13)}
+"#;
+        assert_eval_eq!(
+            input,
+            dict!({ int!(11) => int!(40),
+                int!(12) => int!(40),
+                int!(13) => int!(40),
+                int!(14) => int!(44),
+                int!(15) => int!(48),
+            })
+        );
+    }
+
+    #[test]
+    fn dict_comprehension_tuple_unpacking() {
+        let input = r#"
+{x: y for (x, y) in [(1, 2), (3, 4)]}
+"#;
+
+        assert_eval_eq!(
+            input,
+            dict!({ int!(1) => int!(2),
+                int!(3) => int!(4),
+            })
+        );
     }
 
     #[test]
@@ -4274,19 +4390,43 @@ b['a']
 a = (i * 2 for i in [1,2])
 b = next(a)
 c = next(a)
+b, c
+"#;
+        assert_eval_eq!(input, tuple![int!(2), int!(4)]);
 
+        let input = r#"
+t = type(x * y for x in [2,4])
+"#;
+        let ctx = run(input);
+        assert_type_eq!(ctx, "t", Type::Generator);
+    }
+
+    #[test]
+    fn generator_comprehension_nested_clauses() {
+        let input = r#"
 d = (x * y for x in [2,4] for y in [3,5])
-e = type(d)
-f = list(d)
+list(d)
+"#;
+        assert_eval_eq!(input, list![int!(6), int!(10), int!(12), int!(20)]);
+    }
+
+    #[test]
+    fn generator_comprehension_with_condition() {
+        let input = r#"
+d = (x * 2 for x in range(1,5) if x % 2 == 1)
+list(d)
+"#;
+        assert_eval_eq!(input, list![int!(2), int!(6)]);
+    }
+
+    #[test]
+    fn generator_comprehension_tuple_unpacking() {
+        let input = r#"
+d = (x + y for (x, y) in [(1, 2), (3, 4)])
+list(d)
 "#;
 
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "b", int!(2));
-        assert_read_eq!(ctx, "c", int!(4));
-        assert_variant!(ctx, "d", Generator);
-        assert_type_eq!(ctx, "e", Type::Generator);
-        assert_read_eq!(ctx, "f", list![int!(6), int!(10), int!(12), int!(20),]);
+        assert_eval_eq!(input, list![int!(3), int!(7)]);
     }
 
     #[test]

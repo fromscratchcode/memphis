@@ -222,36 +222,11 @@ impl TreewalkInterpreter {
 
     /// Python can unpack any iterables, not any index reads.
     fn evaluate_unpacking_assignment(&self, left: &[Expr], right: &Expr) -> TreewalkResult<()> {
-        let right_result = self
-            .evaluate_expr(right)?
-            .as_iterable()
-            .raise(self)?
-            .into_iter();
-
-        // Collect the items once so that we can get a length without clearing our iterator, some
-        // of which (`ListIter`, etc) use interior mutability to track iterator state.
-        let right_items: Vec<_> = right_result.clone_box().collect();
-        let right_len = right_items.len();
-
-        if left.len() < right_len {
-            Exception::value_error(format!(
-                "too many values to unpack (expected {})",
-                left.len()
-            ))
-            .raise(self)
-        } else if left.len() > right_len {
-            Exception::value_error(format!(
-                "not enough values to unpack (expected {}, got {})",
-                left.len(),
-                right_len
-            ))
-            .raise(self)
-        } else {
-            for (key, value) in left.iter().zip(right_items) {
-                self.execute_assignment(key, value)?;
-            }
-            Ok(())
+        let values = self.unpack_iterable(self.evaluate_expr(right)?, left.len())?;
+        for (key, value) in left.iter().zip(values) {
+            self.execute_assignment(key, value)?;
         }
+        Ok(())
     }
 
     fn evaluate_compound_assignment(

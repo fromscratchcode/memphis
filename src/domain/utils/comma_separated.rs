@@ -1,9 +1,10 @@
-pub fn format_comma_separated<I>(iter: I) -> String
+use crate::domain::MemphisValue;
+
+pub fn format_comma_separated<'a, I>(iter: I) -> String
 where
-    I: IntoIterator,
-    I::Item: ToString,
+    I: IntoIterator<Item = &'a MemphisValue>,
 {
-    format_comma_separated_with(iter, |i| i.to_string())
+    format_comma_separated_with(iter, |i| i.repr())
 }
 
 pub fn format_comma_separated_with<I, F>(iter: I, format_fn: F) -> String

@@ -6,7 +6,6 @@ use crate::{
         FormatOption, LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
-        protocols::TryEvalFrom,
         result::Raise,
         types::{
             iterators::GeneratorIter, Dict, Exception, Function, Generator, List, Set, Slice, Str,
@@ -152,45 +151,15 @@ impl TreewalkInterpreter {
         body: &Expr,
         clauses: &[ForClause],
     ) -> TreewalkResult<TreewalkValue> {
-        if let Some((first_clause, remaining_clauses)) = clauses.split_first() {
-            // Recursive case: Process the first ForClause
-            let mut output = vec![];
-            for i in self
-                .evaluate_expr(&first_clause.iterable)?
-                .as_iterable()
-                .raise(self)?
-            {
-                if first_clause.indices.len() == 1 {
-                    self.state.write(first_clause.indices[0].as_str(), i);
-                } else {
-                    for (key, value) in first_clause
-                        .indices
-                        .iter()
-                        .zip(i.as_iterable().raise(self)?)
-                    {
-                        self.state.write(key.as_str(), value);
-                    }
-                }
+        let mut output = vec![];
 
-                if let Some(condition) = first_clause.condition.as_ref() {
-                    if !self.evaluate_expr(condition)?.coerce_to_bool() {
-                        continue;
-                    }
-                }
+        self.evaluate_comprehension(clauses, &mut || {
+            let value = self.evaluate_expr(body)?;
+            output.push(value);
+            Ok(())
+        })?;
 
-                // Recursively handle the rest of the clauses. If `remaining_clauses` is empty,
-                // we'll hit the base case on the next call.
-                match self.evaluate_list_comprehension(body, remaining_clauses)? {
-                    TreewalkValue::List(list) => output.extend(list),
-                    single => output.push(single),
-                }
-            }
-
-            Ok(TreewalkValue::List(Container::new(List::new(output))))
-        } else {
-            // Base case: Evaluate the expression. We drop into this case when `clauses` is empty.
-            self.evaluate_expr(body)
-        }
+        Ok(TreewalkValue::List(Container::new(List::new(output))))
     }
 
     fn evaluate_set_comprehension(
@@ -198,9 +167,15 @@ impl TreewalkInterpreter {
         body: &Expr,
         clauses: &[ForClause],
     ) -> TreewalkResult<TreewalkValue> {
-        let evaluated = self.evaluate_list_comprehension(body, clauses)?;
-        let set = Set::try_eval_from(evaluated, self)?;
-        Ok(TreewalkValue::Set(Container::new(set)))
+        let mut output = Set::default();
+
+        self.evaluate_comprehension(clauses, &mut || {
+            let value = self.evaluate_expr(body)?;
+            output.add(value).raise(self)?;
+            Ok(())
+        })?;
+
+        Ok(TreewalkValue::Set(Container::new(output)))
     }
 
     fn evaluate_dict_comprehension(
@@ -209,28 +184,15 @@ impl TreewalkInterpreter {
         key_body: &Expr,
         value_body: &Expr,
     ) -> TreewalkResult<TreewalkValue> {
-        let first_clause = match clauses {
-            [first] => first,
-            _ => unimplemented!(),
-        };
-
         let mut dict = Dict::default();
-        for i in self
-            .evaluate_expr(&first_clause.iterable)?
-            .as_iterable()
-            .raise(self)?
-        {
-            for (key, value) in first_clause
-                .indices
-                .iter()
-                .zip(i.as_iterable().raise(self)?)
-            {
-                self.state.write(key.as_str(), value);
-            }
-            let key_result = self.evaluate_expr(key_body)?;
-            let value_result = self.evaluate_expr(value_body)?;
-            dict.insert(key_result, value_result).raise(self)?;
-        }
+
+        self.evaluate_comprehension(clauses, &mut || {
+            let key = self.evaluate_expr(key_body)?;
+            let value = self.evaluate_expr(value_body)?;
+            dict.insert(key, value).raise(self)?;
+            Ok(())
+        })?;
+
         Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 
@@ -422,5 +384,38 @@ impl TreewalkInterpreter {
         let step = evaluate_to_integer(&params.step)?;
 
         Ok(Slice::new(start, stop, step))
+    }
+
+    fn evaluate_comprehension<F>(&self, clauses: &[ForClause], emit: &mut F) -> TreewalkResult<()>
+    where
+        F: FnMut() -> TreewalkResult<()>,
+    {
+        if let Some((clause, remaining)) = clauses.split_first() {
+            let ForClause {
+                index,
+                iterable,
+                condition,
+            } = clause;
+
+            for i in self.evaluate_expr(iterable)?.as_iterable().raise(self)? {
+                // Bind variables
+                self.execute_loop_index_assignment(index, i)?;
+
+                // Condition
+                if let Some(condition) = condition {
+                    if !self.evaluate_expr(condition)?.coerce_to_bool() {
+                        continue;
+                    }
+                }
+
+                // Recurse
+                self.evaluate_comprehension(remaining, emit)?;
+            }
+
+            Ok(())
+        } else {
+            // Base case: emit one value
+            emit()
+        }
     }
 }

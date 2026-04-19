@@ -46,18 +46,14 @@ impl TreewalkValue {
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Option<Box<dyn IndexRead>>> {
         let result: Box<dyn IndexRead> = match self {
+            TreewalkValue::Object(ref i) if self.hasattr(interpreter, Dunder::GetItem)? => {
+                Box::new(i.clone()) as Box<dyn IndexRead>
+            }
             TreewalkValue::List(list) => Box::new(list),
             TreewalkValue::Tuple(tuple) => Box::new(tuple),
             TreewalkValue::Dict(dict) => Box::new(dict),
             TreewalkValue::MappingProxy(proxy) => Box::new(proxy),
             TreewalkValue::Str(s) => Box::new(s),
-            TreewalkValue::Object(ref i) => {
-                if self.hasattr(interpreter, Dunder::GetItem)? {
-                    Box::new(i.clone()) as Box<dyn IndexRead>
-                } else {
-                    return Ok(None);
-                }
-            }
             _ => return Ok(None),
         };
 
@@ -69,15 +65,11 @@ impl TreewalkValue {
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Option<Box<dyn IndexWrite>>> {
         let result: Box<dyn IndexWrite> = match self {
+            TreewalkValue::Object(ref i) if self.hasattr(interpreter, Dunder::SetItem)? => {
+                Box::new(i.clone()) as Box<dyn IndexWrite>
+            }
             TreewalkValue::List(list) => Box::new(list),
             TreewalkValue::Dict(dict) => Box::new(dict),
-            TreewalkValue::Object(ref i) => {
-                if self.hasattr(interpreter, Dunder::SetItem)? {
-                    Box::new(i.clone()) as Box<dyn IndexWrite>
-                } else {
-                    return Ok(None);
-                }
-            }
             _ => return Ok(None),
         };
 
@@ -89,14 +81,10 @@ impl TreewalkValue {
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Option<Box<dyn CloneableNonDataDescriptor>>> {
         let result: Box<dyn CloneableNonDataDescriptor> = match self {
-            TreewalkValue::NonDataDescriptor(i) => i,
-            TreewalkValue::Object(ref i) => {
-                if self.hasattr(interpreter, Dunder::Get)? {
-                    Box::new(i.clone()) as Box<dyn CloneableNonDataDescriptor>
-                } else {
-                    return Ok(None);
-                }
+            TreewalkValue::Object(ref i) if self.hasattr(interpreter, Dunder::Get)? => {
+                Box::new(i.clone()) as Box<dyn CloneableNonDataDescriptor>
             }
+            TreewalkValue::NonDataDescriptor(i) => i,
             TreewalkValue::Classmethod(i) => Box::new(i),
             TreewalkValue::Staticmethod(i) => Box::new(i),
             TreewalkValue::Property(i) => Box::new(i),
@@ -111,12 +99,8 @@ impl TreewalkValue {
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Option<Box<dyn CloneableDataDescriptor>>> {
         let result = match self {
-            TreewalkValue::Object(ref i) => {
-                if self.hasattr(interpreter, Dunder::Set)? {
-                    Box::new(i.clone()) as Box<dyn CloneableDataDescriptor>
-                } else {
-                    return Ok(None);
-                }
+            TreewalkValue::Object(ref i) if self.hasattr(interpreter, Dunder::Set)? => {
+                Box::new(i.clone()) as Box<dyn CloneableDataDescriptor>
             }
             TreewalkValue::DataDescriptor(i) => i,
             // TODO handle property here

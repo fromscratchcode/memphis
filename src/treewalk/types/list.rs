@@ -117,7 +117,7 @@ impl IndexWrite for Container<List> {
                 let i = normalize_index(i, self.borrow().len())
                     .ok_or_else(|| Exception::index_error("list assignment index out of range"))
                     .raise(interpreter)?;
-                self.borrow_mut().set(i as usize, value);
+                self.borrow_mut().set(i, value);
             }
             _ => {
                 return Exception::type_error(format!(

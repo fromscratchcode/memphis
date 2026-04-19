@@ -652,7 +652,7 @@ impl VirtualMachine {
                     return false;
                 }
 
-                for (x, y) in a.clone().into_iter().zip(b.clone().into_iter()) {
+                for (x, y) in a.clone().into_iter().zip(b.clone()) {
                     if !self.equals(x, y) {
                         return false;
                     }

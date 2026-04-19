@@ -1,6 +1,6 @@
 use crate::{
     core::Container,
-    parser::types::{Ast, Expr, ForClause, LoopIndex, Statement, StatementKind},
+    parser::types::{Ast, ConditionalAst, Expr, ForClause, Statement, StatementKind},
     treewalk::{
         pausable::{Frame, Pausable, PausableStack, PausableStepResult},
         protocols::Iterable,
@@ -79,27 +79,34 @@ impl Generator {
     // recursively builds a generator function out of them. This will then become the body of the
     // function provided to a generator.
     fn build_nested_loops(body: &Expr, clauses: &[ForClause]) -> Ast {
-        if let Some((first_clause, remaining_clauses)) = clauses.split_first() {
-            let loop_body = if remaining_clauses.is_empty() {
-                // Base case: Yield the body
-                Ast::from_expr(Expr::Yield(Some(Box::new(body.clone()))))
-            } else {
-                // Recursive case: Build nested loop for the remaining clauses
-                Self::build_nested_loops(body, remaining_clauses)
-            };
+        if let Some((clause, remaining)) = clauses.split_first() {
+            // Recursive case: Build nested loop for the remaining clauses
+            let loop_body = Self::build_nested_loops(body, remaining);
 
-            let index = if first_clause.indices.len() == 1 {
-                &first_clause.indices[0]
+            let ForClause {
+                index,
+                iterable,
+                condition,
+            } = clause;
+
+            let loop_body = if let Some(condition) = &condition {
+                Ast::new(vec![Statement::new(
+                    1,
+                    StatementKind::IfElse {
+                        if_part: ConditionalAst::new(condition.clone(), loop_body),
+                        elif_parts: Vec::new(),
+                        else_part: None,
+                    },
+                )])
             } else {
-                // This is if we need to unpack multiple variables
-                unimplemented!()
+                loop_body
             };
 
             let for_in_loop = Statement::new(
                 1,
                 StatementKind::ForInLoop {
-                    index: LoopIndex::Variable(index.clone()),
-                    iterable: first_clause.iterable.clone(),
+                    index: index.clone(),
+                    iterable: iterable.clone(),
                     body: loop_body,
                     else_block: None,
                 },
@@ -107,7 +114,8 @@ impl Generator {
 
             Ast::new(vec![for_in_loop])
         } else {
-            unreachable!()
+            // Base case: Yield the body
+            Ast::from_expr(Expr::Yield(Some(Box::new(body.clone()))))
         }
     }
 }

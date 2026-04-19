@@ -441,6 +441,17 @@ macro_rules! from_import_item {
     };
 }
 
+macro_rules! loop_index {
+    ($name:expr) => {
+        $crate::parser::types::LoopIndex::Variable($crate::domain::Identifier::new($name).unwrap())
+    };
+    ($first:expr, $($rest:expr),+ $(,)?) => {
+        $crate::parser::types::LoopIndex::Tuple(vec![
+            $crate::domain::Identifier::new($first).unwrap(),
+            $($crate::domain::Identifier::new($rest).unwrap()),+])
+    };
+}
+
 pub(crate) use await_expr;
 pub(crate) use bin_op;
 pub(crate) use bool;
@@ -465,6 +476,7 @@ pub(crate) use int;
 pub(crate) use lambda;
 pub(crate) use list;
 pub(crate) use logic_op;
+pub(crate) use loop_index;
 pub(crate) use member_access;
 pub(crate) use method_call;
 pub(crate) use none;

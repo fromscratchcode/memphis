@@ -182,7 +182,9 @@ impl TerminalRepl {
                 self.current_line.insert(self.cursor_index, c);
                 self.cursor_index += 1;
             }
-            KeyCode::Backspace => {
+            KeyCode::Backspace =>
+            {
+                #[allow(clippy::collapsible_match)]
                 if self.cursor_index > 0 {
                     self.cursor_index -= 1;
                     self.current_line.remove(self.cursor_index);
@@ -236,12 +238,16 @@ impl TerminalRepl {
                     self.cursor_index = self.current_line.len();
                 }
             }
-            KeyCode::Right => {
+            KeyCode::Right =>
+            {
+                #[allow(clippy::collapsible_match)]
                 if self.cursor_index < self.current_line.len() {
                     self.cursor_index += 1;
                 }
             }
-            KeyCode::Left => {
+            KeyCode::Left =>
+            {
+                #[allow(clippy::collapsible_match)]
                 if self.cursor_index > 0 {
                     self.cursor_index -= 1;
                 }

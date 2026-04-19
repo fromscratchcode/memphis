@@ -80,6 +80,13 @@ impl MemphisValue {
             _ => None,
         }
     }
+
+    pub fn repr(&self) -> String {
+        match self {
+            MemphisValue::Str(i) => format!("'{}'", i),
+            _ => self.to_string(),
+        }
+    }
 }
 
 impl PartialEq for MemphisValue {
@@ -146,8 +153,9 @@ impl Display for MemphisValue {
                     write!(f, "({}+{}j)", re, im)
                 }
             }
-            // TODO this should be wrapped by '' in REPL mode but not for f-strings and the
-            // print builtin. we'll need a way to differentiate those contexts
+            // Display the string with _no_ quotes around it, like for f-strings or the print
+            // builtin. Display with 'single quotes', like for the REPL or inside containers, is
+            // handled in repr.
             MemphisValue::Str(s) => write!(f, "{s}"),
             MemphisValue::Bool(b) => match b {
                 true => write!(f, "True"),
@@ -166,25 +174,28 @@ impl Display for MemphisValue {
                 write!(f, "frozenset({{{}}})", format_comma_separated(i))
             }
             MemphisValue::Dict(i) => {
-                let formatted =
-                    format_comma_separated_with(i, |pair| format!("'{}': {}", pair.0, pair.1));
+                let formatted = format_comma_separated_with(i, |pair| {
+                    format!("{}: {}", pair.0.repr(), pair.1.repr())
+                });
                 write!(f, "{{{formatted}}}")
             }
             MemphisValue::DictItems(i) => {
-                let formatted =
-                    format_comma_separated_with(i, |pair| format!("('{}', {})", pair.0, pair.1));
+                let formatted = format_comma_separated_with(i, |pair| {
+                    format!("({}, {})", pair.0.repr(), pair.1.repr())
+                });
                 write!(f, "dict_items([{formatted}])")
             }
             MemphisValue::DictKeys(i) => {
-                let formatted = format_comma_separated_with(i, |key| format!("'{key}'"));
+                let formatted = format_comma_separated_with(i, |key| key.repr());
                 write!(f, "dict_keys([{formatted}])")
             }
             MemphisValue::DictValues(i) => {
                 write!(f, "dict_values([{}])", format_comma_separated(i))
             }
             MemphisValue::MappingProxy(i) => {
-                let formatted =
-                    format_comma_separated_with(i, |pair| format!("'{}': {}", pair.0, pair.1));
+                let formatted = format_comma_separated_with(i, |pair| {
+                    format!("{}: {}", pair.0.repr(), pair.1.repr())
+                });
                 write!(f, "mappingproxy({{{formatted}}})")
             }
             MemphisValue::Range(start, stop, step) => {
@@ -248,5 +259,26 @@ impl Display for MemphisValue {
             MemphisValue::Function(name) => write!(f, "<function {}>", name),
             MemphisValue::Method(name) => write!(f, "<bound method {}>", name),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::test_utils::*;
+
+    #[test]
+    fn dict_display_uses_repr() {
+        let value = dict!({
+            int!(0) => int!(0),
+            int!(2) => int!(4),
+            int!(4) => int!(8),
+        });
+        assert_eq!(value.to_string(), "{0: 0, 2: 4, 4: 8}");
+    }
+
+    #[test]
+    fn list_display_uses_repr() {
+        let value = list![str!("123")];
+        assert_eq!(value.to_string(), "['123']");
     }
 }
