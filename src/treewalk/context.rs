@@ -19,15 +19,18 @@ pub struct TreewalkContext {
 }
 
 impl TreewalkContext {
-    pub fn new(origin: ModuleOrigin) -> Self {
-        let state = Self::init_state(origin);
-        Self::from_state(state)
+    pub fn new(memphis_state: Container<MemphisState>, origin: ModuleOrigin) -> Self {
+        let state = Self::init_state(memphis_state.clone(), origin);
+        Self::from_state(memphis_state, state)
     }
 
-    pub fn from_state(treewalk_state: Container<TreewalkState>) -> Self {
+    pub fn from_state(
+        memphis_state: Container<MemphisState>,
+        treewalk_state: Container<TreewalkState>,
+    ) -> Self {
         Self {
             lexer: Lexer::script(),
-            interpreter: TreewalkInterpreter::new(treewalk_state),
+            interpreter: TreewalkInterpreter::new(memphis_state, treewalk_state),
         }
     }
 
@@ -54,12 +57,15 @@ impl TreewalkContext {
         self.lexer.add_text(&line);
     }
 
-    fn init_state(origin: ModuleOrigin) -> Container<TreewalkState> {
-        let state = Container::new(MemphisState::init(origin.clone()));
-        let treewalk_state = Container::new(TreewalkState::new(state));
+    fn init_state(
+        memphis_state: Container<MemphisState>,
+        origin: ModuleOrigin,
+    ) -> Container<TreewalkState> {
+        let treewalk_state = Container::new(TreewalkState::new());
 
         let module = Container::new(Module::new(ModuleName::main(), None, origin));
-        treewalk_state.push_module_context(module);
+        memphis_state.push_stack_frame(&*module.borrow());
+        treewalk_state.push_module(module);
 
         treewalk_state
     }
@@ -78,8 +84,7 @@ impl TreewalkContext {
     #[cfg(test)]
     pub fn enable_capture(&mut self) {
         self.interpreter
-            .state
-            .memphis_state()
+            .memphis_state
             .borrow_mut()
             .io
             .enable_capture();
@@ -87,22 +92,21 @@ impl TreewalkContext {
 
     #[cfg(test)]
     pub fn take_output(&mut self) -> Option<String> {
-        self.interpreter
-            .state
-            .memphis_state()
-            .borrow_mut()
-            .io
-            .take_output()
+        self.interpreter.memphis_state.borrow_mut().io.take_output()
     }
 
     #[cfg(test)]
     pub fn stdin() -> Self {
-        Self::new(ModuleOrigin::Stdin)
+        // We don't need to initialize the ModuleOrigin here because there's no filepath to record.
+        let state = Container::new(MemphisState::new());
+        Self::new(state, ModuleOrigin::Stdin)
     }
 
     #[cfg(test)]
     pub fn script(source: Source) -> Self {
-        Self::new(ModuleOrigin::File(source.path().to_path_buf()))
+        let origin = ModuleOrigin::File(source.path().to_path_buf());
+        let state = Container::new(MemphisState::init(&origin));
+        Self::new(state, origin)
     }
 }
 

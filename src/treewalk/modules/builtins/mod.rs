@@ -268,12 +268,7 @@ impl Callable for PrintBuiltin {
             })
             .collect::<Vec<_>>()
             .join(" ");
-        interpreter
-            .state
-            .memphis_state()
-            .borrow_mut()
-            .io
-            .print_line(&value);
+        interpreter.memphis_state.borrow_mut().io.print_line(&value);
         Ok(TreewalkValue::None)
     }
 

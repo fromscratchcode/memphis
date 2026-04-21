@@ -26,13 +26,6 @@ pub struct DebugCallStack {
     frames: Vec<DebugStackFrame>,
 }
 
-impl Default for DebugCallStack {
-    /// Provides a default, empty call stack.
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl DebugCallStack {
     /// Initializes an empty call stack.
     pub fn new() -> Self {

@@ -16,7 +16,7 @@ use crate::{
 
 impl TreewalkInterpreter {
     pub fn evaluate_statement(&self, stmt: &Statement) -> TreewalkResult<TreewalkValue> {
-        self.state.set_line_number(stmt.start_line);
+        self.memphis_state.set_line_number(stmt.start_line);
 
         // These are the only types of statements that will return a value.
         match &stmt.kind {

@@ -2,11 +2,7 @@ use std::cell::UnsafeCell;
 
 use crate::{
     core::Container,
-    domain::{
-        resolve_import_path, DebugCallStack, DebugStackFrame, FromImportPath, ModuleName,
-        ToDebugStackFrame, Type,
-    },
-    runtime::MemphisState,
+    domain::{resolve_import_path, FromImportPath, ModuleName, Type},
     treewalk::{
         modules::builtins,
         types::{Class, Dict, Exception, Function, Module},
@@ -17,7 +13,6 @@ use crate::{
 };
 
 pub struct TreewalkState {
-    memphis_state: Container<MemphisState>,
     module_store: ModuleStore,
     type_registry: TypeRegistry,
     scope_manager: ScopeManager,
@@ -25,14 +20,8 @@ pub struct TreewalkState {
     pub executor: UnsafeCell<Executor>,
 }
 
-impl Default for TreewalkState {
-    fn default() -> Self {
-        Self::new(Container::new(MemphisState::default()))
-    }
-}
-
 impl TreewalkState {
-    pub fn new(memphis_state: Container<MemphisState>) -> Self {
+    pub fn new() -> Self {
         let type_registry = TypeRegistry::new();
 
         // We still want the `TypeRegistry` to own the type classes, but we must make some of them
@@ -43,7 +32,6 @@ impl TreewalkState {
         module_store.load_native_modules(&type_registry);
 
         TreewalkState {
-            memphis_state,
             module_store,
             type_registry,
             scope_manager: ScopeManager::new(Container::new(builtins_mod)),
@@ -54,37 +42,6 @@ impl TreewalkState {
 }
 
 impl Container<TreewalkState> {
-    pub fn memphis_state(&self) -> Container<MemphisState> {
-        self.borrow().memphis_state.clone()
-    }
-
-    pub fn push_module_context(&self, module: Container<Module>) {
-        self.push_stack_frame(&*module.borrow());
-        self.push_module(module);
-    }
-
-    pub fn save_line_number(&self) {
-        self.borrow().memphis_state.save_line_number();
-    }
-
-    pub fn set_line_number(&self, line_number: usize) {
-        self.borrow().memphis_state.set_line_number(line_number);
-    }
-
-    /// Return the `CallStack` at the current moment in time. This should be used at the time of an
-    /// exception or immediately before any other use as it is a snapshot and will not keep updating.
-    pub fn debug_call_stack(&self) -> DebugCallStack {
-        self.borrow().memphis_state.debug_call_stack()
-    }
-
-    pub fn push_stack_frame<T: ToDebugStackFrame>(&self, context: &T) {
-        self.borrow().memphis_state.push_stack_frame(context);
-    }
-
-    pub fn pop_stack_frame(&self) -> Option<DebugStackFrame> {
-        self.borrow().memphis_state.pop_stack_frame()
-    }
-
     /// Write an `TreewalkValue` to the symbol table.
     pub fn write(&self, name: &str, value: TreewalkValue) {
         self.borrow_mut().scope_manager.write(name, value);

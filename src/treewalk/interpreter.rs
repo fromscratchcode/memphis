@@ -26,20 +26,26 @@ mod stmt;
 #[derive(Clone)]
 pub struct TreewalkInterpreter {
     pub state: Container<TreewalkState>,
+    pub memphis_state: Container<MemphisState>,
 }
 
 impl Default for TreewalkInterpreter {
     fn default() -> Self {
-        let state = Container::new(TreewalkState::new(Container::new(MemphisState::default())));
-        let module = Container::new(Module::new_empty(ModuleName::main()));
-        state.push_module_context(module);
-        Self::new(state)
+        let memphis_state = Container::new(MemphisState::new());
+        let state = Container::new(TreewalkState::new());
+        let module = Module::new_empty(ModuleName::main());
+        memphis_state.push_stack_frame(&module);
+        state.push_module(Container::new(module));
+        Self::new(memphis_state, state)
     }
 }
 
 impl TreewalkInterpreter {
-    pub fn new(state: Container<TreewalkState>) -> Self {
-        TreewalkInterpreter { state }
+    pub fn new(memphis_state: Container<MemphisState>, state: Container<TreewalkState>) -> Self {
+        TreewalkInterpreter {
+            memphis_state,
+            state,
+        }
     }
 
     pub fn with_executor<R>(&self, f: impl FnOnce(&mut Executor) -> R) -> R {
@@ -54,8 +60,8 @@ impl TreewalkInterpreter {
     }
 
     pub fn raise(&self, error: Exception) -> RaisedException {
-        self.state.save_line_number();
-        RaisedException::new(self.state.debug_call_stack(), error)
+        self.memphis_state.save_line_number();
+        RaisedException::new(self.memphis_state.debug_call_stack(), error)
     }
 
     fn execute_ast(&self, ast: &Ast) -> TreewalkResult<TreewalkValue> {

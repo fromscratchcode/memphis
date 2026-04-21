@@ -3,7 +3,7 @@ mod core;
 #[cfg(feature = "interactive")]
 mod parser;
 #[cfg(feature = "interactive")]
-pub use core::{ReplCore, ReplResult, ReplStep};
+pub use core::{ReplCore, ReplOutput, ReplResult, ReplStep};
 
 #[cfg(feature = "repl")]
 mod terminal;

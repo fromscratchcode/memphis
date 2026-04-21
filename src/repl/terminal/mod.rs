@@ -6,7 +6,7 @@ use crossterm::{
 };
 
 use crate::{
-    repl::{ReplCore, ReplResult, ReplStep},
+    repl::{ReplCore, ReplOutput, ReplResult, ReplStep},
     Engine,
 };
 
@@ -24,14 +24,16 @@ enum ReplControl {
 /// These are ergonomic helpers specific to the terminal REPL.
 impl ReplStep {
     pub fn initial() -> Self {
-        Self::Complete {
+        let output = ReplOutput {
+            stdout: String::from(""),
             result: ReplResult::None,
-        }
+        };
+        Self::Complete(output)
     }
 
     pub fn indent_level(&self) -> usize {
         match self {
-            ReplStep::Complete { .. } => 0,
+            ReplStep::Complete(_) => 0,
             ReplStep::Incomplete { indent } => *indent,
         }
     }
@@ -42,7 +44,14 @@ impl ReplStep {
 
     pub fn output(&self) -> Option<&ReplResult> {
         match self {
-            ReplStep::Complete { result } => Some(result),
+            ReplStep::Complete(output) => Some(&output.result),
+            ReplStep::Incomplete { .. } => None,
+        }
+    }
+
+    pub fn stdout(&self) -> Option<&str> {
+        match self {
+            ReplStep::Complete(output) => Some(&output.stdout),
             ReplStep::Incomplete { .. } => None,
         }
     }
@@ -290,6 +299,10 @@ impl TerminalRepl {
 
         let step = self.core.input_line(line);
 
+        if let Some(stdout) = step.stdout() {
+            let _ = terminal_io.write(stdout);
+        }
+
         if let Some(result) = step.output() {
             match result {
                 ReplResult::Ok(val) => {
@@ -382,21 +395,19 @@ mod tests {
         }
 
         /// For a populated `MockTerminalIO`, fetch the last return value.
+        ///
+        /// End of the output will be similar to this, which is why we look for the 2nd to last
+        /// element.
+        ///
+        /// "Traceback....NameError...\n",
+        /// ">>> ",
         fn return_val(&self) -> String {
-            // End of the output will be similar to this, which is why we look for the 3rd to last
-            // element.
-            //
-            // "Traceback....NameError...",
-            // "\n",
-            // ">>> ",
-            let third_from_last = self
-                .output
+            self.output
                 .len()
-                .checked_sub(3)
+                .checked_sub(2)
                 .and_then(|index| self.output.get(index))
-                .expect("Not enough elements in output");
-
-            third_from_last.to_string()
+                .expect("Not enough elements in output")
+                .to_string()
         }
     }
 
@@ -416,8 +427,7 @@ mod tests {
         }
 
         fn writeln<T: Display>(&mut self, output: T) -> io::Result<()> {
-            self.write(output)?;
-            self.write("\n")
+            self.write(format!("{}\n", output))
         }
 
         fn redraw<T: Display>(&mut self, output: T, _col: usize) -> io::Result<()> {
@@ -440,7 +450,7 @@ mod tests {
     #[test]
     fn test_repl_expr() {
         let return_val = run("12345\n");
-        assert_eq!(return_val, "12345");
+        assert_eq!(return_val, "12345\n");
     }
 
     #[test]
@@ -461,7 +471,7 @@ def foo():
 foo()
 "#;
         let return_val = run(code);
-        assert_eq!(return_val, "20");
+        assert_eq!(return_val, "20\n");
     }
 
     #[test]
@@ -472,7 +482,7 @@ x = (1 +
 x
 "#;
         let return_val = run(code);
-        assert_eq!(return_val, "3");
+        assert_eq!(return_val, "3\n");
     }
 
     #[test]
@@ -487,7 +497,7 @@ foo()
         // TODO should we test all of these through both engines? Not sure yet, that may be too
         // deep of a test for this file.
         let return_val = run_vm(code);
-        assert_eq!(return_val, "20");
+        assert_eq!(return_val, "20\n");
     }
 
     #[test]
@@ -497,7 +507,7 @@ foo()
         events.insert(4, ctrl_c);
 
         let return_val = run_events(events);
-        assert_eq!(return_val, "56789");
+        assert_eq!(return_val, "56789\n");
     }
 
     #[test]
@@ -536,7 +546,7 @@ def foo():
 foo()
 "#;
         let return_val = run(code);
-        assert_eq!(return_val, "46");
+        assert_eq!(return_val, "46\n");
     }
 
     #[test]
@@ -548,7 +558,7 @@ b
 a
 "#;
         let return_val = run(code);
-        assert_eq!(return_val, "10");
+        assert_eq!(return_val, "10\n");
     }
 
     #[test]
@@ -561,6 +571,6 @@ b
 a
 "#;
         let return_val = run_vm(code);
-        assert_eq!(return_val, "10");
+        assert_eq!(return_val, "10\n");
     }
 }

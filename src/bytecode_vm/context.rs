@@ -21,8 +21,7 @@ pub struct VmContext {
 }
 
 impl VmContext {
-    pub fn new(origin: ModuleOrigin) -> Self {
-        let state = Container::new(MemphisState::init(origin.clone()));
+    pub fn new(state: Container<MemphisState>, origin: ModuleOrigin) -> Self {
         let runtime = Container::new(Runtime::new());
         Self::from_state(ModuleName::main(), None, origin, state, runtime)
     }
@@ -99,12 +98,16 @@ impl VmContext {
 
     #[cfg(any(test, feature = "wasm"))]
     pub fn stdin() -> Self {
-        Self::new(ModuleOrigin::Stdin)
+        // We don't need to initialize the ModuleOrigin here because there's no filepath to record.
+        let state = Container::new(MemphisState::new());
+        Self::new(state, ModuleOrigin::Stdin)
     }
 
     #[cfg(test)]
     pub fn script(source: Source) -> Self {
-        Self::new(ModuleOrigin::File(source.path().to_path_buf()))
+        let origin = ModuleOrigin::File(source.path().to_path_buf());
+        let state = Container::new(MemphisState::init(&origin));
+        Self::new(state, origin)
     }
 }
 

@@ -66,12 +66,13 @@ impl TreewalkInterpreter {
     }
 
     fn enter_imported_module(&self, module: Container<Module>) {
-        self.state.save_line_number();
-        self.state.push_module_context(module);
+        self.memphis_state.save_line_number();
+        self.memphis_state.push_stack_frame(&*module.borrow());
+        self.state.push_module(module);
     }
 
     fn exit_imported_module(&self) -> DomainResult<Container<Module>> {
-        self.state
+        self.memphis_state
             .pop_stack_frame()
             .ok_or_else(Exception::runtime_error)?;
         self.state.pop_module().ok_or_else(Exception::runtime_error)
@@ -79,8 +80,7 @@ impl TreewalkInterpreter {
 
     fn import_module(&self, module_name: &ModuleName) -> TreewalkResult<Container<Module>> {
         let (resolved, source) = self
-            .state
-            .memphis_state()
+            .memphis_state
             .load_source(module_name)
             .map_err(|err| Exception::import_error(err.message))
             .raise(self)?;
@@ -88,7 +88,7 @@ impl TreewalkInterpreter {
         let module = self.prepare_imported_module(&resolved);
         self.enter_imported_module(module);
 
-        TreewalkContext::from_state(self.state.clone())
+        TreewalkContext::from_state(self.memphis_state.clone(), self.state.clone())
             .eval_inner(source.text().clone())
             .map_err(TreewalkDisruption::Error)?;
 

@@ -11,8 +11,13 @@ pub enum ReplResult {
     Err(String),
 }
 
+pub struct ReplOutput {
+    pub stdout: String,
+    pub result: ReplResult,
+}
+
 pub enum ReplStep {
-    Complete { result: ReplResult },
+    Complete(ReplOutput),
     Incomplete { indent: usize },
 }
 
@@ -44,12 +49,19 @@ impl ReplCore {
         match parse_step {
             ParseStep::Incomplete { indent } => ReplStep::Incomplete { indent },
             ParseStep::Complete | ParseStep::Error => {
+                self.context.enable_capture();
+
                 // We still run parser errors through eval because that pipeline will generate the
                 // correct errors, some of which may be heap allocated.
                 let result = self.eval(text);
                 self.input.clear();
 
-                ReplStep::Complete { result }
+                let stdout = self
+                    .context
+                    .take_output()
+                    .expect("Failed to capture stdout");
+                let output = ReplOutput { stdout, result };
+                ReplStep::Complete(output)
             }
         }
     }
@@ -77,8 +89,9 @@ mod tests {
         let out = core.input_line("1 + 2\n");
 
         match out {
-            ReplStep::Complete { result } => {
-                assert_eq!(result, ReplResult::Ok("3".to_string()));
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::Ok("3".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -91,8 +104,24 @@ mod tests {
         let out = core.input_line("a = 5\n");
 
         match out {
-            ReplStep::Complete { result } => {
-                assert_eq!(result, ReplResult::None);
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::None);
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_print_statement_has_no_output_but_has_side_effects() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out = core.input_line("print(123)\n");
+
+        match out {
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from("123\n"));
+                assert_eq!(output.result, ReplResult::None);
             }
             _ => panic!("expected complete"),
         }
@@ -116,14 +145,15 @@ mod tests {
 
         let out3 = core.input_line("\n");
         match out3 {
-            ReplStep::Complete { .. } => {}
+            ReplStep::Complete(_) => {}
             _ => panic!("expected complete"),
         }
 
         let out4 = core.input_line("foo()\n");
         match out4 {
-            ReplStep::Complete { result } => {
-                assert_eq!(result, ReplResult::Ok("10".to_string()));
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::Ok("10".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -143,8 +173,9 @@ mod tests {
 
         let out2 = core.input_line("123\n");
         match out2 {
-            ReplStep::Complete { result } => {
-                assert_eq!(result, ReplResult::Ok("123".to_string()));
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::Ok("123".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -156,16 +187,18 @@ mod tests {
 
         let out1 = core.input_line("undefined_var\n");
         match out1 {
-            ReplStep::Complete { result } => {
-                assert!(matches!(result, ReplResult::Err(_)));
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert!(matches!(output.result, ReplResult::Err(_)));
             }
             _ => panic!("expected complete"),
         }
 
         let out2 = core.input_line("1 + 1\n");
         match out2 {
-            ReplStep::Complete { result } => {
-                assert_eq!(result, ReplResult::Ok("2".to_string()));
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::Ok("2".to_string()));
             }
             _ => panic!("expected complete"),
         }

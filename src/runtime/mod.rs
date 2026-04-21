@@ -1,5 +1,7 @@
 mod imports;
+mod io;
 mod state;
 
-pub use imports::ImportResolver;
+use imports::ImportResolver;
+use io::MemphisIo;
 pub use state::MemphisState;

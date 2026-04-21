@@ -27,8 +27,8 @@ impl TreewalkInterpreter {
 
         // If we don't save the current line number, we won't properly record where in the current
         // file we called the next function from.
-        self.state.save_line_number();
-        self.state.push_stack_frame(&*function.borrow());
+        self.memphis_state.save_line_number();
+        self.memphis_state.push_stack_frame(&*function.borrow());
         self.state.push_function(function.clone());
 
         // We do not propagate errors here because we still must restore the scopes and things
@@ -40,7 +40,7 @@ impl TreewalkInterpreter {
             result,
             Ok(_) | Err(TreewalkDisruption::Signal(TreewalkSignal::Return(_)))
         ) {
-            self.state.pop_stack_frame();
+            self.memphis_state.pop_stack_frame();
             self.state.pop_function();
             self.state.pop_local();
             self.state.pop_captured_env();

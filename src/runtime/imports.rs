@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 /// A store of directories searched during each import.
-#[derive(Default)]
 pub struct ImportResolver {
     search_paths: Vec<PathBuf>,
 }

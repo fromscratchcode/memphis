@@ -1,7 +1,4 @@
-use std::{
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     core::Container,
@@ -11,7 +8,7 @@ use crate::{
     },
 };
 
-use super::ImportResolver;
+use super::{ImportResolver, MemphisIo};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImportError {
@@ -26,47 +23,11 @@ impl ImportError {
     }
 }
 
-pub struct MemphisIo {
-    stdout_capture: Option<Vec<u8>>,
-}
-
-impl MemphisIo {
-    pub fn new() -> Self {
-        Self {
-            stdout_capture: None,
-        }
-    }
-
-    pub fn enable_capture(&mut self) {
-        self.stdout_capture = Some(Vec::new());
-    }
-
-    pub fn take_output(&mut self) -> Option<String> {
-        self.stdout_capture
-            .take()
-            .map(|b| String::from_utf8(b).unwrap())
-    }
-
-    pub fn print_line(&mut self, s: &str) {
-        if let Some(buf) = &mut self.stdout_capture {
-            writeln!(buf, "{}", s).unwrap();
-        } else {
-            println!("{}", s);
-        }
-    }
-}
-
 pub struct MemphisState {
     import_resolver: ImportResolver,
     debug_call_stack: DebugCallStack,
     line_number: usize,
     pub io: MemphisIo,
-}
-
-impl Default for MemphisState {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl MemphisState {
@@ -79,7 +40,7 @@ impl MemphisState {
         }
     }
 
-    pub fn init(origin: ModuleOrigin) -> Self {
+    pub fn init(origin: &ModuleOrigin) -> Self {
         let mut state = MemphisState::new();
         if let ModuleOrigin::File(ref p) = origin {
             state.register_root(p);

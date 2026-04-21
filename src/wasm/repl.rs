@@ -2,7 +2,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    repl::{ReplCore, ReplResult, ReplStep},
+    repl::{ReplCore, ReplOutput, ReplResult, ReplStep},
     Engine,
 };
 
@@ -25,16 +25,34 @@ impl From<ReplResult> for WasmReplResult {
 }
 
 #[derive(Serialize)]
+pub struct WasmReplOutput {
+    pub stdout: String,
+    pub result: WasmReplResult,
+}
+
+impl From<ReplOutput> for WasmReplOutput {
+    fn from(result: ReplOutput) -> Self {
+        WasmReplOutput {
+            stdout: result.stdout,
+            result: WasmReplResult::from(result.result),
+        }
+    }
+}
+
+#[derive(Serialize)]
 #[serde(tag = "type", content = "data", rename_all = "lowercase")]
 pub enum WasmReplStep {
-    Complete(WasmReplResult),
+    Complete(WasmReplOutput),
     Incomplete(usize),
 }
 
 impl From<ReplStep> for WasmReplStep {
     fn from(value: ReplStep) -> Self {
         match value {
-            ReplStep::Complete { result } => WasmReplStep::Complete(result.into()),
+            ReplStep::Complete(output) => {
+                let wasm_output = WasmReplOutput::from(output);
+                WasmReplStep::Complete(wasm_output)
+            }
             ReplStep::Incomplete { indent } => WasmReplStep::Incomplete(indent),
         }
     }
