@@ -73,7 +73,9 @@ impl TreewalkInterpreter {
         match self.execute_ast(&ast) {
             Ok(result) => Ok(result),
             Err(TreewalkDisruption::Error(e)) => Err(e),
-            Err(TreewalkDisruption::Signal(_)) => Err(self.raise(Exception::runtime_error())),
+            Err(TreewalkDisruption::Signal(s)) => Err(self.raise(Exception::runtime_error_with(
+                format!("Uncaught signal: {:?}", s),
+            ))),
         }
     }
 }
