@@ -18,7 +18,6 @@ pub enum PausableState {
         queue: Container<VecDeque<TreewalkValue>>,
     },
     InBlock,
-    Finished,
 }
 
 /// The context that allows a `Pausable` to be paused and resumed. This represents an individual

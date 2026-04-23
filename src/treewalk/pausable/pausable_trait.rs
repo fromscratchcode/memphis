@@ -212,7 +212,6 @@ pub trait Pausable {
                 }
                 PausableState::Running => {
                     if self.context().current_frame().is_finished() {
-                        self.context_mut().set_state(PausableState::Finished);
                         self.on_exit(interpreter);
                         return self.finish(result).raise(interpreter);
                     }
@@ -299,7 +298,6 @@ pub trait Pausable {
                         self.context_mut().restart_frame();
                     }
                 }
-                PausableState::Finished => unreachable!(),
             }
         }
     }
