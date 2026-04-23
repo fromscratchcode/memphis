@@ -364,6 +364,10 @@ impl TreewalkInterpreter {
     }
 
     fn evaluate_yield_from(&self, expr: &Expr) -> TreewalkResult<TreewalkValue> {
+        if let Some(result) = self.state.take_current_yield_from_result() {
+            return Ok(result);
+        }
+
         let gen = self.evaluate_expr(expr)?;
         Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(gen)))
     }

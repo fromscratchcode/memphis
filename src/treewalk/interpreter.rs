@@ -4715,7 +4715,6 @@ a = list(gen())
     }
 
     #[test]
-    #[ignore]
     fn yield_from_with_return() {
         let input = r#"
 def g1():

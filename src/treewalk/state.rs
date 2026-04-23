@@ -109,6 +109,30 @@ impl Container<TreewalkState> {
         self.borrow_mut().execution_context.pop_receiver()
     }
 
+    pub fn push_yield_from_result_frame(&self) {
+        self.borrow_mut()
+            .execution_context
+            .push_yield_from_result_frame();
+    }
+
+    pub fn pop_yield_from_result_frame(&self) -> Option<Option<TreewalkValue>> {
+        self.borrow_mut()
+            .execution_context
+            .pop_yield_from_result_frame()
+    }
+
+    pub fn set_current_yield_from_result(&self, value: TreewalkValue) {
+        self.borrow_mut()
+            .execution_context
+            .set_current_yield_from_result(value);
+    }
+
+    pub fn take_current_yield_from_result(&self) -> Option<TreewalkValue> {
+        self.borrow_mut()
+            .execution_context
+            .take_current_yield_from_result()
+    }
+
     pub fn current_class(&self) -> Option<Container<Class>> {
         self.borrow().execution_context.read_class()
     }
