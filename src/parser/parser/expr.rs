@@ -529,6 +529,9 @@ impl Parser<'_> {
             Token::OctalLiteral(literal) => self.parse_octal_literal(literal),
             Token::HexLiteral(literal) => self.parse_hex_literal(literal),
             Token::FStringStart => self.parse_f_string(),
+            Token::UnterminatedString(_) => {
+                Err(ParserError::syntax_error("unterminated string literal"))
+            }
             _ => Err(ParserError::UnexpectedToken(self.current_token().clone())),
         }
     }
@@ -1482,6 +1485,16 @@ tuple((1,
         let input = "{ 2, **second, }";
         let e = expect_error!(input);
         assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+    }
+
+    #[test]
+    fn unterminated_string_literal() {
+        let input = r#""hello"#;
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("unterminated string literal".to_string())
+        );
     }
 
     #[test]

@@ -10,6 +10,11 @@ use crate::{
     lexer::{MultilineString, Token},
 };
 
+enum DelimitedString {
+    Terminated(String),
+    Unterminated(String),
+}
+
 #[derive(PartialEq)]
 pub enum LexerMode {
     Script,
@@ -302,16 +307,23 @@ impl Lexer {
                 let literal =
                     consume_literal_with_prefix(&mut chars, "0x", |c| c.is_ascii_hexdigit());
                 self.pending_tokens.push_back(Token::HexLiteral(literal));
-            } else if starts_with_any(&chars, &["r\"", "R\""]) {
+            } else if starts_with_any(&chars, &["r\"", "R\"", "r\'", "R\'"]) {
                 chars.next();
-                chars.next();
-                let literal = consume_delimited(&mut chars, '"');
-                self.pending_tokens
-                    .push_back(Token::RawStringLiteral(literal));
+                let end_quote = chars
+                    .next()
+                    .expect("Expected end quote to raw string literal");
+                let token = match consume_delimited_str(&mut chars, end_quote) {
+                    DelimitedString::Terminated(l) => Token::RawStringLiteral(l),
+                    DelimitedString::Unterminated(l) => Token::UnterminatedString(l),
+                };
+                self.pending_tokens.push_back(token);
             } else if matches!(c, '"' | '\'') {
                 chars.next();
-                let literal = consume_delimited(&mut chars, c);
-                self.pending_tokens.push_back(Token::StringLiteral(literal));
+                let token = match consume_delimited_str(&mut chars, c) {
+                    DelimitedString::Terminated(l) => Token::StringLiteral(l),
+                    DelimitedString::Unterminated(l) => Token::UnterminatedString(l),
+                };
+                self.pending_tokens.push_back(token);
             } else if c.is_alphabetic() || c == '_' {
                 let literal = consume_literal(&mut chars, |c| c.is_alphanumeric() || c == '_');
 
@@ -560,12 +572,12 @@ fn push_escape_sequence(chars: &mut Peekable<Chars>, literal: &mut String) {
     }
 }
 
-fn consume_delimited(chars: &mut Peekable<Chars>, end_char: char) -> String {
+fn consume_delimited_str(chars: &mut Peekable<Chars>, end_char: char) -> DelimitedString {
     let mut literal = String::new();
 
     while let Some(c) = chars.next() {
         if c == end_char {
-            break;
+            return DelimitedString::Terminated(literal);
         } else if c == '\\' {
             push_escape_sequence(chars, &mut literal);
         } else {
@@ -573,7 +585,7 @@ fn consume_delimited(chars: &mut Peekable<Chars>, end_char: char) -> String {
         }
     }
 
-    literal
+    DelimitedString::Unterminated(literal)
 }
 
 fn consume_bytes_literal(chars: &mut Peekable<Chars>, end_char: char) -> Vec<u8> {
@@ -2570,6 +2582,24 @@ R"hello"
         );
 
         let input = r#"
+r'hello'
+"#;
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![Token::RawStringLiteral("hello".into()), Token::Newline,]
+        );
+
+        let input = r#"
+R'hello'
+"#;
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![Token::RawStringLiteral("hello".into()), Token::Newline,]
+        );
+
+        let input = r#"
 r"""OS routines for NT or Posix depending on what system we're on.
 
 This exports:
@@ -2866,6 +2896,19 @@ for i in a:
                 Token::Plus,
                 Token::Identifier(ident("a")),
                 Token::Newline,
+            ]
+        );
+    }
+
+    #[test]
+    fn unterminated_string_literal() {
+        let input = r#""hello"#;
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::UnterminatedString("hello".to_string()),
+                Token::Newline
             ]
         );
     }

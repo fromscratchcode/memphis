@@ -108,6 +108,8 @@ pub enum Token {
     InvalidCharacter(char),
     // we started lexing something valid looking, but it turned into something we don't support
     Invalid(String),
+    // we got to the end of a line with a string unterminated
+    UnterminatedString(String),
 }
 
 impl TryFrom<&Token> for BinOp {
