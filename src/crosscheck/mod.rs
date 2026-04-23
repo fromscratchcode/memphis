@@ -11,6 +11,7 @@ mod crosscheck_import;
 mod crosscheck_index_access;
 mod crosscheck_method_call;
 mod crosscheck_multiple_return;
+mod crosscheck_next_builtin;
 mod crosscheck_parse_order;
 mod crosscheck_unary_expression;
 mod crosscheck_unpacking;

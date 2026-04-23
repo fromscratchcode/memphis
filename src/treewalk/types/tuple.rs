@@ -1,4 +1,5 @@
 use crate::{
+    core::Container,
     domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
         macros::*,
@@ -105,14 +106,14 @@ impl IntoIterator for Tuple {
 #[derive(Clone)]
 pub struct TupleIter {
     list_ref: Tuple,
-    current_index: usize,
+    current_index: Container<usize>,
 }
 
 impl TupleIter {
     pub fn new(list_ref: Tuple) -> Self {
         Self {
             list_ref,
-            current_index: 0,
+            current_index: Container::new(0),
         }
     }
 }
@@ -121,11 +122,14 @@ impl Iterator for TupleIter {
     type Item = TreewalkValue;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_index == self.list_ref.len() {
+        if *self.current_index.borrow() == self.list_ref.len() {
             None
         } else {
-            self.current_index += 1;
-            self.list_ref.items.get(self.current_index - 1).cloned()
+            *self.current_index.borrow_mut() += 1;
+            self.list_ref
+                .items
+                .get(*self.current_index.borrow() - 1)
+                .cloned()
         }
     }
 }

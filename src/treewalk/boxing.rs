@@ -116,6 +116,10 @@ impl TreewalkValue {
     /// Use when `next()` is called directly — `next(x)` must fail if `x` is not an iterator.
     #[allow(clippy::wrong_self_convention)]
     pub fn as_iterator_strict(self) -> DomainResult<Box<dyn CloneableIterable>> {
+        // Repeated `next(it)` calls clone `TreewalkValue` through scope loads and arg passing.
+        // Iterator variants listed here therefore need shared mutable state so clones continue
+        // advancing the same logical iterator. List/Tuple/Range/Generator are fixed; the
+        // remaining iterator variants still need the same treatment.
         let result: Box<dyn CloneableIterable> = match self {
             TreewalkValue::ListIter(i) => Box::new(i),
             TreewalkValue::SetIter(i) => Box::new(i),
