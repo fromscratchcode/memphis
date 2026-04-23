@@ -293,7 +293,7 @@ impl Callable for NextBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| len == 1).raise(interpreter)?;
         let mut iterator = args.get_arg(0).as_iterator_strict().raise(interpreter)?;
-        match Iterable::try_next(&mut iterator) {
+        match iterator.try_next() {
             Ok(Some(val)) => Ok(val),
             Ok(None) => Exception::stop_iteration().raise(interpreter),
             Err(e) => Err(e),

@@ -3,9 +3,8 @@ use crate::{
     domain::Type,
     parser::types::{Statement, StatementKind},
     treewalk::{
-        protocols::TryEvalFrom, result::Raise, type_system::CloneableIterable, types::List,
-        DomainResult, Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
-        TreewalkValue,
+        protocols::Iterable, result::Raise, type_system::CloneableIterable, DomainResult, Scope,
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -155,16 +154,23 @@ pub trait Pausable {
                 body,
                 ..
             } => {
-                let evaluated = interpreter.evaluate_expr(iterable)?;
-                let mut queue = List::try_eval_from(evaluated, interpreter)?.as_queue();
+                // This now stores the iterator value directly. That depends on clone-stable
+                // iterator state because `PausableState` is cloned through `current_state()`.
+                // List/Tuple/Range/Generator are safe; remaining iterator variants still need the
+                // same shared-state treatment for pausable `for` loops to be correct.
+                let iterator = interpreter
+                    .evaluate_expr(iterable)?
+                    .as_iterable()
+                    .raise(interpreter)?;
+                let mut iter = iterator.clone().as_iterator_strict().raise(interpreter)?;
 
-                if let Some(item) = queue.pop_front() {
+                if let Some(item) = iter.try_next()? {
                     interpreter.execute_loop_index_assignment(index, item)?;
                     self.context_mut().push(PausableFrame::new(
                         Frame::new(body.clone()),
                         PausableState::InForLoop {
                             index: index.clone(),
-                            queue: Container::new(queue),
+                            iterable: iterator,
                         },
                     ));
                 }
@@ -229,9 +235,13 @@ pub trait Pausable {
                         }
                     };
                 }
-                PausableState::InForLoop { index, queue } => {
+                PausableState::InForLoop { index, iterable } => {
                     if self.context().current_frame().is_finished() {
-                        let item = queue.borrow_mut().pop_front();
+                        let item = iterable
+                            .clone()
+                            .as_iterator_strict()
+                            .raise(interpreter)?
+                            .try_next()?;
                         if let Some(item) = item {
                             interpreter.execute_loop_index_assignment(&index, item)?;
                             self.context_mut().restart_frame();

@@ -1,7 +1,4 @@
-use std::collections::VecDeque;
-
 use crate::{
-    core::Container,
     parser::types::{Expr, LoopIndex, Statement},
     treewalk::{pausable::Frame, TreewalkValue},
 };
@@ -15,7 +12,7 @@ pub enum PausableState {
     InWhileLoop(Expr),
     InForLoop {
         index: LoopIndex,
-        queue: Container<VecDeque<TreewalkValue>>,
+        iterable: TreewalkValue,
     },
     InBlock,
 }
