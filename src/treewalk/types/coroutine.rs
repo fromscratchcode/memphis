@@ -6,7 +6,9 @@ use crate::{
     parser::types::Statement,
     treewalk::{
         macros::*,
-        pausable::{Frame, Pausable, PausableStack, PausableState, PausableStepResult},
+        pausable::{
+            Frame, Pausable, PausableRunner, PausableStack, PausableState, PausableStepResult,
+        },
         protocols::Callable,
         result::Raise,
         types::Function,
@@ -85,6 +87,13 @@ impl Coroutine {
         self.context().current_state() != PausableState::Created
     }
 
+    pub fn run_until_pause(
+        &mut self,
+        interpreter: &TreewalkInterpreter,
+    ) -> TreewalkResult<TreewalkValue> {
+        PausableRunner::run_until_pause(self, interpreter)
+    }
+
     /// Execute the next instruction in the `Frame` and return whether we hit an `await` or not. If
     /// the next instruction is a control flow statement which leads the execution into a block,
     /// the coroutine state is updated to reflect this.
@@ -136,7 +145,7 @@ impl Pausable for Coroutine {
         match self.execute_statement(interpreter, stmt)? {
             Poll::Ready(val) => Ok(PausableStepResult::Return(val)),
             Poll::Waiting => {
-                self.on_exit(interpreter);
+                PausableRunner::on_exit(interpreter);
                 Ok(PausableStepResult::Break)
             }
         }

@@ -17,6 +17,8 @@ pub enum PausableStepResult {
     Break,
 }
 
+pub struct PausableRunner;
+
 /// The interface for generators and coroutines, which share the ability to be paused and resumed.
 pub trait Pausable {
     /// A getter for the [`PausableContext`] of a pausable function.
@@ -39,35 +41,40 @@ pub trait Pausable {
         interpreter: &TreewalkInterpreter,
         statement: Statement,
     ) -> TreewalkResult<PausableStepResult>;
+}
 
+impl PausableRunner {
     /// The default behavior which selects the next [`Statement`] and manually evaluates any
     /// control flow statements. This then calls [`Pausable::handle_step`] to set up any return
     /// values based on whether a control flow structure was encountered.
-    fn step(&mut self, interpreter: &TreewalkInterpreter) -> TreewalkResult<PausableStepResult> {
-        let statement = self.context_mut().next_statement();
+    pub fn step<P: Pausable>(
+        pausable: &mut P,
+        interpreter: &TreewalkInterpreter,
+    ) -> TreewalkResult<PausableStepResult> {
+        let statement = pausable.context_mut().next_statement();
 
         // Delegate to the common function for control flow
         let encountered_control_flow =
-            self.execute_control_flow_statement(&statement, interpreter)?;
+            Self::execute_control_flow_statement(pausable, &statement, interpreter)?;
 
         if encountered_control_flow {
             return Ok(PausableStepResult::NoOp);
         }
 
-        self.handle_step(interpreter, statement)
+        pausable.handle_step(interpreter, statement)
     }
 
     /// The default behavior required to perform the necessary context switching when entering a
     /// pausable function.
     /// TODO we used to push a new stack frame here, perhaps we need do to that for each statement
     /// now?
-    fn on_entry(&self, interpreter: &TreewalkInterpreter) {
-        interpreter.state.push_local(self.scope());
+    pub fn on_entry<P: Pausable>(pausable: &P, interpreter: &TreewalkInterpreter) {
+        interpreter.state.push_local(pausable.scope());
     }
 
     /// The default behavior required to perform the necessary context switching when exiting a
     /// pausable function.
-    fn on_exit(&mut self, interpreter: &TreewalkInterpreter) {
+    pub fn on_exit(interpreter: &TreewalkInterpreter) {
         interpreter.state.pop_local();
     }
 
@@ -79,14 +86,14 @@ pub trait Pausable {
     /// whenever this coroutine is awaited.
     ///
     /// A boolean is returned indicated whether a control flow statement was encountered.
-    fn execute_control_flow_statement(
-        &mut self,
+    pub fn execute_control_flow_statement<P: Pausable>(
+        pausable: &mut P,
         stmt: &Statement,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<bool> {
         match &stmt.kind {
             StatementKind::WhileLoop(cond_ast) => {
-                self.context_mut().push(PausableFrame::new(
+                pausable.context_mut().push(PausableFrame::new(
                     Frame::new_finished(cond_ast.ast.clone()),
                     PausableState::InWhileLoop(cond_ast.condition.clone()),
                 ));
@@ -102,7 +109,7 @@ pub trait Pausable {
                     .evaluate_expr(&if_part.condition)?
                     .coerce_to_bool()
                 {
-                    self.context_mut().push(PausableFrame::new(
+                    pausable.context_mut().push(PausableFrame::new(
                         Frame::new(if_part.ast.clone()),
                         PausableState::InBlock,
                     ));
@@ -115,7 +122,7 @@ pub trait Pausable {
                         .evaluate_expr(&elif_part.condition)?
                         .coerce_to_bool()
                     {
-                        self.context_mut().push(PausableFrame::new(
+                        pausable.context_mut().push(PausableFrame::new(
                             Frame::new(elif_part.ast.clone()),
                             PausableState::InBlock,
                         ));
@@ -125,7 +132,7 @@ pub trait Pausable {
                 }
 
                 if let Some(else_body) = else_part {
-                    self.context_mut().push(PausableFrame::new(
+                    pausable.context_mut().push(PausableFrame::new(
                         Frame::new(else_body.clone()),
                         PausableState::InBlock,
                     ));
@@ -147,7 +154,7 @@ pub trait Pausable {
                     .evaluate_expr(iterable)?
                     .as_iterable()
                     .raise(interpreter)?;
-                self.context_mut().push(PausableFrame::new(
+                pausable.context_mut().push(PausableFrame::new(
                     Frame::new_finished(body.clone()),
                     PausableState::InForLoop {
                         index: index.clone(),
@@ -162,27 +169,27 @@ pub trait Pausable {
     }
 
     /// Run this [`Pausable`] until it reaches a pause event.
-    fn run_until_pause(
-        &mut self,
+    pub fn run_until_pause<P: Pausable>(
+        pausable: &mut P,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<TreewalkValue> {
-        self.on_entry(interpreter);
+        Self::on_entry(pausable, interpreter);
 
         let mut result = TreewalkValue::None;
         loop {
-            match self.context().current_state() {
+            match pausable.context().current_state() {
                 PausableState::Created => {
-                    self.context_mut().start();
+                    pausable.context_mut().start();
                     continue;
                 }
                 PausableState::Running => {
-                    if self.context().current_frame().is_finished() {
-                        self.on_exit(interpreter);
-                        return self.finish(result).raise(interpreter);
+                    if pausable.context().current_frame().is_finished() {
+                        Self::on_exit(interpreter);
+                        return pausable.finish(result).raise(interpreter);
                     }
                 }
                 PausableState::InForLoop { index, iterable } => {
-                    if self.context().current_frame().is_finished() {
+                    if pausable.context().current_frame().is_finished() {
                         let item = iterable
                             .clone()
                             .as_iterator_strict()
@@ -190,32 +197,32 @@ pub trait Pausable {
                             .try_next()?;
                         if let Some(item) = item {
                             interpreter.execute_loop_index_assignment(&index, item)?;
-                            self.context_mut().restart_frame();
+                            pausable.context_mut().restart_frame();
                         } else {
-                            self.context_mut().pop();
+                            pausable.context_mut().pop();
                             continue;
                         }
                     }
                 }
                 PausableState::InBlock => {
-                    if self.context().current_frame().is_finished() {
-                        self.context_mut().pop();
+                    if pausable.context().current_frame().is_finished() {
+                        pausable.context_mut().pop();
                         continue;
                     }
                 }
                 PausableState::InWhileLoop(condition) => {
-                    if self.context().current_frame().is_finished() {
+                    if pausable.context().current_frame().is_finished() {
                         if interpreter.evaluate_expr(&condition)?.coerce_to_bool() {
-                            self.context_mut().restart_frame();
+                            pausable.context_mut().restart_frame();
                         } else {
-                            self.context_mut().pop();
+                            pausable.context_mut().pop();
                             continue;
                         }
                     }
                 }
             }
 
-            match self.step(interpreter)? {
+            match Self::step(pausable, interpreter)? {
                 PausableStepResult::NoOp => {}
                 PausableStepResult::BreakAndReturn(val) => {
                     break Ok(val);

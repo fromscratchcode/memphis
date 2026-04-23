@@ -2,7 +2,7 @@ use crate::{
     core::Container,
     parser::types::{Ast, ConditionalAst, Expr, ForClause, Statement, StatementKind},
     treewalk::{
-        pausable::{Frame, Pausable, PausableStack, PausableStepResult},
+        pausable::{Frame, Pausable, PausableRunner, PausableStack, PausableStepResult},
         protocols::Iterable,
         result::Raise,
         type_system::CloneableIterable,
@@ -60,7 +60,7 @@ impl Generator {
             }
         }
 
-        <Self as Pausable>::run_until_pause(self, interpreter)
+        PausableRunner::run_until_pause(self, interpreter)
     }
 
     /// By this point, all control flow statements have already been handled manually. Evaluate all
@@ -168,7 +168,7 @@ impl Pausable for Generator {
     ) -> TreewalkResult<PausableStepResult> {
         match self.execute_statement(interpreter, stmt)? {
             Some(yielded) => {
-                self.on_exit(interpreter);
+                PausableRunner::on_exit(interpreter);
                 Ok(PausableStepResult::BreakAndReturn(yielded))
             }
             None => Ok(PausableStepResult::NoOp),
