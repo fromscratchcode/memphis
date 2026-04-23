@@ -13,6 +13,13 @@ impl Frame {
         Self { ast, pc: 0 }
     }
 
+    /// Initialize a [`Frame`] in a completed state so the caller can use the normal loop
+    /// restart path to begin execution.
+    pub fn new_finished(ast: Ast) -> Self {
+        let pc = ast.len();
+        Self { ast, pc }
+    }
+
     /// Return a boolean indicating whether we have instructions left in the block to evaluate.
     pub fn is_finished(&self) -> bool {
         self.len() <= self.pc

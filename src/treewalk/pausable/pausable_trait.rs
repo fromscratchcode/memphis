@@ -96,15 +96,10 @@ pub trait Pausable {
     ) -> TreewalkResult<bool> {
         match &stmt.kind {
             StatementKind::WhileLoop(cond_ast) => {
-                if interpreter
-                    .evaluate_expr(&cond_ast.condition)?
-                    .coerce_to_bool()
-                {
-                    self.context_mut().push(PausableFrame::new(
-                        Frame::new(cond_ast.ast.clone()),
-                        PausableState::InWhileLoop(cond_ast.condition.clone()),
-                    ));
-                }
+                self.context_mut().push(PausableFrame::new(
+                    Frame::new_finished(cond_ast.ast.clone()),
+                    PausableState::InWhileLoop(cond_ast.condition.clone()),
+                ));
 
                 Ok(true)
             }
@@ -162,18 +157,13 @@ pub trait Pausable {
                     .evaluate_expr(iterable)?
                     .as_iterable()
                     .raise(interpreter)?;
-                let mut iter = iterator.clone().as_iterator_strict().raise(interpreter)?;
-
-                if let Some(item) = iter.try_next()? {
-                    interpreter.execute_loop_index_assignment(index, item)?;
-                    self.context_mut().push(PausableFrame::new(
-                        Frame::new(body.clone()),
-                        PausableState::InForLoop {
-                            index: index.clone(),
-                            iterable: iterator,
-                        },
-                    ));
-                }
+                self.context_mut().push(PausableFrame::new(
+                    Frame::new_finished(body.clone()),
+                    PausableState::InForLoop {
+                        index: index.clone(),
+                        iterable: iterator,
+                    },
+                ));
 
                 Ok(true)
             }
@@ -285,8 +275,12 @@ pub trait Pausable {
                 }
                 PausableState::InWhileLoop(condition) => {
                     if self.context().current_frame().is_finished() {
-                        self.context_mut().pop();
-                        continue;
+                        if interpreter.evaluate_expr(&condition)?.coerce_to_bool() {
+                            self.context_mut().restart_frame();
+                        } else {
+                            self.context_mut().pop();
+                            continue;
+                        }
                     }
 
                     match self.step(interpreter)? {
@@ -301,12 +295,6 @@ pub trait Pausable {
                             break Ok(TreewalkValue::None);
                         }
                     };
-
-                    if self.context().current_frame().is_finished()
-                        && interpreter.evaluate_expr(&condition)?.coerce_to_bool()
-                    {
-                        self.context_mut().restart_frame();
-                    }
                 }
             }
         }
