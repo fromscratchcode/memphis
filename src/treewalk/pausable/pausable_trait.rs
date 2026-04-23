@@ -105,35 +105,11 @@ impl PausableRunner {
                 elif_parts,
                 else_part,
             } => {
-                if interpreter
-                    .evaluate_expr(&if_part.condition)?
-                    .coerce_to_bool()
+                if let Some(selected_block) =
+                    interpreter.select_if_branch(if_part, elif_parts, else_part)?
                 {
                     pausable.context_mut().push(PausableFrame::new(
-                        Frame::new(if_part.ast.clone()),
-                        PausableState::InBlock,
-                    ));
-
-                    return Ok(true);
-                }
-
-                for elif_part in elif_parts {
-                    if interpreter
-                        .evaluate_expr(&elif_part.condition)?
-                        .coerce_to_bool()
-                    {
-                        pausable.context_mut().push(PausableFrame::new(
-                            Frame::new(elif_part.ast.clone()),
-                            PausableState::InBlock,
-                        ));
-
-                        return Ok(true);
-                    }
-                }
-
-                if let Some(else_body) = else_part {
-                    pausable.context_mut().push(PausableFrame::new(
-                        Frame::new(else_body.clone()),
+                        Frame::new(selected_block),
                         PausableState::InBlock,
                     ));
                 }

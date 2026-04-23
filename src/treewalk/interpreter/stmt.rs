@@ -285,26 +285,30 @@ impl TreewalkInterpreter {
         elif_parts: &[ConditionalAst],
         else_part: &Option<Ast>,
     ) -> TreewalkResult<()> {
-        let if_condition_result = self.evaluate_expr(&if_part.condition)?;
-        if if_condition_result.coerce_to_bool() {
-            self.execute_ast(&if_part.ast)?;
-            return Ok(());
-        }
-
-        for elif_part in elif_parts {
-            let elif_condition_result = self.evaluate_expr(&elif_part.condition)?;
-            if elif_condition_result.coerce_to_bool() {
-                self.execute_ast(&elif_part.ast)?;
-                return Ok(());
-            }
-        }
-
-        if let Some(else_part) = else_part {
-            self.execute_ast(else_part)?;
-            return Ok(());
+        if let Some(selected_block) = self.select_if_branch(if_part, elif_parts, else_part)? {
+            self.execute_ast(&selected_block)?;
         }
 
         Ok(())
+    }
+
+    pub fn select_if_branch(
+        &self,
+        if_part: &ConditionalAst,
+        elif_parts: &[ConditionalAst],
+        else_part: &Option<Ast>,
+    ) -> TreewalkResult<Option<Ast>> {
+        if self.evaluate_expr(&if_part.condition)?.coerce_to_bool() {
+            return Ok(Some(if_part.ast.clone()));
+        }
+
+        for elif_part in elif_parts {
+            if self.evaluate_expr(&elif_part.condition)?.coerce_to_bool() {
+                return Ok(Some(elif_part.ast.clone()));
+            }
+        }
+
+        Ok(else_part.clone())
     }
 
     fn evaluate_while_loop(&self, cond_ast: &ConditionalAst) -> TreewalkResult<()> {
