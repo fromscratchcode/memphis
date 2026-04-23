@@ -205,25 +205,13 @@ pub trait Pausable {
             match self.context().current_state() {
                 PausableState::Created => {
                     self.context_mut().start();
+                    continue;
                 }
                 PausableState::Running => {
                     if self.context().current_frame().is_finished() {
                         self.on_exit(interpreter);
                         return self.finish(result).raise(interpreter);
                     }
-
-                    match self.step(interpreter)? {
-                        PausableStepResult::NoOp => {}
-                        PausableStepResult::BreakAndReturn(val) => {
-                            break Ok(val);
-                        }
-                        PausableStepResult::Return(val) => {
-                            result = val;
-                        }
-                        PausableStepResult::Break => {
-                            break Ok(TreewalkValue::None);
-                        }
-                    };
                 }
                 PausableState::InForLoop { index, iterable } => {
                     if self.context().current_frame().is_finished() {
@@ -240,38 +228,12 @@ pub trait Pausable {
                             continue;
                         }
                     }
-
-                    match self.step(interpreter)? {
-                        PausableStepResult::NoOp => {}
-                        PausableStepResult::BreakAndReturn(val) => {
-                            break Ok(val);
-                        }
-                        PausableStepResult::Return(val) => {
-                            result = val;
-                        }
-                        PausableStepResult::Break => {
-                            break Ok(TreewalkValue::None);
-                        }
-                    };
                 }
                 PausableState::InBlock => {
                     if self.context().current_frame().is_finished() {
                         self.context_mut().pop();
                         continue;
                     }
-
-                    match self.step(interpreter)? {
-                        PausableStepResult::NoOp => {}
-                        PausableStepResult::BreakAndReturn(val) => {
-                            break Ok(val);
-                        }
-                        PausableStepResult::Return(val) => {
-                            result = val;
-                        }
-                        PausableStepResult::Break => {
-                            break Ok(TreewalkValue::None);
-                        }
-                    };
                 }
                 PausableState::InWhileLoop(condition) => {
                     if self.context().current_frame().is_finished() {
@@ -282,21 +244,21 @@ pub trait Pausable {
                             continue;
                         }
                     }
-
-                    match self.step(interpreter)? {
-                        PausableStepResult::NoOp => {}
-                        PausableStepResult::BreakAndReturn(val) => {
-                            break Ok(val);
-                        }
-                        PausableStepResult::Return(val) => {
-                            result = val;
-                        }
-                        PausableStepResult::Break => {
-                            break Ok(TreewalkValue::None);
-                        }
-                    };
                 }
             }
+
+            match self.step(interpreter)? {
+                PausableStepResult::NoOp => {}
+                PausableStepResult::BreakAndReturn(val) => {
+                    break Ok(val);
+                }
+                PausableStepResult::Return(val) => {
+                    result = val;
+                }
+                PausableStepResult::Break => {
+                    break Ok(TreewalkValue::None);
+                }
+            };
         }
     }
 }
