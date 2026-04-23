@@ -39,6 +39,30 @@ impl Generator {
         Self::new(Container::new(Scope::default()), function)
     }
 
+    pub fn run_until_pause(
+        &mut self,
+        interpreter: &TreewalkInterpreter,
+    ) -> TreewalkResult<TreewalkValue> {
+        // `yield from` delegation is generator-specific behavior layered on top of the shared
+        // pausable state machine.
+        if let Some(delegated) = &mut self.delegated {
+            match delegated.try_next() {
+                Ok(Some(val)) => return Ok(val),
+                Ok(None) => {
+                    self.delegated = None;
+                }
+                Err(TreewalkDisruption::Error(e))
+                    if e.exception.get_type() == crate::domain::Type::StopIteration =>
+                {
+                    self.delegated = None;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        <Self as Pausable>::run_until_pause(self, interpreter)
+    }
+
     /// By this point, all control flow statements have already been handled manually. Evaluate all
     /// other statements unless we encounter a yield.
     ///
@@ -149,14 +173,6 @@ impl Pausable for Generator {
             }
             None => Ok(PausableStepResult::NoOp),
         }
-    }
-
-    fn clear_delegated(&mut self) {
-        self.delegated = None;
-    }
-
-    fn delegated(&mut self) -> Option<&mut Box<dyn CloneableIterable>> {
-        self.delegated.as_mut()
     }
 }
 

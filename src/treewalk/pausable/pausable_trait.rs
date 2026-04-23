@@ -1,10 +1,9 @@
 use crate::{
     core::Container,
-    domain::Type,
     parser::types::{Statement, StatementKind},
     treewalk::{
-        protocols::Iterable, result::Raise, type_system::CloneableIterable, DomainResult, Scope,
-        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        protocols::Iterable, result::Raise, DomainResult, Scope, TreewalkInterpreter,
+        TreewalkResult, TreewalkValue,
     },
 };
 
@@ -27,15 +26,6 @@ pub trait Pausable {
 
     /// A getter for the [`Scope`] of a pausable function.
     fn scope(&self) -> Container<Scope>;
-
-    fn delegated(&mut self) -> Option<&mut Box<dyn CloneableIterable>> {
-        // Only generators will need this. Coroutines use the executor instead.
-        None
-    }
-
-    fn clear_delegated(&mut self) {
-        unimplemented!("This Pausable does not support delegation.")
-    }
 
     /// A handle to perform any necessary cleanup once this function returns, including set its
     /// return value.
@@ -176,28 +166,6 @@ pub trait Pausable {
         &mut self,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<TreewalkValue> {
-        // We must check this first to handle `yield from`. This is because generators do not have
-        // a parent executor the way coroutines do.
-        if let Some(delegated) = &mut self.delegated() {
-            match delegated.try_next() {
-                Ok(Some(val)) => {
-                    // Yielding a value from sub-generator, bubble it up
-                    return Ok(val);
-                }
-                Ok(None) => {
-                    // Sub-generator finished, fall through and resume parent generator
-                    self.clear_delegated();
-                }
-                Err(TreewalkDisruption::Error(e))
-                    if e.exception.get_type() == Type::StopIteration =>
-                {
-                    // Sub-generator finished, fall through and resume parent generator
-                    self.clear_delegated();
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
         self.on_entry(interpreter);
 
         let mut result = TreewalkValue::None;
