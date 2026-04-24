@@ -3,12 +3,14 @@ use crate::{
         compiler::Opcode,
         runtime::{
             import_utils::build_module_chain,
+            iter_internal,
             modules::builtins,
+            next_internal,
             types::{
                 str_getitem, Coroutine, Dict, Exception, FunctionObject, Generator, List, Method,
                 Object, Tuple,
             },
-            BuiltinFunction, Completion, FrameExit, StepResult, Suspension,
+            BuiltinFunction, Completion, FrameExit, NextResult, StepResult, Suspension,
         },
         VirtualMachine, VmValue,
     },
@@ -287,22 +289,25 @@ impl VirtualMachine {
             }
             Opcode::GetIter => {
                 let obj_ref = self.pop();
-                let iterator_ref = step_raised!(builtins::iter_internal(self, obj_ref));
+                let iterator_ref = step_raised!(iter_internal(self, obj_ref));
                 self.push(iterator_ref);
             }
             Opcode::ForIter(offset) => {
                 // Don’t pop, we need the iterator on the stack for the next iteration
                 let iter_ref = self.peek();
-                let next_ref = step_raised!(builtins::next_internal(self, iter_ref));
+                let next_ref = step_raised!(next_internal(self, iter_ref));
 
-                if let Some(next_ref) = next_ref {
-                    // Iterator stays, value now lives above it
-                    self.push(next_ref);
-                } else {
-                    // Pop the iterator only if exhausted
-                    let _ = self.pop();
-                    self.call_stack.jump_to_offset(offset);
-                    return StepResult::Continue;
+                match next_ref {
+                    NextResult::Yielded(next_ref) => {
+                        // Iterator stays, value now lives above it
+                        self.push(next_ref);
+                    }
+                    NextResult::Exhausted(_) => {
+                        // Pop the iterator only if exhausted
+                        let _ = self.pop();
+                        self.call_stack.jump_to_offset(offset);
+                        return StepResult::Continue;
+                    }
                 }
             }
             Opcode::Jump(offset) => {
@@ -452,7 +457,7 @@ impl VirtualMachine {
                 if !self.current_frame().has_subgenerator() {
                     // First time hitting this instruction: pop the iterable and store it
                     let iterable_ref = self.pop();
-                    let iterator_ref = step_raised!(builtins::iter_internal(self, iterable_ref));
+                    let iterator_ref = step_raised!(iter_internal(self, iterable_ref));
                     let frame = self.current_frame_mut();
                     frame.set_subgenerator(iterator_ref);
                 }
@@ -464,16 +469,17 @@ impl VirtualMachine {
                 };
 
                 // Actually try the next() call
-                let next_result = step_raised!(builtins::next_internal(self, iterator_ref));
+                let next_result = step_raised!(next_internal(self, iterator_ref));
                 match next_result {
-                    Some(val) => {
+                    NextResult::Yielded(val) => {
                         return StepResult::Exit(FrameExit::Suspended(Suspension::Yield(val)));
                         // yield and don't advance PC
                     }
-                    None => {
+                    NextResult::Exhausted(return_val) => {
                         // Sub-generator is done, clean up and continue
                         let frame = self.current_frame_mut();
                         frame.clear_subgenerator();
+                        self.push(return_val.unwrap_or_else(|| self.none()));
                         self.call_stack.advance_pc(); // advance past YieldFrom
                         return StepResult::Continue;
                     }
@@ -584,15 +590,15 @@ impl VirtualMachine {
             }
             Opcode::UnpackSequence(n) => {
                 let iterable_ref = self.pop();
-                let iter_ref = step_raised!(builtins::iter_internal(self, iterable_ref));
+                let iter_ref = step_raised!(iter_internal(self, iterable_ref));
 
                 let mut items = Vec::with_capacity(n);
                 for _ in 0..n {
-                    let next = step_raised!(builtins::next_internal(self, iter_ref));
+                    let next = step_raised!(next_internal(self, iter_ref));
 
                     match next {
-                        Some(value) => items.push(value),
-                        None => {
+                        NextResult::Yielded(value) => items.push(value),
+                        NextResult::Exhausted(_) => {
                             let msg = self.intern_string(&format!(
                                 "not enough values to unpack (expected {}, got {})",
                                 n,
@@ -604,8 +610,8 @@ impl VirtualMachine {
                     }
                 }
 
-                let extra = step_raised!(builtins::next_internal(self, iter_ref));
-                if extra.is_some() {
+                let extra = step_raised!(next_internal(self, iter_ref));
+                if matches!(extra, NextResult::Yielded(_)) {
                     let msg =
                         self.intern_string(&format!("too many values to unpack (expected {})", n));
                     let exc = Exception::value_error(msg);

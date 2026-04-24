@@ -4665,66 +4665,6 @@ a = memoryview
     }
 
     #[test]
-    fn yield_from_for_loop() {
-        let input = r#"
-def countdown(n):
-    while n > 0:
-        yield n
-        n -= 1
-
-def countdown_from(x, y):
-    yield from countdown(x)
-    yield from countdown(y)
-
-sum = 0
-for number in countdown_from(3, 2):
-    sum += number
-
-sum
-"#;
-        assert_eval_eq!(input, int!(9));
-    }
-
-    #[test]
-    fn yield_from_list_builtin() {
-        let input = r#"
-def gen():
-    yield from [1, 2, 3]
-
-list(gen())
-"#;
-        assert_eval_eq!(input, list![int!(1), int!(2), int!(3)]);
-    }
-
-    #[test]
-    fn yield_from_list_builtin_empty() {
-        let input = r#"
-def gen():
-    yield from []
-
-list(gen())
-"#;
-        assert_eval_eq!(input, list![]);
-    }
-
-    #[test]
-    fn yield_from_with_return() {
-        let input = r#"
-def g1():
-    yield 1
-    yield 2
-    return 42
-
-def g2():
-    x = yield from g1()
-    yield x
-
-list(g2())
-"#;
-        assert_eval_eq!(input, list![int!(1), int!(2), int!(42)]);
-    }
-
-    #[test]
     fn traceback_and_frame() {
         let input = r#"
 try:

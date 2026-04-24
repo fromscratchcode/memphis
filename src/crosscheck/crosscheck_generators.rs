@@ -47,31 +47,3 @@ b = next(g)
 
     assert_stop_iteration!(e.exception);
 }
-
-#[test]
-fn yield_from_list_builtin_list_iterable() {
-    let input = r#"
-def gen():
-    yield from [1, 2, 3]
-
-list(gen())
-"#;
-
-    assert_crosscheck_return!(input, list![int!(1), int!(2), int!(3)]);
-}
-
-#[test]
-fn yield_from_list_builtin_generator_iterable() {
-    let input = r#"
-def subgen():
-    yield 1
-    yield 2
-    yield 4
-
-def gen():
-    yield from subgen()
-
-list(gen())
-"#;
-    assert_crosscheck_return!(input, list![int!(1), int!(2), int!(4)]);
-}

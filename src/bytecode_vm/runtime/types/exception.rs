@@ -55,6 +55,10 @@ impl Exception {
         Self::new_empty(ExceptionKind::StopIteration)
     }
 
+    pub fn stop_iteration_with(value: Reference) -> Self {
+        Self::new(ExceptionKind::StopIteration, vec![value])
+    }
+
     pub fn value_error(msg: Reference) -> Self {
         Self::new(ExceptionKind::ValueError, vec![msg])
     }
