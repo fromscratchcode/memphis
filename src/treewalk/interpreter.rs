@@ -4665,7 +4665,7 @@ a = memoryview
     }
 
     #[test]
-    fn yield_from() {
+    fn yield_from_for_loop() {
         let input = r#"
 def countdown(n):
     while n > 0:
@@ -4679,11 +4679,10 @@ def countdown_from(x, y):
 sum = 0
 for number in countdown_from(3, 2):
     sum += number
+
+sum
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "sum", int!(9));
+        assert_eval_eq!(input, int!(9));
     }
 
     #[test]
@@ -4692,12 +4691,9 @@ for number in countdown_from(3, 2):
 def gen():
     yield from [1, 2, 3]
 
-a = list(gen())
+list(gen())
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(3)]);
+        assert_eval_eq!(input, list![int!(1), int!(2), int!(3)]);
     }
 
     #[test]
@@ -4706,12 +4702,9 @@ a = list(gen())
 def gen():
     yield from []
 
-a = list(gen())
+list(gen())
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![]);
+        assert_eval_eq!(input, list![]);
     }
 
     #[test]
@@ -4726,12 +4719,9 @@ def g2():
     x = yield from g1()
     yield x
 
-a = list(g2())
+list(g2())
 "#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(42)]);
+        assert_eval_eq!(input, list![int!(1), int!(2), int!(42)]);
     }
 
     #[test]
