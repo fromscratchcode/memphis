@@ -186,10 +186,7 @@ impl Pausable for Generator {
         stmt: Statement,
     ) -> TreewalkResult<PausableStepResult> {
         match self.execute_statement(interpreter, stmt)? {
-            Some(yielded) => {
-                PausableRunner::on_exit(interpreter);
-                Ok(PausableStepResult::BreakAndReturn(yielded))
-            }
+            Some(yielded) => Ok(PausableStepResult::BreakAndReturn(yielded)),
             None => Ok(PausableStepResult::NoOp),
         }
     }

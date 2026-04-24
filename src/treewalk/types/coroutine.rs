@@ -144,10 +144,7 @@ impl Pausable for Coroutine {
     ) -> TreewalkResult<PausableStepResult> {
         match self.execute_statement(interpreter, stmt)? {
             Poll::Ready(val) => Ok(PausableStepResult::Return(val)),
-            Poll::Waiting => {
-                PausableRunner::on_exit(interpreter);
-                Ok(PausableStepResult::Break)
-            }
+            Poll::Waiting => Ok(PausableStepResult::Break),
         }
     }
 }

@@ -10,20 +10,6 @@ use super::{Frame, Pausable, PausableFrame, PausableState, PausableStepResult};
 pub struct PausableRunner;
 
 impl PausableRunner {
-    /// The default behavior required to perform the necessary context switching when entering a
-    /// pausable function.
-    /// TODO we used to push a new stack frame here, perhaps we need do to that for each statement
-    /// now?
-    pub fn on_entry<P: Pausable>(pausable: &P, interpreter: &TreewalkInterpreter) {
-        interpreter.state.push_local(pausable.scope());
-    }
-
-    /// The default behavior required to perform the necessary context switching when exiting a
-    /// pausable function.
-    pub fn on_exit(interpreter: &TreewalkInterpreter) {
-        interpreter.state.pop_local();
-    }
-
     /// Run this [`Pausable`] until it reaches a pause event.
     pub fn run_until_pause<P: Pausable>(
         pausable: &mut P,
@@ -81,12 +67,14 @@ impl PausableRunner {
             match Self::step(pausable, interpreter)? {
                 PausableStepResult::NoOp => {}
                 PausableStepResult::BreakAndReturn(val) => {
+                    Self::on_exit(interpreter);
                     break Ok(val);
                 }
                 PausableStepResult::Return(val) => {
                     result = val;
                 }
                 PausableStepResult::Break => {
+                    Self::on_exit(interpreter);
                     break Ok(TreewalkValue::None);
                 }
             };
@@ -177,5 +165,17 @@ impl PausableRunner {
             }
             _ => Ok(false), // only control flow statements are handled here
         }
+    }
+
+    /// The default behavior required to perform the necessary context switching when entering a
+    /// pausable function.
+    fn on_entry<P: Pausable>(pausable: &P, interpreter: &TreewalkInterpreter) {
+        interpreter.state.push_local(pausable.scope());
+    }
+
+    /// The default behavior required to perform the necessary context switching when exiting a
+    /// pausable function.
+    fn on_exit(interpreter: &TreewalkInterpreter) {
+        interpreter.state.pop_local();
     }
 }
