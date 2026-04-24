@@ -66,14 +66,14 @@ impl PausableRunner {
 
             match Self::step(pausable, interpreter)? {
                 PausableStepResult::NoOp => {}
-                PausableStepResult::BreakAndReturn(val) => {
+                PausableStepResult::YieldValue(val) => {
                     Self::on_exit(interpreter);
                     break Ok(val);
                 }
                 PausableStepResult::Return(val) => {
                     result = val;
                 }
-                PausableStepResult::Break => {
+                PausableStepResult::Suspend => {
                     Self::on_exit(interpreter);
                     break Ok(TreewalkValue::None);
                 }
@@ -98,7 +98,7 @@ impl PausableRunner {
             return Ok(PausableStepResult::NoOp);
         }
 
-        pausable.handle_step(interpreter, statement)
+        pausable.execute_statement(interpreter, statement)
     }
 
     /// This function manually executes any control flow statements. Any changes are reflected by

@@ -86,38 +86,6 @@ impl Generator {
         PausableRunner::run_until_pause(self, interpreter)
     }
 
-    /// By this point, all control flow statements have already been handled manually. Evaluate all
-    /// other statements unless we encounter a yield.
-    ///
-    /// Only yield statements will cause a value to be returned, everything else will return
-    /// `None`.
-    fn execute_statement(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        stmt: Statement,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
-        match interpreter.evaluate_statement(&stmt) {
-            Ok(_) => Ok(None),
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => {
-                Exception::stop_iteration_with(val).raise(interpreter)
-            }
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Yield(val))) => Ok(Some(val)),
-            Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(val))) => {
-                if matches!(self.suspend, GeneratorSuspend::None) {
-                    self.context_mut().step_back();
-                    self.suspend =
-                        GeneratorSuspend::Delegating(val.as_iterator().raise(interpreter)?);
-                }
-
-                match self.resume_delegation(interpreter)? {
-                    Some(val) => Ok(Some(val)),
-                    None => Ok(None),
-                }
-            }
-            Err(e) => Err(e),
-        }
-    }
-
     // This is a utility which takes the parsed elements found in a generator comprehension and
     // recursively builds a generator function out of them. This will then become the body of the
     // function provided to a generator.
@@ -180,14 +148,33 @@ impl Pausable for Generator {
         Err(Exception::stop_iteration())
     }
 
-    fn handle_step(
+    /// Only yield statements will cause a value to be returned.
+    fn execute_statement(
         &mut self,
         interpreter: &TreewalkInterpreter,
         stmt: Statement,
     ) -> TreewalkResult<PausableStepResult> {
-        match self.execute_statement(interpreter, stmt)? {
-            Some(yielded) => Ok(PausableStepResult::BreakAndReturn(yielded)),
-            None => Ok(PausableStepResult::NoOp),
+        match interpreter.evaluate_statement(&stmt) {
+            Ok(_) => Ok(PausableStepResult::NoOp),
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => {
+                Exception::stop_iteration_with(val).raise(interpreter)
+            }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Yield(val))) => {
+                Ok(PausableStepResult::YieldValue(val))
+            }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(val))) => {
+                if matches!(self.suspend, GeneratorSuspend::None) {
+                    self.context_mut().step_back();
+                    self.suspend =
+                        GeneratorSuspend::Delegating(val.as_iterator().raise(interpreter)?);
+                }
+
+                match self.resume_delegation(interpreter)? {
+                    Some(val) => Ok(PausableStepResult::YieldValue(val)),
+                    None => Ok(PausableStepResult::NoOp),
+                }
+            }
+            Err(e) => Err(e),
         }
     }
 }
