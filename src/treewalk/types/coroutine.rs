@@ -7,7 +7,8 @@ use crate::{
     treewalk::{
         macros::*,
         pausable::{
-            Frame, Pausable, PausableRunner, PausableStack, PausableState, PausableStepResult,
+            Completion, Frame, FrameExit, Pausable, PausableRunner, PausableStack, PausableState,
+            StepResult, Suspension,
         },
         protocols::Callable,
         result::Raise,
@@ -112,19 +113,19 @@ impl Pausable for Coroutine {
         &mut self,
         interpreter: &TreewalkInterpreter,
         stmt: &Statement,
-    ) -> TreewalkResult<PausableStepResult> {
+    ) -> TreewalkResult<StepResult> {
         let step_result = match interpreter.evaluate_statement(stmt) {
-            Ok(result) => Ok(PausableStepResult::Return(result)),
+            Ok(_) => Ok(StepResult::Continue),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep)) => {
-                Ok(PausableStepResult::Suspend)
+                Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Sleep)))
             }
             Err(TreewalkDisruption::Signal(TreewalkSignal::Await)) => {
                 // suspend and do _not_ advance PC
-                return Ok(PausableStepResult::Suspend);
+                return Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Await)));
             }
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(result))) => {
-                Ok(PausableStepResult::Return(result))
-            }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(result))) => Ok(
+                StepResult::Exit(FrameExit::Completed(Completion::Return(result))),
+            ),
             Err(e) => Err(e),
         };
 

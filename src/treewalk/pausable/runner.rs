@@ -1,11 +1,14 @@
 use crate::{
     parser::types::{Statement, StatementKind},
     treewalk::{
-        protocols::Iterable, result::Raise, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        pausable::{Completion, FrameExit, Suspension},
+        protocols::Iterable,
+        result::Raise,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
-use super::{Frame, Pausable, PausableFrame, PausableState, PausableStepResult};
+use super::{Frame, Pausable, PausableFrame, PausableState, StepResult};
 
 pub struct PausableRunner;
 
@@ -17,7 +20,6 @@ impl PausableRunner {
     ) -> TreewalkResult<TreewalkValue> {
         Self::on_entry(pausable, interpreter);
 
-        let mut result = TreewalkValue::None;
         loop {
             match pausable.context().state() {
                 PausableState::Created => {
@@ -27,7 +29,7 @@ impl PausableRunner {
                 PausableState::Running => {
                     if pausable.context().frame().is_finished() {
                         Self::on_exit(interpreter);
-                        return pausable.finish(result).raise(interpreter);
+                        return pausable.finish(TreewalkValue::None).raise(interpreter);
                     }
                 }
                 PausableState::InForLoop { index, iterable } => {
@@ -65,19 +67,21 @@ impl PausableRunner {
             }
 
             match Self::step(pausable, interpreter)? {
-                PausableStepResult::NoOp => {}
-                PausableStepResult::YieldValue(val) => {
+                StepResult::Continue => {}
+                StepResult::Exit(exit) => {
                     Self::on_exit(interpreter);
-                    break Ok(val);
+                    return match exit {
+                        FrameExit::Completed(completion) => match completion {
+                            Completion::Return(val) => pausable.finish(val).raise(interpreter),
+                        },
+                        FrameExit::Suspended(suspension) => match suspension {
+                            Suspension::Yield(val) => Ok(val),
+                            Suspension::Await => Ok(TreewalkValue::None),
+                            Suspension::Sleep => Ok(TreewalkValue::None),
+                        },
+                    };
                 }
-                PausableStepResult::Return(val) => {
-                    result = val;
-                }
-                PausableStepResult::Suspend => {
-                    Self::on_exit(interpreter);
-                    break Ok(TreewalkValue::None);
-                }
-            };
+            }
         }
     }
 
@@ -87,7 +91,7 @@ impl PausableRunner {
     fn step<P: Pausable>(
         pausable: &mut P,
         interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<PausableStepResult> {
+    ) -> TreewalkResult<StepResult> {
         let statement = pausable.context_mut().frame().current_statement().clone();
 
         // Delegate to the common function for control flow
@@ -95,7 +99,7 @@ impl PausableRunner {
             Self::execute_control_flow_statement(pausable, &statement, interpreter)?;
 
         if encountered_control_flow {
-            return Ok(PausableStepResult::NoOp);
+            return Ok(StepResult::Continue);
         }
 
         pausable.execute_statement(interpreter, &statement)

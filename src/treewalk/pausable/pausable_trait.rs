@@ -4,15 +4,7 @@ use crate::{
     treewalk::{DomainResult, Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue},
 };
 
-use super::PausableStack;
-
-/// This instructs [`Pausable::run_until_pause`] what action should happen next.
-pub enum PausableStepResult {
-    NoOp,                      // keep going
-    YieldValue(TreewalkValue), // stop running, produce a value to caller
-    Suspend,                   // stop running, no value to caller
-    Return(TreewalkValue),     // finished completely with a value
-}
+use super::{PausableStack, StepResult};
 
 /// The interface for generators and coroutines, which share the ability to be paused and resumed.
 pub trait Pausable {
@@ -35,5 +27,5 @@ pub trait Pausable {
         &mut self,
         interpreter: &TreewalkInterpreter,
         statement: &Statement,
-    ) -> TreewalkResult<PausableStepResult>;
+    ) -> TreewalkResult<StepResult>;
 }

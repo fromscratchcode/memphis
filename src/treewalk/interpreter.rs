@@ -1691,6 +1691,35 @@ except StopIteration as e:
     }
 
     #[test]
+    #[ignore]
+    fn generator_with_early_return_skips_later_yields() {
+        let input = r#"
+def g():
+    yield 1
+    return 42
+    yield 2
+    yield 3
+
+gen = g()
+a = next(gen)
+
+b = None
+try:
+    next(gen)
+except StopIteration as e:
+    b = e.value
+
+c = list(g())
+"#;
+
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "a", int!(1));
+        assert_read_eq!(ctx, "b", int!(42));
+        assert_read_eq!(ctx, "c", list![int!(1)]);
+    }
+
+    #[test]
     fn basic_inheritance() {
         let input = r#"
 class Parent:

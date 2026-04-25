@@ -3,7 +3,9 @@ use crate::{
     domain::Type,
     parser::types::{Ast, ConditionalAst, Expr, ForClause, Statement, StatementKind},
     treewalk::{
-        pausable::{Frame, Pausable, PausableRunner, PausableStack, PausableStepResult},
+        pausable::{
+            Frame, FrameExit, Pausable, PausableRunner, PausableStack, StepResult, Suspension,
+        },
         protocols::Iterable,
         result::Raise,
         type_system::CloneableIterable,
@@ -153,15 +155,15 @@ impl Pausable for Generator {
         &mut self,
         interpreter: &TreewalkInterpreter,
         stmt: &Statement,
-    ) -> TreewalkResult<PausableStepResult> {
+    ) -> TreewalkResult<StepResult> {
         let step_result = match interpreter.evaluate_statement(stmt) {
-            Ok(_) => Ok(PausableStepResult::NoOp),
+            Ok(_) => Ok(StepResult::Continue),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => {
                 Exception::stop_iteration_with(val).raise(interpreter)
             }
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Yield(val))) => {
-                Ok(PausableStepResult::YieldValue(val))
-            }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Yield(val))) => Ok(StepResult::Exit(
+                FrameExit::Suspended(Suspension::Yield(val)),
+            )),
             Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(val))) => {
                 if matches!(self.suspend, GeneratorSuspend::None) {
                     self.suspend =
@@ -171,9 +173,11 @@ impl Pausable for Generator {
                 match self.resume_delegation(interpreter)? {
                     Some(val) => {
                         // yield and do _not_ advance PC
-                        return Ok(PausableStepResult::YieldValue(val));
+                        return Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Yield(
+                            val,
+                        ))));
                     }
-                    None => Ok(PausableStepResult::NoOp),
+                    None => Ok(StepResult::Continue),
                 }
             }
             Err(e) => Err(e),
