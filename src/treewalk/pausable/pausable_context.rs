@@ -54,10 +54,10 @@ impl PausableStack {
         }
     }
 
-    pub fn next_statement(&mut self) -> Statement {
+    pub fn current_statement(&mut self) -> &Statement {
         self.0
             .last_mut()
-            .map(|context| context.frame.next_statement())
+            .map(|context| context.frame.current_statement())
             .unwrap()
     }
 
@@ -79,9 +79,9 @@ impl PausableStack {
         self.set_state(PausableState::Running);
     }
 
-    pub fn step_back(&mut self) {
+    pub fn advance_pc(&mut self) {
         if let Some(context) = self.0.last_mut() {
-            context.frame.step_back();
+            context.frame.advance_pc();
         }
     }
 }

@@ -88,7 +88,7 @@ impl PausableRunner {
         pausable: &mut P,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<PausableStepResult> {
-        let statement = pausable.context_mut().next_statement();
+        let statement = pausable.context_mut().current_statement().clone();
 
         // Delegate to the common function for control flow
         let encountered_control_flow =
@@ -98,7 +98,7 @@ impl PausableRunner {
             return Ok(PausableStepResult::NoOp);
         }
 
-        pausable.execute_statement(interpreter, statement)
+        pausable.execute_statement(interpreter, &statement)
     }
 
     /// This function manually executes any control flow statements. Any changes are reflected by
@@ -116,6 +116,7 @@ impl PausableRunner {
     ) -> TreewalkResult<bool> {
         match &stmt.kind {
             StatementKind::WhileLoop(cond_ast) => {
+                pausable.context_mut().advance_pc();
                 pausable.context_mut().push(PausableFrame::new(
                     Frame::new_finished(cond_ast.ast.clone()),
                     PausableState::InWhileLoop(cond_ast.condition.clone()),
@@ -128,6 +129,7 @@ impl PausableRunner {
                 elif_parts,
                 else_part,
             } => {
+                pausable.context_mut().advance_pc();
                 if let Some(selected_block) =
                     interpreter.select_if_branch(if_part, elif_parts, else_part)?
                 {
@@ -145,6 +147,7 @@ impl PausableRunner {
                 body,
                 ..
             } => {
+                pausable.context_mut().advance_pc();
                 // This now stores the iterator value directly. That depends on clone-stable
                 // iterator state because `PausableState` is cloned through `current_state()`.
                 // List/Tuple/Range/Generator are safe; remaining iterator variants still need the

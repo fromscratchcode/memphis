@@ -25,17 +25,12 @@ impl Frame {
         self.len() <= self.pc
     }
 
-    /// Mutably access the next [`Statement`] of the block, incrementing the program counter.
-    pub fn next_statement(&mut self) -> Statement {
-        let statement = self.ast.get(self.pc).expect("No statement!").clone();
-        self.pc += 1;
-        statement
+    pub fn current_statement(&mut self) -> &Statement {
+        self.ast.get(self.pc).expect("No statement!")
     }
 
-    /// If we encountered an await during while evaluating an instruction, we need to reset the
-    /// program counter so that we can rerun this instruction again.
-    pub fn step_back(&mut self) {
-        self.pc -= 1;
+    pub fn advance_pc(&mut self) {
+        self.pc += 1;
     }
 
     /// Reset the program counter to the start of the block. This is useful to simulate loops.

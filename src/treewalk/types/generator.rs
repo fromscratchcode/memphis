@@ -152,9 +152,9 @@ impl Pausable for Generator {
     fn execute_statement(
         &mut self,
         interpreter: &TreewalkInterpreter,
-        stmt: Statement,
+        stmt: &Statement,
     ) -> TreewalkResult<PausableStepResult> {
-        match interpreter.evaluate_statement(&stmt) {
+        let step_result = match interpreter.evaluate_statement(stmt) {
             Ok(_) => Ok(PausableStepResult::NoOp),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => {
                 Exception::stop_iteration_with(val).raise(interpreter)
@@ -164,18 +164,23 @@ impl Pausable for Generator {
             }
             Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(val))) => {
                 if matches!(self.suspend, GeneratorSuspend::None) {
-                    self.context_mut().step_back();
                     self.suspend =
                         GeneratorSuspend::Delegating(val.as_iterator().raise(interpreter)?);
                 }
 
                 match self.resume_delegation(interpreter)? {
-                    Some(val) => Ok(PausableStepResult::YieldValue(val)),
+                    Some(val) => {
+                        // yield and do _not_ advance PC
+                        return Ok(PausableStepResult::YieldValue(val));
+                    }
                     None => Ok(PausableStepResult::NoOp),
                 }
             }
             Err(e) => Err(e),
-        }
+        };
+
+        self.context_mut().advance_pc();
+        step_result
     }
 }
 

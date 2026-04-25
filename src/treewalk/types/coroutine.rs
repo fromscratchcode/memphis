@@ -111,22 +111,25 @@ impl Pausable for Coroutine {
     fn execute_statement(
         &mut self,
         interpreter: &TreewalkInterpreter,
-        stmt: Statement,
+        stmt: &Statement,
     ) -> TreewalkResult<PausableStepResult> {
-        match interpreter.evaluate_statement(&stmt) {
+        let step_result = match interpreter.evaluate_statement(stmt) {
             Ok(result) => Ok(PausableStepResult::Return(result)),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep)) => {
                 Ok(PausableStepResult::Suspend)
             }
             Err(TreewalkDisruption::Signal(TreewalkSignal::Await)) => {
-                self.context_mut().step_back();
-                Ok(PausableStepResult::Suspend)
+                // suspend and do _not_ advance PC
+                return Ok(PausableStepResult::Suspend);
             }
             Err(TreewalkDisruption::Signal(TreewalkSignal::Return(result))) => {
                 Ok(PausableStepResult::Return(result))
             }
             Err(e) => Err(e),
-        }
+        };
+
+        self.context_mut().advance_pc();
+        step_result
     }
 }
 

@@ -34,6 +34,6 @@ pub trait Pausable {
     fn execute_statement(
         &mut self,
         interpreter: &TreewalkInterpreter,
-        statement: Statement,
+        statement: &Statement,
     ) -> TreewalkResult<PausableStepResult>;
 }
