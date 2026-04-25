@@ -1,5 +1,5 @@
 use crate::{
-    parser::types::{Expr, LoopIndex, Statement},
+    parser::types::{Expr, LoopIndex},
     treewalk::{pausable::Frame, TreewalkValue},
 };
 
@@ -48,40 +48,25 @@ impl PausableStack {
         self.0.pop()
     }
 
-    pub fn set_state(&mut self, state: PausableState) {
-        if let Some(context) = self.0.last_mut() {
-            context.state = state;
-        }
-    }
-
-    pub fn current_statement(&mut self) -> &Statement {
-        self.0
-            .last_mut()
-            .map(|context| context.frame.current_statement())
-            .unwrap()
-    }
-
-    pub fn current_frame(&self) -> &Frame {
+    pub fn frame(&self) -> &Frame {
         &self.0.last().unwrap().frame
     }
 
-    pub fn current_state(&self) -> PausableState {
-        self.0.last().unwrap().state.clone()
+    pub fn frame_mut(&mut self) -> &mut Frame {
+        &mut self.0.last_mut().unwrap().frame
     }
 
-    pub fn restart_frame(&mut self) {
-        if let Some(context) = self.0.last_mut() {
-            context.frame.restart();
-        }
+    pub fn state(&self) -> &PausableState {
+        &self.0.last().unwrap().state
     }
 
     pub fn start(&mut self) {
         self.set_state(PausableState::Running);
     }
 
-    pub fn advance_pc(&mut self) {
+    fn set_state(&mut self, state: PausableState) {
         if let Some(context) = self.0.last_mut() {
-            context.frame.advance_pc();
+            context.state = state;
         }
     }
 }

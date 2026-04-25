@@ -25,7 +25,7 @@ impl Frame {
         self.len() <= self.pc
     }
 
-    pub fn current_statement(&mut self) -> &Statement {
+    pub fn current_statement(&self) -> &Statement {
         self.ast.get(self.pc).expect("No statement!")
     }
 

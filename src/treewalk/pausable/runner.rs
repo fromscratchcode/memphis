@@ -19,27 +19,27 @@ impl PausableRunner {
 
         let mut result = TreewalkValue::None;
         loop {
-            match pausable.context().current_state() {
+            match pausable.context().state() {
                 PausableState::Created => {
                     pausable.context_mut().start();
                     continue;
                 }
                 PausableState::Running => {
-                    if pausable.context().current_frame().is_finished() {
+                    if pausable.context().frame().is_finished() {
                         Self::on_exit(interpreter);
                         return pausable.finish(result).raise(interpreter);
                     }
                 }
                 PausableState::InForLoop { index, iterable } => {
-                    if pausable.context().current_frame().is_finished() {
+                    if pausable.context().frame().is_finished() {
                         let item = iterable
                             .clone()
                             .as_iterator_strict()
                             .raise(interpreter)?
                             .try_next()?;
                         if let Some(item) = item {
-                            interpreter.execute_loop_index_assignment(&index, item)?;
-                            pausable.context_mut().restart_frame();
+                            interpreter.execute_loop_index_assignment(index, item)?;
+                            pausable.context_mut().frame_mut().restart();
                         } else {
                             pausable.context_mut().pop();
                             continue;
@@ -47,15 +47,15 @@ impl PausableRunner {
                     }
                 }
                 PausableState::InBlock => {
-                    if pausable.context().current_frame().is_finished() {
+                    if pausable.context().frame().is_finished() {
                         pausable.context_mut().pop();
                         continue;
                     }
                 }
                 PausableState::InWhileLoop(condition) => {
-                    if pausable.context().current_frame().is_finished() {
-                        if interpreter.evaluate_expr(&condition)?.coerce_to_bool() {
-                            pausable.context_mut().restart_frame();
+                    if pausable.context().frame().is_finished() {
+                        if interpreter.evaluate_expr(condition)?.coerce_to_bool() {
+                            pausable.context_mut().frame_mut().restart();
                         } else {
                             pausable.context_mut().pop();
                             continue;
@@ -88,7 +88,7 @@ impl PausableRunner {
         pausable: &mut P,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<PausableStepResult> {
-        let statement = pausable.context_mut().current_statement().clone();
+        let statement = pausable.context_mut().frame().current_statement().clone();
 
         // Delegate to the common function for control flow
         let encountered_control_flow =
@@ -116,7 +116,7 @@ impl PausableRunner {
     ) -> TreewalkResult<bool> {
         match &stmt.kind {
             StatementKind::WhileLoop(cond_ast) => {
-                pausable.context_mut().advance_pc();
+                pausable.context_mut().frame_mut().advance_pc();
                 pausable.context_mut().push(PausableFrame::new(
                     Frame::new_finished(cond_ast.ast.clone()),
                     PausableState::InWhileLoop(cond_ast.condition.clone()),
@@ -129,7 +129,7 @@ impl PausableRunner {
                 elif_parts,
                 else_part,
             } => {
-                pausable.context_mut().advance_pc();
+                pausable.context_mut().frame_mut().advance_pc();
                 if let Some(selected_block) =
                     interpreter.select_if_branch(if_part, elif_parts, else_part)?
                 {
@@ -147,7 +147,7 @@ impl PausableRunner {
                 body,
                 ..
             } => {
-                pausable.context_mut().advance_pc();
+                pausable.context_mut().frame_mut().advance_pc();
                 // This now stores the iterator value directly. That depends on clone-stable
                 // iterator state because `PausableState` is cloned through `current_state()`.
                 // List/Tuple/Range/Generator are safe; remaining iterator variants still need the

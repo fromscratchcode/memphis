@@ -79,7 +79,7 @@ impl Coroutine {
     }
 
     pub fn has_started(&self) -> bool {
-        self.context().current_state() != PausableState::Created
+        self.context().state() != &PausableState::Created
     }
 
     pub fn run_until_pause(
@@ -128,7 +128,7 @@ impl Pausable for Coroutine {
             Err(e) => Err(e),
         };
 
-        self.context_mut().advance_pc();
+        self.context_mut().frame_mut().advance_pc();
         step_result
     }
 }

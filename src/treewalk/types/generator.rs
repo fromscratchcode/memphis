@@ -179,7 +179,7 @@ impl Pausable for Generator {
             Err(e) => Err(e),
         };
 
-        self.context_mut().advance_pc();
+        self.context_mut().frame_mut().advance_pc();
         step_result
     }
 }
