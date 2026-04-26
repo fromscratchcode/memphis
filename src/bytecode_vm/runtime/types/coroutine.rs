@@ -39,4 +39,12 @@ impl Coroutine {
             waiters: vec![],
         }
     }
+
+    pub fn is_finished_with(&self) -> Option<Reference> {
+        if let CoroutineState::Finished(return_ref) = self.state {
+            Some(return_ref)
+        } else {
+            None
+        }
+    }
 }

@@ -494,9 +494,14 @@ impl VirtualMachine {
                         return StepResult::Exit(FrameExit::Suspended(Suspension::Sleep(duration)));
                     }
                     VmValue::Coroutine(co) => {
-                        return StepResult::Exit(FrameExit::Suspended(Suspension::Await(
-                            co.clone(),
-                        )));
+                        if let Some(return_ref) = co.borrow().is_finished_with() {
+                            self.push(return_ref);
+                            return StepResult::Continue;
+                        } else {
+                            return StepResult::Exit(FrameExit::Suspended(Suspension::Await(
+                                co.clone(),
+                            )));
+                        }
                     }
                     _ => {
                         let msg = self.intern_string("Expected awaitable");
