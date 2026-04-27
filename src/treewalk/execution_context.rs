@@ -23,6 +23,10 @@ pub struct ExecutionContextManager {
     /// [`TreewalkValue`] already are wrapped in a [`Container`].
     current_receiver_stack: Vec<TreewalkValue>,
 
+    /// A stack of pending `yield from` completion values for the currently running generators.
+    /// The top value is consumed by `evaluate_yield_from()` when a delegated generator finishes.
+    current_yield_from_result_stack: Vec<Option<TreewalkValue>>,
+
     current_exception: Option<RaisedException>,
 }
 
@@ -32,6 +36,7 @@ impl ExecutionContextManager {
             lexical_class_stack: vec![],
             current_function_stack: vec![],
             current_receiver_stack: vec![],
+            current_yield_from_result_stack: vec![],
             current_exception: None,
         }
     }
@@ -70,6 +75,26 @@ impl ExecutionContextManager {
 
     pub fn pop_receiver(&mut self) -> Option<TreewalkValue> {
         self.current_receiver_stack.pop()
+    }
+
+    pub fn push_yield_from_result_frame(&mut self) {
+        self.current_yield_from_result_stack.push(None);
+    }
+
+    pub fn pop_yield_from_result_frame(&mut self) -> Option<Option<TreewalkValue>> {
+        self.current_yield_from_result_stack.pop()
+    }
+
+    pub fn set_current_yield_from_result(&mut self, value: TreewalkValue) {
+        if let Some(slot) = self.current_yield_from_result_stack.last_mut() {
+            *slot = Some(value);
+        }
+    }
+
+    pub fn take_current_yield_from_result(&mut self) -> Option<TreewalkValue> {
+        self.current_yield_from_result_stack
+            .last_mut()
+            .and_then(Option::take)
     }
 
     /// Return the currently executing function.

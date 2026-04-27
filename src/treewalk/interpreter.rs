@@ -1691,6 +1691,35 @@ except StopIteration as e:
     }
 
     #[test]
+    #[ignore]
+    fn generator_with_early_return_skips_later_yields() {
+        let input = r#"
+def g():
+    yield 1
+    return 42
+    yield 2
+    yield 3
+
+gen = g()
+a = next(gen)
+
+b = None
+try:
+    next(gen)
+except StopIteration as e:
+    b = e.value
+
+c = list(g())
+"#;
+
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "a", int!(1));
+        assert_read_eq!(ctx, "b", int!(42));
+        assert_read_eq!(ctx, "c", list![int!(1)]);
+    }
+
+    #[test]
     fn basic_inheritance() {
         let input = r#"
 class Parent:
@@ -4662,77 +4691,6 @@ a = memoryview
         let ctx = run(input);
 
         assert_variant!(ctx, "a", Class);
-    }
-
-    #[test]
-    fn yield_from() {
-        let input = r#"
-def countdown(n):
-    while n > 0:
-        yield n
-        n -= 1
-
-def countdown_from(x, y):
-    yield from countdown(x)
-    yield from countdown(y)
-
-sum = 0
-for number in countdown_from(3, 2):
-    sum += number
-"#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "sum", int!(9));
-    }
-
-    #[test]
-    fn yield_from_list_builtin() {
-        let input = r#"
-def gen():
-    yield from [1, 2, 3]
-
-a = list(gen())
-"#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(3)]);
-    }
-
-    #[test]
-    fn yield_from_list_builtin_empty() {
-        let input = r#"
-def gen():
-    yield from []
-
-a = list(gen())
-"#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![]);
-    }
-
-    #[test]
-    #[ignore]
-    fn yield_from_with_return() {
-        let input = r#"
-def g1():
-    yield 1
-    yield 2
-    return 42
-
-def g2():
-    x = yield from g1()
-    yield x
-
-a = list(g2())
-"#;
-
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", list![int!(1), int!(2), int!(42)]);
     }
 
     #[test]

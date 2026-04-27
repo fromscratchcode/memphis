@@ -2,9 +2,10 @@ use crate::{
     bytecode_vm::{
         result::Raise,
         runtime::{
+            iter_internal, next_internal,
             runtime::register_builtin_funcs,
             types::{Class, Exception, List, Module, Range, Tuple},
-            BuiltinFn, Reference,
+            BuiltinFn, NextResult, Reference,
         },
         Runtime, VirtualMachine, VmResult, VmValue,
     },
@@ -75,7 +76,7 @@ fn collect_iterable(vm: &mut VirtualMachine, obj_ref: Reference) -> VmResult<Vec
     let iter_ref = iter_internal(vm, obj_ref)?;
 
     let mut collected = vec![];
-    while let Some(item_ref) = next_internal(vm, iter_ref)? {
+    while let NextResult::Yielded(item_ref) = next_internal(vm, iter_ref)? {
         collected.push(item_ref);
     }
 
@@ -215,33 +216,6 @@ fn expect_integer_or_raise(vm: &mut VirtualMachine, value: &VmValue) -> VmResult
     }
 }
 
-/// Internal method used by GET_ITER
-/// For the public-facing builtin `iter(obj)`, use `iter`.
-pub fn iter_internal(vm: &mut VirtualMachine, obj_ref: Reference) -> VmResult<Reference> {
-    let value = vm.deref(obj_ref);
-    let iterator_ref = match value {
-        VmValue::Generator(_) => obj_ref,
-        VmValue::List(list) => {
-            let type_ = vm.runtime.borrow().builtin_types.list_iter;
-            vm.new_object(type_, VmValue::ListIter(Container::new(list.into_iter())))
-        }
-        VmValue::Tuple(tuple) => {
-            let type_ = vm.runtime.borrow().builtin_types.tuple_iter;
-            vm.new_object(type_, VmValue::TupleIter(Container::new(tuple.iter())))
-        }
-        VmValue::Range(range) => {
-            let type_ = vm.runtime.borrow().builtin_types.range_iter;
-            vm.new_object(type_, VmValue::RangeIter(Container::new(range.iter())))
-        }
-        _ => {
-            let msg = vm.intern_string(&format!("'{}' object is not iterable", value.get_type()));
-            return Exception::type_error(msg).raise(vm);
-        }
-    };
-
-    Ok(iterator_ref)
-}
-
 fn iter(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     let iterable_ref = match args.len() {
         1 => args[0],
@@ -254,30 +228,6 @@ fn iter(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     iter_internal(vm, iterable_ref)
 }
 
-/// Internal method used by FOR_ITER
-/// For the public-facing builtin `next(it)`, we must return a StopIterator error to the user.
-pub fn next_internal(vm: &mut VirtualMachine, iter_ref: Reference) -> VmResult<Option<Reference>> {
-    let iter_value = vm.deref(iter_ref);
-    match iter_value {
-        VmValue::Generator(ref generator) => Ok(vm.resume_generator(generator.clone())),
-        VmValue::ListIter(ref list_iter) => Ok(list_iter.borrow_mut().next()),
-        VmValue::TupleIter(ref list_iter) => Ok(list_iter.borrow_mut().next()),
-        VmValue::RangeIter(ref range_iter) => Ok(range_iter.borrow_mut().next().map(|i| {
-            // TODO it doesn't feel like this should be necessary, what if the range iter
-            // returned full objects here.
-            let type_ = vm.runtime.borrow().builtin_types.int;
-            vm.new_object(type_, VmValue::Int(i))
-        })),
-        _ => {
-            let msg = vm.intern_string(&format!(
-                "'{}' object is not an iterator",
-                iter_value.get_type()
-            ));
-            Exception::type_error(msg).raise(vm)
-        }
-    }
-}
-
 fn next(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     if args.len() != 1 {
         let msg = vm.intern_string(&format!("next() expected 1 argument, got {}", args.len()));
@@ -285,8 +235,8 @@ fn next(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
     }
 
     match next_internal(vm, args[0])? {
-        Some(val) => Ok(val),
-        None => Exception::stop_iteration().raise(vm),
+        NextResult::Yielded(val) => Ok(val),
+        NextResult::Exhausted(_) => Exception::stop_iteration().raise(vm),
     }
 }
 

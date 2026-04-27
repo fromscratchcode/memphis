@@ -4,10 +4,10 @@ use crate::{
         indices::{ConstantIndex, FreeIndex, LocalIndex, NonlocalIndex},
         result::Raise,
         runtime::{
-            modules::builtins,
+            iter_internal, next_internal,
             types::{Coroutine, Exception, FunctionObject, Generator, Method, Module},
-            CallStack, Completion, Frame, FrameExit, HeapObject, Reference, StepResult, Suspension,
-            VmExecutor,
+            CallStack, Completion, Frame, FrameExit, HeapObject, NextResult, Reference, StepResult,
+            Suspension, VmExecutor,
         },
         utils::HashKey,
         DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
@@ -666,15 +666,15 @@ impl VirtualMachine {
     }
 
     fn value_in_iter(&mut self, needle_ref: Reference, haystack_ref: Reference) -> VmResult<bool> {
-        let iter = builtins::iter_internal(self, haystack_ref)?;
+        let iter = iter_internal(self, haystack_ref)?;
         loop {
-            match builtins::next_internal(self, iter)? {
-                Some(item_ref) => {
+            match next_internal(self, iter)? {
+                NextResult::Yielded(item_ref) => {
                     if self.equals(needle_ref, item_ref) {
                         return Ok(true);
                     }
                 }
-                None => return Ok(false),
+                NextResult::Exhausted(_) => return Ok(false),
             }
         }
     }
@@ -706,15 +706,15 @@ impl VirtualMachine {
         frame
     }
 
-    pub fn resume_generator(&mut self, generator: Container<Generator>) -> Option<Reference> {
+    pub fn resume_generator(&mut self, generator: Container<Generator>) -> NextResult {
         let frame = generator.borrow_mut().frame.clone();
         let (step_result, new_frame) = self.run_frame(frame);
         let return_val = match step_result {
-            FrameExit::Suspended(Suspension::Yield(val)) => Some(val),
+            FrameExit::Suspended(Suspension::Yield(val)) => NextResult::Yielded(val),
             FrameExit::Suspended(Suspension::Sleep(_) | Suspension::Await(_)) => {
                 unimplemented!("Async generators are not currently supported.")
             }
-            FrameExit::Completed(Completion::Return(_)) => None,
+            FrameExit::Completed(Completion::Return(val)) => NextResult::Exhausted(Some(val)),
             FrameExit::Completed(Completion::Exception(_)) => {
                 unimplemented!("Exceptions inside generators are not currently supported.")
             }

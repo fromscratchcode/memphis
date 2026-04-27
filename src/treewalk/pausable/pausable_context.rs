@@ -1,8 +1,5 @@
-use std::collections::VecDeque;
-
 use crate::{
-    core::Container,
-    parser::types::{Expr, LoopIndex, Statement},
+    parser::types::{Expr, LoopIndex},
     treewalk::{pausable::Frame, TreewalkValue},
 };
 
@@ -15,10 +12,9 @@ pub enum PausableState {
     InWhileLoop(Expr),
     InForLoop {
         index: LoopIndex,
-        queue: Container<VecDeque<TreewalkValue>>,
+        iterable: TreewalkValue,
     },
     InBlock,
-    Finished,
 }
 
 /// The context that allows a `Pausable` to be paused and resumed. This represents an individual
@@ -52,40 +48,25 @@ impl PausableStack {
         self.0.pop()
     }
 
-    pub fn set_state(&mut self, state: PausableState) {
-        if let Some(context) = self.0.last_mut() {
-            context.state = state;
-        }
-    }
-
-    pub fn next_statement(&mut self) -> Statement {
-        self.0
-            .last_mut()
-            .map(|context| context.frame.next_statement())
-            .unwrap()
-    }
-
-    pub fn current_frame(&self) -> &Frame {
+    pub fn frame(&self) -> &Frame {
         &self.0.last().unwrap().frame
     }
 
-    pub fn current_state(&self) -> PausableState {
-        self.0.last().unwrap().state.clone()
+    pub fn frame_mut(&mut self) -> &mut Frame {
+        &mut self.0.last_mut().unwrap().frame
     }
 
-    pub fn restart_frame(&mut self) {
-        if let Some(context) = self.0.last_mut() {
-            context.frame.restart();
-        }
+    pub fn state(&self) -> &PausableState {
+        &self.0.last().unwrap().state
     }
 
     pub fn start(&mut self) {
         self.set_state(PausableState::Running);
     }
 
-    pub fn step_back(&mut self) {
+    fn set_state(&mut self, state: PausableState) {
         if let Some(context) = self.0.last_mut() {
-            context.frame.step_back();
+            context.state = state;
         }
     }
 }

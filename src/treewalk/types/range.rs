@@ -1,4 +1,5 @@
 use crate::{
+    core::Container,
     domain::{Dunder, Type},
     treewalk::{
         macros::*,
@@ -58,11 +59,11 @@ impl IntoIterator for Range {
 }
 
 #[derive(Clone)]
-pub struct RangeIter(Range);
+pub struct RangeIter(Container<Range>);
 
 impl RangeIter {
     fn new(range: Range) -> Self {
-        RangeIter(range)
+        RangeIter(Container::new(range))
     }
 }
 
@@ -70,11 +71,12 @@ impl Iterator for RangeIter {
     type Item = TreewalkValue;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0.start < self.0.stop {
-            let result = self.0.start;
+        let mut range = self.0.borrow_mut();
+        if range.start < range.stop {
+            let result = range.start;
             // Modify the start value in the range itself to prep the state for the next time
             // `next` is called.
-            self.0.start += self.0.step;
+            range.start += range.step;
             Some(TreewalkValue::Int(result))
         } else {
             None

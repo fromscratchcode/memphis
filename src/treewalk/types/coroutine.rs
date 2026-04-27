@@ -6,7 +6,10 @@ use crate::{
     parser::types::Statement,
     treewalk::{
         macros::*,
-        pausable::{Frame, Pausable, PausableStack, PausableState, PausableStepResult},
+        pausable::{
+            Completion, Frame, FrameExit, Pausable, PausableRunner, PausableStack, PausableState,
+            StepResult, Suspension,
+        },
         protocols::Callable,
         result::Raise,
         types::Function,
@@ -15,11 +18,6 @@ use crate::{
         TreewalkSignal, TreewalkValue,
     },
 };
-
-pub enum Poll {
-    Waiting,
-    Ready(TreewalkValue),
-}
 
 /// Stateful encapsulation of a pausable `Function` with a `Scope`. This must be run by an
 /// `Executor`.
@@ -82,31 +80,14 @@ impl Coroutine {
     }
 
     pub fn has_started(&self) -> bool {
-        self.context().current_state() != PausableState::Created
+        self.context().state() != &PausableState::Created
     }
 
-    /// Execute the next instruction in the `Frame` and return whether we hit an `await` or not. If
-    /// the next instruction is a control flow statement which leads the execution into a block,
-    /// the coroutine state is updated to reflect this.
-    fn execute_statement(
+    pub fn run_until_pause(
         &mut self,
         interpreter: &TreewalkInterpreter,
-        stmt: Statement,
-    ) -> TreewalkResult<Poll> {
-        match interpreter.evaluate_statement(&stmt) {
-            // We cannot return the default value here because certain statement types may
-            // actually have a return value (expression, return, etc).
-            Ok(result) => Ok(Poll::Ready(result)),
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep)) => Ok(Poll::Waiting),
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Await)) => {
-                self.context_mut().step_back();
-                Ok(Poll::Waiting)
-            }
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(result))) => {
-                Ok(Poll::Ready(result))
-            }
-            Err(e) => Err(e),
-        }
+    ) -> TreewalkResult<TreewalkValue> {
+        PausableRunner::run_until_pause(self, interpreter)
     }
 }
 
@@ -128,18 +109,28 @@ impl Pausable for Coroutine {
         Ok(TreewalkValue::None)
     }
 
-    fn handle_step(
+    fn execute_statement(
         &mut self,
         interpreter: &TreewalkInterpreter,
-        stmt: Statement,
-    ) -> TreewalkResult<PausableStepResult> {
-        match self.execute_statement(interpreter, stmt)? {
-            Poll::Ready(val) => Ok(PausableStepResult::Return(val)),
-            Poll::Waiting => {
-                self.on_exit(interpreter);
-                Ok(PausableStepResult::Break)
+        stmt: &Statement,
+    ) -> TreewalkResult<StepResult> {
+        let step_result = match interpreter.evaluate_statement(stmt) {
+            Ok(_) => Ok(StepResult::Continue),
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep)) => {
+                Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Sleep)))
             }
-        }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Await)) => {
+                // suspend and do _not_ advance PC
+                return Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Await)));
+            }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(result))) => Ok(
+                StepResult::Exit(FrameExit::Completed(Completion::Return(result))),
+            ),
+            Err(e) => Err(e),
+        };
+
+        self.context_mut().frame_mut().advance_pc();
+        step_result
     }
 }
 
