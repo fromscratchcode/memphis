@@ -15,10 +15,8 @@ fn init() -> Compiler {
     Compiler::new(&ModuleName::main(), &None, "compiler_unit_test")
 }
 
-fn init_ctx(text: &str) -> VmContext {
-    let mut ctx = VmContext::stdin();
-    ctx.add_text(Text::new(text));
-    ctx
+fn init_ctx() -> VmContext {
+    VmContext::stdin()
 }
 
 pub fn compile_stmt(stmt: Statement) -> Bytecode {
@@ -39,30 +37,31 @@ pub fn expect_err(stmt: Statement) -> CompilerError {
 }
 
 pub fn compile(text: &str) -> CodeObject {
-    init_ctx(text)
-        .compile()
+    init_ctx()
+        .compile(&Text::new(text))
         .expect("Failed to compile test program!")
 }
 
 pub fn compile_at_pkg(text: &str, module: ModuleName, pkg: ModuleName) -> CodeObject {
-    let mut ctx = init_ctx(text);
+    let mut ctx = init_ctx();
     ctx.set_module(module);
     ctx.set_pkg(pkg);
-    ctx.compile().expect("Failed to compile test program!")
+    ctx.compile(&Text::new(text))
+        .expect("Failed to compile test program!")
 }
 
 pub fn compile_err(text: &str) -> CompilerError {
-    match init_ctx(text).compile() {
+    match init_ctx().compile(&Text::new(text)) {
         Ok(_) => panic!("Expected an CompilerError!"),
         Err(e) => e,
     }
 }
 
 pub fn compile_err_at_pkg(text: &str, module: ModuleName, pkg: ModuleName) -> CompilerError {
-    let mut ctx = init_ctx(text);
+    let mut ctx = init_ctx();
     ctx.set_module(module);
     ctx.set_pkg(pkg);
-    match ctx.compile() {
+    match ctx.compile(&Text::new(text)) {
         Ok(_) => panic!("Expected an CompilerError!"),
         Err(e) => e,
     }

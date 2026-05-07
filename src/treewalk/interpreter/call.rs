@@ -1,13 +1,16 @@
+use std::any::Any;
+
 use crate::{
     core::{log, Container, LogLevel},
     domain::FunctionType,
+    parser::types::Callee,
     treewalk::{
         result::Raise,
         type_system::CloneableCallable,
         types::{iterators::GeneratorIter, Coroutine, Exception, Function, Generator},
         utils::Args,
-        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue,
+        value::RuntimeCallable,
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
     },
 };
 
@@ -50,6 +53,24 @@ impl TreewalkInterpreter {
         self.call(method, args)
     }
 
+    pub fn evaluate_callable(&self, callee: &Callee) -> TreewalkResult<RuntimeCallable> {
+        match callee {
+            Callee::Expr(callee) => self.evaluate_expr(callee)?.as_callable().raise(self),
+            Callee::Symbol(name) => self.load_callable(name.as_str()),
+        }
+    }
+
+    pub fn expect_function(
+        &self,
+        callable: RuntimeCallable,
+    ) -> TreewalkResult<Container<Function>> {
+        (callable.as_ref() as &dyn Any)
+            .downcast_ref::<Container<Function>>()
+            .cloned()
+            .ok_or_else(|| Exception::type_error("Expected a function"))
+            .raise(self)
+    }
+
     fn dispatch_callable(
         &self,
         callable: Box<dyn CloneableCallable>,
@@ -59,27 +80,15 @@ impl TreewalkInterpreter {
             FunctionType::Generator => {
                 // TODO we may want to support builtin generators in the future. For now, we only
                 // support user-defined so we are safe to downcast to `Container<Function>`.
-                let function = callable
-                    .as_any()
-                    .downcast_ref::<Container<Function>>()
-                    .cloned()
-                    .ok_or_else(|| Exception::type_error("Expected a function"))
-                    .raise(self)?;
-                let symbol_table = function.borrow().bind_args(&args).raise(self)?;
-                let scope = Container::new(Scope::new(symbol_table));
+                let function = self.expect_function(callable)?;
+                let scope = function.borrow().create_scope(&args).raise(self)?;
                 let generator_function = Generator::new(scope, function);
                 let generator_iterator = GeneratorIter::new(generator_function, self.clone());
                 Ok(TreewalkValue::Generator(generator_iterator))
             }
             FunctionType::Async => {
-                let function = callable
-                    .as_any()
-                    .downcast_ref::<Container<Function>>()
-                    .cloned()
-                    .ok_or_else(|| Exception::type_error("Expected a function"))
-                    .raise(self)?;
-                let symbol_table = function.borrow().bind_args(&args).raise(self)?;
-                let scope = Container::new(Scope::new(symbol_table));
+                let function = self.expect_function(callable)?;
+                let scope = function.borrow().create_scope(&args).raise(self)?;
                 let coroutine = Coroutine::new(scope, function);
                 Ok(TreewalkValue::Coroutine(Container::new(coroutine)))
             }

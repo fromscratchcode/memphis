@@ -16,18 +16,13 @@ pub trait TryEvalFrom: Sized {
     ) -> TreewalkResult<Self>;
 }
 
-pub trait Callable {
+pub trait Callable: Any {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue>;
 
     fn name(&self) -> String;
 
     fn function_type(&self) -> FunctionType {
         FunctionType::Regular
-    }
-
-    /// This stub exists so that we can downcast to `Container<Function>`.
-    fn as_any(&self) -> &dyn Any {
-        unreachable!()
     }
 
     /// A callable will not have a receiver by default, but certain types (`Method`) can have them.

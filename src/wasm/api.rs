@@ -40,9 +40,8 @@ pub fn lex(text: String) -> JsValue {
 }
 
 fn actually_compile(text: &str) -> CompilerResult<CodeObject> {
-    let mut ctx = VmContext::stdin();
-    ctx.add_text(Text::new(text));
-    ctx.compile()
+    let ctx = VmContext::stdin();
+    ctx.compile(&Text::new(text))
 }
 
 fn actually_lex(text: &str) -> Vec<Token> {

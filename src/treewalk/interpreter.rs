@@ -4,6 +4,8 @@ use crate::{
     parser::types::Ast,
     runtime::MemphisState,
     treewalk::{
+        debugger::TreewalkDebugSession,
+        pausable::Frame,
         types::{Exception, Module},
         Executor, RaisedException, TreewalkDisruption, TreewalkResult, TreewalkState,
         TreewalkValue,
@@ -77,6 +79,11 @@ impl TreewalkInterpreter {
                 format!("Uncaught signal: {:?}", s),
             ))),
         }
+    }
+
+    pub fn start_debug_session(&self, ast: Ast) -> TreewalkDebugSession {
+        let frame = Frame::new(ast);
+        TreewalkDebugSession::new(frame, self.clone())
     }
 }
 

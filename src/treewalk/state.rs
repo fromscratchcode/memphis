@@ -1,4 +1,4 @@
-use std::cell::UnsafeCell;
+use std::{cell::UnsafeCell, collections::HashMap};
 
 use crate::{
     core::Container,
@@ -11,6 +11,21 @@ use crate::{
         ScopeManager, TreewalkValue, TypeRegistry,
     },
 };
+
+pub struct DebugSnapshot {
+    globals: HashMap<String, TreewalkValue>,
+    locals: HashMap<String, TreewalkValue>,
+}
+
+impl DebugSnapshot {
+    pub fn get_local(&self, key: &str) -> Option<&TreewalkValue> {
+        self.locals.get(key)
+    }
+
+    pub fn get_global(&self, key: &str) -> Option<&TreewalkValue> {
+        self.globals.get(key)
+    }
+}
 
 pub struct TreewalkState {
     module_store: ModuleStore,
@@ -173,6 +188,11 @@ impl Container<TreewalkState> {
         scope.as_dict()
     }
 
+    // It feels like this should be optional?
+    pub fn read_locals(&self) -> Container<Scope> {
+        self.borrow().scope_manager.read_local()
+    }
+
     pub fn mark_nonlocal(&self, name: &str) {
         self.borrow_mut().scope_manager.mark_nonlocal(name);
     }
@@ -238,5 +258,15 @@ impl Container<TreewalkState> {
 
     pub fn class_name(&self, value: &TreewalkValue) -> String {
         self.class_of(value).borrow().name().to_string()
+    }
+
+    pub fn debug_snapshot(&self) -> DomainResult<DebugSnapshot> {
+        let globals = self.read_globals().to_symbol_table()?;
+        let locals = self
+            .read_locals()
+            .borrow()
+            .to_runtime_dict()
+            .to_symbol_table()?;
+        Ok(DebugSnapshot { globals, locals })
     }
 }

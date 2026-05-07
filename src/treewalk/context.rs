@@ -4,7 +4,7 @@ use crate::{
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     lexer::Lexer,
-    parser::Parser,
+    parser::{types::Ast, Parser},
     runtime::MemphisState,
     treewalk::{
         types::{Exception, Module},
@@ -14,7 +14,6 @@ use crate::{
 };
 
 pub struct TreewalkContext {
-    lexer: Lexer,
     interpreter: TreewalkInterpreter,
 }
 
@@ -29,32 +28,26 @@ impl TreewalkContext {
         treewalk_state: Container<TreewalkState>,
     ) -> Self {
         Self {
-            lexer: Lexer::script(),
             interpreter: TreewalkInterpreter::new(memphis_state, treewalk_state),
         }
     }
 
     pub fn eval_inner(&mut self, text: Text) -> Result<TreewalkValue, RaisedException> {
-        self.add_text(text);
-        self.run()
+        let ast = self.parse(&text)?;
+        self.interpreter.execute(ast)
     }
 
-    fn run(&mut self) -> Result<TreewalkValue, RaisedException> {
-        // Destructure to break the borrow into disjoint pieces
-        let TreewalkContext {
-            lexer, interpreter, ..
-        } = self;
+    pub fn parse(&self, text: &Text) -> Result<Ast, RaisedException> {
+        let mut lexer = Lexer::script();
+        lexer.add_text(text);
 
-        let mut parser = Parser::new(lexer);
-        let ast = parser
-            .parse()
-            .map_err(|e| interpreter.raise(Exception::syntax_error(e.to_string())))?;
+        let mut parser = Parser::new(&mut lexer);
+        let ast = parser.parse().map_err(|e| {
+            self.interpreter
+                .raise(Exception::syntax_error(e.to_string()))
+        })?;
 
-        interpreter.execute(ast)
-    }
-
-    fn add_text(&mut self, line: Text) {
-        self.lexer.add_text(&line);
+        Ok(ast)
     }
 
     fn init_state(

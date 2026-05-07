@@ -1,23 +1,46 @@
 use crate::parser::types::{Ast, Statement};
 
+#[derive(Debug, Clone)]
+pub enum FrameKind {
+    Block,
+    Function { cross_module: bool },
+}
+
 /// An association between an [`Ast`] of code and the current statement.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pc: usize,
     ast: Ast,
+    pub kind: FrameKind,
 }
 
 impl Frame {
     /// Initialize a [`Frame`].
     pub fn new(ast: Ast) -> Self {
-        Self { ast, pc: 0 }
+        Self {
+            ast,
+            pc: 0,
+            kind: FrameKind::Block,
+        }
+    }
+
+    pub fn new_function(ast: Ast, cross_module: bool) -> Self {
+        Self {
+            ast,
+            pc: 0,
+            kind: FrameKind::Function { cross_module },
+        }
     }
 
     /// Initialize a [`Frame`] in a completed state so the caller can use the normal loop
     /// restart path to begin execution.
     pub fn new_finished(ast: Ast) -> Self {
         let pc = ast.len();
-        Self { ast, pc }
+        Self {
+            ast,
+            pc,
+            kind: FrameKind::Block,
+        }
     }
 
     /// Return a boolean indicating whether we have instructions left in the block to evaluate.
@@ -36,6 +59,10 @@ impl Frame {
     /// Reset the program counter to the start of the block. This is useful to simulate loops.
     pub fn restart(&mut self) {
         self.pc = 0;
+    }
+
+    pub fn finish(&mut self) {
+        self.pc = self.ast.len();
     }
 
     /// Return the length of the block held by this frame.

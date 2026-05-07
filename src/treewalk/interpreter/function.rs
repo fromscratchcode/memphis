@@ -8,11 +8,33 @@ use crate::{
 };
 
 impl TreewalkInterpreter {
-    pub(crate) fn enter_function(
+    pub(crate) fn run_function(
         &self,
         function: Container<Function>,
         scope: Container<Scope>,
     ) -> TreewalkResult<TreewalkValue> {
+        let cross_module = self.enter_function_context(function.clone(), scope);
+
+        // We do not propagate errors here because we still must restore the scopes and things
+        // before returning.
+        let result = self.execute_ast(&function.borrow().body);
+
+        // If an error is thrown, we should return that immediately without restoring any state.
+        if matches!(
+            result,
+            Ok(_) | Err(TreewalkDisruption::Signal(TreewalkSignal::Return(_)))
+        ) {
+            self.exit_function_context(cross_module);
+        }
+
+        result
+    }
+
+    pub fn enter_function_context(
+        &self,
+        function: Container<Function>,
+        scope: Container<Scope>,
+    ) -> bool {
         let cross_module = !self
             .state
             .current_module()
@@ -31,25 +53,17 @@ impl TreewalkInterpreter {
         self.memphis_state.push_stack_frame(&*function.borrow());
         self.state.push_function(function.clone());
 
-        // We do not propagate errors here because we still must restore the scopes and things
-        // before returning.
-        let result = self.execute_ast(&function.borrow().body);
+        cross_module
+    }
 
-        // If an error is thrown, we should return that immediately without restoring any state.
-        if matches!(
-            result,
-            Ok(_) | Err(TreewalkDisruption::Signal(TreewalkSignal::Return(_)))
-        ) {
-            self.memphis_state.pop_stack_frame();
-            self.state.pop_function();
-            self.state.pop_local();
-            self.state.pop_captured_env();
-            if cross_module {
-                self.state.pop_module();
-            }
+    pub fn exit_function_context(&self, cross_module: bool) {
+        self.memphis_state.pop_stack_frame();
+        self.state.pop_function();
+        self.state.pop_local();
+        self.state.pop_captured_env();
+        if cross_module {
+            self.state.pop_module();
         }
-
-        result
     }
 
     pub fn apply_decorators(

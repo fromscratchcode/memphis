@@ -1,5 +1,6 @@
 mod boxing;
 mod context;
+mod debugger;
 mod execution_context;
 mod executor;
 pub mod import_utils;

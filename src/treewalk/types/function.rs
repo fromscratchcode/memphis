@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use crate::{
     core::{log, Container, LogLevel},
     domain::{DebugStackFrame, Dunder, FunctionType, ToDebugStackFrame, Type},
@@ -168,6 +166,11 @@ impl Function {
     pub fn bind_args(&self, args: &Args) -> DomainResult<SymbolTable> {
         bind_args(self.name(), args, &self.args)
     }
+
+    pub fn create_scope(&self, args: &Args) -> DomainResult<Container<Scope>> {
+        let symbol_table = self.bind_args(args)?;
+        Ok(Container::new(Scope::new(symbol_table)))
+    }
 }
 
 impl MemberRead for Container<Function> {
@@ -227,9 +230,8 @@ impl MemberWrite for Container<Function> {
 
 impl Callable for Container<Function> {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        let symbol_table = self.borrow().bind_args(&args).raise(interpreter)?;
-        let scope = Container::new(Scope::new(symbol_table));
-        interpreter.enter_function(self.clone(), scope)
+        let scope = self.borrow().create_scope(&args).raise(interpreter)?;
+        interpreter.run_function(self.clone(), scope)
     }
 
     fn name(&self) -> String {
@@ -238,12 +240,6 @@ impl Callable for Container<Function> {
 
     fn function_type(&self) -> FunctionType {
         self.borrow().function_type.clone()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        // returning a reference to self, not self directly. This is required so that there is a
-        // known size at compile-time.
-        self
     }
 }
 

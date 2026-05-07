@@ -29,6 +29,9 @@ use crate::{
     },
 };
 
+// TODO this should likely become a full struct
+pub type RuntimeCallable = Box<dyn CloneableCallable>;
+
 #[derive(Clone)]
 pub enum TreewalkValue {
     None,

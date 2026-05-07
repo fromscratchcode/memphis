@@ -259,12 +259,7 @@ impl TreewalkInterpreter {
         call_args: &CallArgs,
     ) -> TreewalkResult<TreewalkValue> {
         let args = self.evaluate_args(call_args)?;
-
-        let function = match callee {
-            Callee::Expr(callee) => self.evaluate_expr(callee)?.as_callable().raise(self)?,
-            Callee::Symbol(name) => self.load_callable(name.as_str())?,
-        };
-
+        let function = self.evaluate_callable(callee)?;
         self.call(function, args)
     }
 
