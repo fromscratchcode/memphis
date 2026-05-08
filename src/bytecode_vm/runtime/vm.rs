@@ -119,8 +119,8 @@ impl VirtualMachine {
         let (resolved, source) = self
             .state
             .load_source(module_name)
-            .map_err(|err| {
-                let msg = self.intern_string(&err.message);
+            .map_err(|_| {
+                let msg = self.intern_string(&module_name.as_str());
                 Exception::import_error(msg)
             })
             .raise(self)?;

@@ -406,7 +406,7 @@ f.x
 import not_found
 "#;
         let e = eval_expect_error(text);
-        assert_import_error!(e.exception, "No module named not_found");
+        assert_import_error!(e.exception, "not_found");
     }
 
     #[test]

@@ -82,7 +82,7 @@ impl TreewalkInterpreter {
         let (resolved, source) = self
             .memphis_state
             .load_source(module_name)
-            .map_err(|err| Exception::import_error(err.message))
+            .map_err(|_| Exception::import_error(module_name))
             .raise(self)?;
 
         let module = self.prepare_imported_module(&resolved);

@@ -79,6 +79,18 @@ impl MemphisException {
     }
 }
 
+static KNOWN_UNSUPPORTED_STDLIB: [&str; 9] = [
+    "abc",
+    "math",
+    "random",
+    "datetime",
+    "json",
+    "re",
+    "collections",
+    "itertools",
+    "__future__",
+];
+
 impl Display for MemphisException {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "{}", self.kind.display_name())?;
@@ -91,6 +103,21 @@ impl Display for MemphisException {
         }
 
         match self.kind {
+            ExceptionKind::ImportError => {
+                if let Some(MemphisValue::Str(module_name)) = self.payload.first() {
+                    if KNOWN_UNSUPPORTED_STDLIB.contains(&module_name.as_str()) {
+                        write!(
+                            f,
+                            "The '{}' module is not yet implemented in Memphis.",
+                            module_name
+                        )
+                    } else {
+                        write!(f, "No module named '{}'", module_name)
+                    }
+                } else {
+                    Ok(())
+                }
+            }
             ExceptionKind::NameError => {
                 if let Some(MemphisValue::Str(name)) = self.payload.first() {
                     write!(f, "name '{}' is not defined", name)
@@ -128,5 +155,25 @@ impl Display for MemphisException {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::{test_utils::str, ExceptionKind, MemphisException};
+
+    #[test]
+    fn import_error_ux_for_stdlib() {
+        let e = MemphisException::new(ExceptionKind::ImportError, vec![str!("math")]);
+        assert_eq!(
+            e.to_string(),
+            String::from("ImportError: The 'math' module is not yet implemented in Memphis.")
+        );
+
+        let e = MemphisException::new(ExceptionKind::ImportError, vec![str!("other")]);
+        assert_eq!(
+            e.to_string(),
+            String::from("ImportError: No module named 'other'")
+        );
     }
 }
