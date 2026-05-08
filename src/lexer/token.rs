@@ -110,6 +110,8 @@ pub enum Token {
     Invalid(String),
     // we got to the end of a line with a string unterminated
     UnterminatedString(String),
+    // we got to the end of input while still inside a triple-quoted string
+    UnterminatedMultilineString(String),
 }
 
 impl TryFrom<&Token> for BinOp {

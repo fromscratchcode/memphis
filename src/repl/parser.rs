@@ -52,6 +52,9 @@ fn check_complete(mut parser: Parser) -> ParseStatus {
             Some(Token::Indent) => ParseStatus::Incomplete(IncompleteReason::NeedsIndent),
             _ => ParseStatus::Incomplete(IncompleteReason::NeedsMoreTokens),
         },
+        Err(ParserError::UnterminatedMultilineString) => {
+            ParseStatus::Incomplete(IncompleteReason::NeedsMoreTokens)
+        }
         Err(_) => ParseStatus::Error,
     }
 }

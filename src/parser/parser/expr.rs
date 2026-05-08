@@ -532,6 +532,7 @@ impl Parser<'_> {
             Token::UnterminatedString(_) => {
                 Err(ParserError::syntax_error("unterminated string literal"))
             }
+            Token::UnterminatedMultilineString(_) => Err(ParserError::UnterminatedMultilineString),
             _ => Err(ParserError::UnexpectedToken(self.current_token().clone())),
         }
     }

@@ -7,6 +7,7 @@ pub enum ParserError {
     ExpectedToken(Token, Token),
     UnexpectedToken(Token),
     SyntaxError(String),
+    UnterminatedMultilineString,
 }
 
 impl ParserError {
@@ -24,6 +25,9 @@ impl ParserError {
                 format!("Unexpected token \"{token:?}\"")
             }
             ParserError::SyntaxError(msg) => msg.clone(),
+            ParserError::UnterminatedMultilineString => {
+                "unterminated triple-quoted string literal".to_string()
+            }
         }
     }
 }
@@ -39,6 +43,9 @@ impl Display for ParserError {
             }
             ParserError::SyntaxError(msg) => {
                 write!(f, "{msg}")
+            }
+            ParserError::UnterminatedMultilineString => {
+                write!(f, "unterminated triple-quoted string literal")
             }
         }
     }

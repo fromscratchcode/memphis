@@ -61,8 +61,11 @@ impl Iterator for Lexer {
                 return Some(token);
             }
 
-            // 2. If there’s no more source to lex, stop
+            // 2. If there’s no more source to lex, flush any unterminated triple-quoted string.
             if self.source_lines.is_empty() {
+                if let Some(string) = self.multiline_string.take() {
+                    return Some(Token::UnterminatedMultilineString(string.literal));
+                }
                 return None;
             }
 
@@ -2910,6 +2913,16 @@ for i in a:
                 Token::UnterminatedString("hello".to_string()),
                 Token::Newline
             ]
+        );
+    }
+
+    #[test]
+    fn unterminated_multiline_string() {
+        let input = r#"""""#;
+        let tokens = tokenize(input);
+        assert_eq!(
+            tokens,
+            vec![Token::UnterminatedMultilineString("\n".to_string())]
         );
     }
 }

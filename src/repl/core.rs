@@ -160,6 +160,70 @@ mod tests {
     }
 
     #[test]
+    fn test_multiline_list() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out1 = core.input_line("[\n");
+        match out1 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out2 = core.input_line("\n");
+        match out2 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out3 = core.input_line("1\n");
+        match out3 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out4 = core.input_line("]\n");
+        match out4 {
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::Ok("[1]".to_string()));
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_multiline_string() {
+        let mut core = ReplCore::new(Engine::Treewalk);
+
+        let out1 = core.input_line("\"\"\"\n");
+        match out1 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out2 = core.input_line("\n");
+        match out2 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out3 = core.input_line("1\n");
+        match out3 {
+            ReplStep::Incomplete { .. } => {}
+            _ => panic!("expected incomplete"),
+        }
+
+        let out4 = core.input_line("\"\"\"\n");
+        match out4 {
+            ReplStep::Complete(output) => {
+                assert_eq!(output.stdout, String::from(""));
+                assert_eq!(output.result, ReplResult::Ok("\n\n1\n".to_string()));
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
     fn test_reset_clears_incomplete_input() {
         let mut core = ReplCore::new(Engine::Treewalk);
 
