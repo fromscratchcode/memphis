@@ -16,7 +16,7 @@
 |Function defintion and function calls|✅|✅|
 |Class definition, instatiation, and method calls|✅|✅|
 |Lexical scoping|✅|✅|
-|Module imports|✅|🔄|
+|Module imports|✅|✅|
 |Floating point|✅|✅|
 |Negative numbers|✅|✅|
 |Stack traces|✅|✅|
@@ -50,7 +50,7 @@
 |f-strings (without escape characters)|✅|✅|
 |Class variables, class methods, and static methods|✅||
 |Type hints (without enforcement)|✅||
-|Exception groups|✅||
+|Exception groups|||
 |Assignment expressions (`:=`)|||
 |`async with` and `async for`|||
 |Async generators|||
