@@ -25,7 +25,7 @@ impl Callable for NetListenBuiltin {
         check_args(&args, |len| len == 1).raise(interpreter)?;
 
         let host_port = args.get_arg(0).as_tuple().raise(interpreter)?;
-        let host = host_port.first().as_str().raise(interpreter)?;
+        let host = host_port.first().as_string().raise(interpreter)?;
         let port = host_port.second().as_int().raise(interpreter)?;
 
         let socket = Socket::new(host, port as usize)

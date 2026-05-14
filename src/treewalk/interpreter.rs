@@ -16,6 +16,7 @@ mod args;
 mod assignment;
 mod call;
 mod class;
+mod delete;
 mod evaluators;
 mod exception_handling;
 mod expr;
@@ -24,6 +25,7 @@ mod import;
 mod load;
 mod object;
 mod stmt;
+mod store;
 
 #[derive(Clone)]
 pub struct TreewalkInterpreter {
@@ -1339,11 +1341,7 @@ t = type(slice)
 
         assert_eq!(extract!(ctx, "b", Class).borrow().name(), "Foo");
         assert_eq!(
-            extract!(ctx, "c", Object)
-                .borrow()
-                .class_ref()
-                .borrow()
-                .name(),
+            extract!(ctx, "c", Object).borrow().class().borrow().name(),
             "Foo"
         );
         assert_read_eq!(ctx, "f", list![int!(1), int!(2), int!(3),]);
@@ -4984,6 +4982,16 @@ del my['one']
 
         assert_read_eq!(ctx, "a", int!(1));
         assert_member_eq!(ctx, "my", "inner", dict!({}));
+    }
+
+    #[test]
+    fn getitem_dunder_behavior() {
+        let input = r#"
+o = object()
+getattr(o, '__getitem__')
+"#;
+        let e = eval_expect_error(input);
+        assert_attribute_error!(e.exception, "object", "__getitem__");
     }
 
     #[test]

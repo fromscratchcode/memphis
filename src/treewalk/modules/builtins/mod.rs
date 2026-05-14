@@ -109,7 +109,7 @@ impl Callable for GetattrBuiltin {
         check_args(&args, |len| [2, 3].contains(&len)).raise(interpreter)?;
 
         let object = args.get_arg(0);
-        let field = args.get_arg(1).as_str().raise(interpreter)?;
+        let field = args.get_arg(1).as_string().raise(interpreter)?;
 
         let attr = object
             .clone()
@@ -139,7 +139,7 @@ impl Callable for SetattrBuiltin {
         check_args(&args, |len| len == 3).raise(interpreter)?;
 
         let object = args.get_arg(0);
-        let field = args.get_arg(1).as_str().raise(interpreter)?;
+        let field = args.get_arg(1).as_string().raise(interpreter)?;
         let value = args.get_arg(2);
 
         object

@@ -5,10 +5,7 @@ use crate::{
     domain::{Dunder, Type},
     treewalk::{
         macros::*,
-        protocols::{
-            Callable, DataDescriptor, IndexRead, IndexWrite, MemberRead, MemberWrite,
-            NonDataDescriptor,
-        },
+        protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
         types::{Class, Exception, Str},
         utils::{args, check_args, Args},
@@ -88,57 +85,6 @@ impl Object {
 
     pub fn class(&self) -> Container<Class> {
         self.class.clone()
-    }
-
-    pub fn class_ref(&self) -> &Container<Class> {
-        &self.class
-    }
-}
-
-impl IndexWrite for Container<Object> {
-    fn setitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-        value: TreewalkValue,
-    ) -> TreewalkResult<()> {
-        let _ = interpreter.call_method(
-            &TreewalkValue::Object(self.clone()),
-            Dunder::SetItem,
-            args![index, value],
-        )?;
-
-        Ok(())
-    }
-
-    fn delitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<()> {
-        let _ = interpreter.call_method(
-            &TreewalkValue::Object(self.clone()),
-            Dunder::DelItem,
-            args![index],
-        )?;
-
-        Ok(())
-    }
-}
-
-impl IndexRead for Container<Object> {
-    fn getitem(
-        &self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue> {
-        let result = interpreter.call_method(
-            &TreewalkValue::Object(self.clone()),
-            Dunder::GetItem,
-            args![index],
-        )?;
-
-        Ok(result)
     }
 }
 

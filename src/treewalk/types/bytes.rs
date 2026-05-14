@@ -56,7 +56,7 @@ impl Callable for DecodeBuiltin {
         let encoding = match args.len() {
             0 => Encoding::default(),
             1 => {
-                let encoding_str = args.get_arg(0).as_str().raise(interpreter)?;
+                let encoding_str = args.get_arg(0).as_string().raise(interpreter)?;
                 Encoding::try_from(encoding_str.as_str()).raise(interpreter)?
             }
             _ => unreachable!(),

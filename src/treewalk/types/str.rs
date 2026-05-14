@@ -5,7 +5,7 @@ use crate::{
     domain::{utils::normalize_index, Dunder, Encoding, Type},
     treewalk::{
         macros::*,
-        protocols::{Callable, IndexRead},
+        protocols::Callable,
         result::Raise,
         types::{Exception, List, Slice},
         utils::{check_args, Args},
@@ -28,6 +28,7 @@ impl_method_provider!(
         SplitBuiltin,
         LowerBuiltin,
         EncodeBuiltin,
+        GetItemBuiltin,
     ]
 );
 impl_iterable!(StrIter);
@@ -99,32 +100,6 @@ impl Deref for Str {
     }
 }
 
-impl IndexRead for Str {
-    fn getitem(
-        &self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue> {
-        let value = match index {
-            TreewalkValue::Int(i) => self
-                .get_normalized(i)
-                .map(TreewalkValue::Str)
-                .ok_or_else(|| Exception::index_error("string index out of range"))
-                .raise(interpreter)?,
-            TreewalkValue::Slice(s) => TreewalkValue::Str(self.slice(&s)),
-            _ => {
-                return Exception::type_error(format!(
-                    "string indices must be integers, not '{}'",
-                    interpreter.state.type_name(&index)
-                ))
-                .raise(interpreter)
-            }
-        };
-
-        Ok(value)
-    }
-}
-
 impl IntoIterator for Str {
     type Item = TreewalkValue;
     type IntoIter = StrIter;
@@ -175,6 +150,8 @@ struct SplitBuiltin;
 struct LowerBuiltin;
 #[derive(Clone)]
 struct EncodeBuiltin;
+#[derive(Clone)]
+struct GetItemBuiltin;
 
 impl Callable for AddBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
@@ -184,9 +161,9 @@ impl Callable for AddBuiltin {
         let a = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
-        let b = args.get_arg(0).as_str().raise(interpreter)?;
+        let b = args.get_arg(0).as_string().raise(interpreter)?;
 
         Ok(TreewalkValue::Str(Str::from(a + &b)))
     }
@@ -203,7 +180,7 @@ impl Callable for MulBuiltin {
         let a = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
         let n = args.get_arg(0).as_int().raise(interpreter)?;
 
@@ -222,9 +199,9 @@ impl Callable for LtBuiltin {
         let a = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
-        let b = args.get_arg(0).as_str().raise(interpreter)?;
+        let b = args.get_arg(0).as_string().raise(interpreter)?;
         Ok(TreewalkValue::Bool(a < b))
     }
 
@@ -240,9 +217,9 @@ impl Callable for ContainsBuiltin {
         let a = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
-        let b = args.get_arg(0).as_str().raise(interpreter)?;
+        let b = args.get_arg(0).as_string().raise(interpreter)?;
 
         Ok(TreewalkValue::Bool(a.contains(&b)))
     }
@@ -259,7 +236,7 @@ impl Callable for JoinBuiltin {
         let delim = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
         let items = args.get_arg(0).as_list().raise(interpreter)?;
         let joined = items.borrow().join(&delim).raise(interpreter)?;
@@ -279,9 +256,9 @@ impl Callable for SplitBuiltin {
         let text = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
-        let delim = args.get_arg(0).as_str().raise(interpreter)?;
+        let delim = args.get_arg(0).as_string().raise(interpreter)?;
 
         // We must use dynamic dispatch because split and splitn return different types.
         let iter: Box<dyn Iterator<Item = &str>> = match args.len() {
@@ -311,7 +288,7 @@ impl Callable for LowerBuiltin {
         let text = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
         Ok(TreewalkValue::Str(Str::from(text.to_lowercase())))
     }
@@ -327,13 +304,13 @@ impl Callable for EncodeBuiltin {
         let text = args
             .get_self()
             .raise(interpreter)?
-            .as_str()
+            .as_string()
             .raise(interpreter)?;
 
         let encoding = match args.len() {
             0 => Encoding::default(),
             1 => {
-                let encoding_str = args.get_arg(0).as_str().raise(interpreter)?;
+                let encoding_str = args.get_arg(0).as_string().raise(interpreter)?;
                 Encoding::try_from(encoding_str.as_str()).raise(interpreter)?
             }
             _ => unreachable!(),
@@ -344,5 +321,40 @@ impl Callable for EncodeBuiltin {
 
     fn name(&self) -> String {
         "encode".into()
+    }
+}
+
+impl Callable for GetItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_str()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+
+        let value = match index {
+            TreewalkValue::Int(i) => object
+                .get_normalized(i)
+                .map(TreewalkValue::Str)
+                .ok_or_else(|| Exception::index_error("string index out of range"))
+                .raise(interpreter)?,
+            TreewalkValue::Slice(s) => TreewalkValue::Str(object.slice(&s)),
+            _ => {
+                return Exception::type_error(format!(
+                    "string indices must be integers, not '{}'",
+                    interpreter.state.type_name(&index)
+                ))
+                .raise(interpreter)
+            }
+        };
+
+        Ok(value)
+    }
+
+    fn name(&self) -> String {
+        Dunder::GetItem.into()
     }
 }

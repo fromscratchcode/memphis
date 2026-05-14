@@ -3,7 +3,7 @@ use crate::{
     domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
         macros::*,
-        protocols::{Callable, IndexRead, TryEvalFrom},
+        protocols::{Callable, TryEvalFrom},
         result::Raise,
         types::{Exception, Slice},
         utils::{check_args, Args},
@@ -17,7 +17,7 @@ pub struct Tuple {
 }
 
 impl_typed!(Tuple, Type::Tuple);
-impl_method_provider!(Tuple, [NewBuiltin]);
+impl_method_provider!(Tuple, [NewBuiltin, GetItemBuiltin]);
 impl_iterable!(TupleIter);
 
 impl Tuple {
@@ -56,31 +56,6 @@ impl Tuple {
     fn slice(&self, slice: &Slice) -> Self {
         let sliced_items = slice.apply(self.len(), |i| self.get(i as usize));
         Self::new(sliced_items)
-    }
-}
-
-impl IndexRead for Tuple {
-    fn getitem(
-        &self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue> {
-        let value = match index {
-            TreewalkValue::Int(i) => self
-                .get_normalized(i)
-                .ok_or_else(|| Exception::index_error("tuple index out of range"))
-                .raise(interpreter)?,
-            TreewalkValue::Slice(s) => TreewalkValue::Tuple(self.slice(&s)),
-            _ => {
-                return Exception::type_error(format!(
-                    "tuple indices must be integers or slices, not {}",
-                    interpreter.state.type_name(&index)
-                ))
-                .raise(interpreter)
-            }
-        };
-
-        Ok(value)
     }
 }
 
@@ -136,6 +111,8 @@ impl Iterator for TupleIter {
 
 #[derive(Clone)]
 struct NewBuiltin;
+#[derive(Clone)]
+struct GetItemBuiltin;
 
 impl Callable for NewBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
@@ -152,5 +129,39 @@ impl Callable for NewBuiltin {
 
     fn name(&self) -> String {
         Dunder::New.into()
+    }
+}
+
+impl Callable for GetItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_tuple()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+
+        let value = match index {
+            TreewalkValue::Int(i) => object
+                .get_normalized(i)
+                .ok_or_else(|| Exception::index_error("tuple index out of range"))
+                .raise(interpreter)?,
+            TreewalkValue::Slice(s) => TreewalkValue::Tuple(object.slice(&s)),
+            _ => {
+                return Exception::type_error(format!(
+                    "tuple indices must be integers or slices, not {}",
+                    interpreter.state.type_name(&index)
+                ))
+                .raise(interpreter)
+            }
+        };
+
+        Ok(value)
+    }
+
+    fn name(&self) -> String {
+        Dunder::GetItem.into()
     }
 }

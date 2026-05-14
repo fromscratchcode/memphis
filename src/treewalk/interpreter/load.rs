@@ -1,8 +1,9 @@
 use crate::{
     core::{log, LogLevel},
+    domain::Dunder,
     treewalk::{
-        result::Raise, type_system::CloneableCallable, types::Exception, TreewalkInterpreter,
-        TreewalkResult, TreewalkValue,
+        result::Raise, type_system::CloneableCallable, types::Exception, utils::args,
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -23,17 +24,19 @@ impl TreewalkInterpreter {
         object: &TreewalkValue,
         index: &TreewalkValue,
     ) -> TreewalkResult<TreewalkValue> {
-        object
-            .clone()
-            .into_index_read(self)?
-            .ok_or_else(|| {
+        match self.call_method(object, Dunder::GetItem, args![index.clone()]) {
+            Ok(i) => Ok(i),
+            Err(TreewalkDisruption::Error(e)) if e.exception.is_missing_attr(&Dunder::GetItem) => {
+                // Remap this error so we don't raise AttributeError: __getitem__
+                // This should really be handled via slots dispatch, which we don't support
                 Exception::type_error(format!(
                     "'{}' object is not subscriptable",
                     object.get_type()
                 ))
-            })
-            .raise(self)?
-            .getitem(self, index.clone())
+                .raise(self)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn load_member<S>(&self, result: &TreewalkValue, field: S) -> TreewalkResult<TreewalkValue>

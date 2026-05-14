@@ -118,6 +118,18 @@ impl Exception {
     pub fn first_arg_or_none(&self) -> TreewalkValue {
         self.payload.first().cloned().unwrap_or(TreewalkValue::None)
     }
+
+    fn index_or_none(&self, index: usize) -> TreewalkValue {
+        self.payload
+            .get(index)
+            .cloned()
+            .unwrap_or(TreewalkValue::None)
+    }
+
+    pub fn is_missing_attr(&self, attr: &str) -> bool {
+        self.kind == ExceptionKind::AttributeError
+            && self.index_or_none(1) == TreewalkValue::Str(Str::new(attr))
+    }
 }
 
 impl From<Exception> for MemphisException {

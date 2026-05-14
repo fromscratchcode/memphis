@@ -383,9 +383,16 @@ impl TreewalkValue {
         }
     }
 
-    pub fn as_str(&self) -> DomainResult<String> {
+    pub fn as_string(&self) -> DomainResult<String> {
         match self {
             TreewalkValue::Str(i) => Ok(i.to_string()),
+            _ => Err(Exception::type_error("Expected a string")),
+        }
+    }
+
+    pub fn as_str(&self) -> DomainResult<Str> {
+        match self {
+            TreewalkValue::Str(i) => Ok(i.clone()),
             _ => Err(Exception::type_error("Expected a string")),
         }
     }
@@ -394,6 +401,13 @@ impl TreewalkValue {
         match self {
             TreewalkValue::Dict(i) => Ok(i.clone()),
             _ => Err(Exception::type_error("Expected a dict")),
+        }
+    }
+
+    pub fn as_mapping_proxy(&self) -> DomainResult<MappingProxy> {
+        match self {
+            TreewalkValue::MappingProxy(i) => Ok(i.clone()),
+            _ => Err(Exception::type_error("Expected a mapping proxy")),
         }
     }
 

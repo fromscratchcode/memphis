@@ -29,7 +29,7 @@ impl TreewalkInterpreter {
         // This is a case where it's simpler if we have an alias: just make the module available
         // at the alias.
         if let Some(alias) = alias {
-            self.state.write(alias.as_str(), module);
+            self.store_var(alias.as_str(), module);
         } else {
             // Otherwise, we must create a module chain. For example:
             //
@@ -40,7 +40,7 @@ impl TreewalkInterpreter {
             // mypackage.myothermodule.add('1', '1')
             let outer_module = import_utils::build_module_chain(module_name, module);
             let symbol_name = module_name.head();
-            self.state.write(symbol_name, outer_module);
+            self.store_var(symbol_name, outer_module);
         }
 
         Ok(())

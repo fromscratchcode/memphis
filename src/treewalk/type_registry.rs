@@ -11,8 +11,8 @@ use crate::{
         types::{
             iterators::{ReversedIter, ZipIterator},
             Bool, ByteArray, Bytes, Class, Classmethod, Complex, Coroutine, Dict, Exception, Float,
-            FrozenSet, Function, Int, List, Memoryview, Object, Property, Range, Set, Slice,
-            Staticmethod, StopIteration, Str, Super, Traceback, Tuple, TypeClass, TypeError,
+            FrozenSet, Function, Int, List, MappingProxy, Memoryview, Object, Property, Range, Set,
+            Slice, Staticmethod, StopIteration, Str, Super, Traceback, Tuple, TypeClass, TypeError,
         },
         TreewalkValue,
     },
@@ -53,6 +53,7 @@ fn builtin_methods() -> HashMap<Type, Vec<Box<dyn CloneableCallable>>> {
     let mut methods = HashMap::new();
 
     register_methods::<Dict>(&mut methods);
+    register_methods::<MappingProxy>(&mut methods);
     register_methods::<Super>(&mut methods);
     register_methods::<Bool>(&mut methods);
     register_methods::<Int>(&mut methods);

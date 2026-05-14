@@ -1,7 +1,7 @@
 use crate::{
     domain::Dunder,
     treewalk::{
-        protocols::{IndexRead, IndexWrite, MemberRead, MemberWrite},
+        protocols::{MemberRead, MemberWrite},
         type_system::{
             CloneableCallable, CloneableDataDescriptor, CloneableIterable,
             CloneableNonDataDescriptor,
@@ -39,41 +39,6 @@ impl TreewalkValue {
             TreewalkValue::Function(i) => Some(Box::new(i)),
             _ => None,
         }
-    }
-
-    pub fn into_index_read(
-        self,
-        interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<Option<Box<dyn IndexRead>>> {
-        let result: Box<dyn IndexRead> = match self {
-            TreewalkValue::Object(ref i) if self.hasattr(interpreter, Dunder::GetItem)? => {
-                Box::new(i.clone()) as Box<dyn IndexRead>
-            }
-            TreewalkValue::List(list) => Box::new(list),
-            TreewalkValue::Tuple(tuple) => Box::new(tuple),
-            TreewalkValue::Dict(dict) => Box::new(dict),
-            TreewalkValue::MappingProxy(proxy) => Box::new(proxy),
-            TreewalkValue::Str(s) => Box::new(s),
-            _ => return Ok(None),
-        };
-
-        Ok(Some(result))
-    }
-
-    pub fn into_index_write(
-        self,
-        interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<Option<Box<dyn IndexWrite>>> {
-        let result: Box<dyn IndexWrite> = match self {
-            TreewalkValue::Object(ref i) if self.hasattr(interpreter, Dunder::SetItem)? => {
-                Box::new(i.clone()) as Box<dyn IndexWrite>
-            }
-            TreewalkValue::List(list) => Box::new(list),
-            TreewalkValue::Dict(dict) => Box::new(dict),
-            _ => return Ok(None),
-        };
-
-        Ok(Some(result))
     }
 
     pub fn into_nondata_descriptor(

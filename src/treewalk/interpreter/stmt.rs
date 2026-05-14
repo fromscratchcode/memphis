@@ -128,36 +128,16 @@ impl TreewalkInterpreter {
         for expr in exprs {
             match expr {
                 Expr::Variable(name) => {
-                    self.state.delete(name.as_str());
+                    self.delete_var(name.as_str());
                 }
                 Expr::IndexAccess { object, index } => {
-                    let index_result = self.evaluate_expr(index)?;
                     let object_result = self.evaluate_expr(object)?;
-                    object_result
-                        .clone()
-                        .into_index_write(self)?
-                        .ok_or_else(|| {
-                            Exception::type_error(format!(
-                                "'{}' object does not support item deletion",
-                                object_result.get_type()
-                            ))
-                        })
-                        .raise(self)?
-                        .delitem(self, index_result)?;
+                    let index_result = self.evaluate_expr(index)?;
+                    self.delete_index(object_result, index_result)?;
                 }
                 Expr::MemberAccess { object, field } => {
-                    let result = self.evaluate_expr(object)?;
-                    result
-                        .clone()
-                        .into_member_writer()
-                        .ok_or_else(|| {
-                            Exception::attribute_error(
-                                self.state.class_name(&result),
-                                field.as_str(),
-                            )
-                        })
-                        .raise(self)?
-                        .delete_member(self, field.as_str())?;
+                    let object_result = self.evaluate_expr(object)?;
+                    self.delete_member(object_result, field.as_str())?;
                 }
                 _ => return Exception::type_error("cannot delete").raise(self),
             }
@@ -273,7 +253,7 @@ impl TreewalkInterpreter {
         // We should note that what we write here it not always a `Function` or even a `Callable`.
         // In the case of the `@property` decorator, what is written to the symbol table is a
         // `MemberDescriptor`.
-        self.state.write(name.as_str(), result);
+        self.store_var(name.as_str(), result);
         Ok(())
     }
 
@@ -402,7 +382,7 @@ impl TreewalkInterpreter {
             .borrow()
             .clone();
 
-        self.state.write(name.as_str(), TreewalkValue::Class(class));
+        self.store_var(name.as_str(), TreewalkValue::Class(class));
 
         Ok(())
     }
@@ -439,7 +419,7 @@ impl TreewalkInterpreter {
                         .ok_or_else(|| Exception::name_error(symbol))
                         .raise(self)?;
 
-                    self.state.write(symbol, value);
+                    self.store_var(symbol, value);
                 }
             }
 
@@ -456,7 +436,7 @@ impl TreewalkInterpreter {
                         .ok_or_else(|| Exception::name_error(original.as_str()))
                         .raise(self)?;
 
-                    self.state.write(imported.as_str(), value);
+                    self.store_var(imported.as_str(), value);
                 }
             }
         }
@@ -503,7 +483,7 @@ impl TreewalkInterpreter {
                 alias: Some(alias), ..
             } = &handler.kind
             {
-                self.state.write(
+                self.store_var(
                     alias.as_str(),
                     TreewalkValue::Exception(raised_exception.exception.clone()),
                 );
@@ -584,7 +564,7 @@ impl TreewalkInterpreter {
         let result = self.call_method(&expr_result, Dunder::Enter, args![])?;
 
         if let Some(variable) = variable {
-            self.state.write(variable.as_str(), result);
+            self.store_var(variable.as_str(), result);
         }
         let block_result = self.execute_ast(block);
 

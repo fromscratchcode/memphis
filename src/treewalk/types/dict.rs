@@ -5,7 +5,7 @@ use crate::{
     domain::{Dunder, Type},
     treewalk::{
         macros::*,
-        protocols::{Callable, IndexRead, IndexWrite, TryEvalFrom},
+        protocols::{Callable, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
         types::{iterators::DictKeysIter, DictItems, DictKeys, DictValues, Exception},
@@ -30,6 +30,9 @@ impl_method_provider!(
         DictKeysBuiltin,
         DictValuesBuiltin,
         DictItemsBuiltin,
+        GetItemBuiltin,
+        SetItemBuiltin,
+        DelItemBuiltin,
     ]
 );
 
@@ -58,6 +61,10 @@ impl Dict {
         } else {
             None
         }
+    }
+
+    pub fn getitem(&self, index: &TreewalkValue) -> DomainResult<TreewalkValue> {
+        self.get(index).ok_or_else(|| Exception::key_error(index))
     }
 
     pub fn has(&self, key: &TreewalkValue) -> bool {
@@ -103,7 +110,7 @@ impl Dict {
         let dict_items = self.items();
         for pair in dict_items {
             let tuple = pair.as_tuple()?;
-            let key = tuple.first().as_str()?;
+            let key = tuple.first().as_string()?;
             let value = tuple.second();
             table.insert(key, value);
         }
@@ -179,44 +186,6 @@ impl IntoIterator for Container<Dict> {
     }
 }
 
-impl IndexRead for Container<Dict> {
-    fn getitem(
-        &self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue> {
-        let value = self
-            .borrow()
-            .get(&index)
-            .ok_or_else(|| Exception::key_error(&index))
-            .raise(interpreter)?;
-        Ok(value)
-    }
-}
-
-impl IndexWrite for Container<Dict> {
-    fn setitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-        value: TreewalkValue,
-    ) -> TreewalkResult<()> {
-        let key = index.as_hash_key().raise(interpreter)?;
-        self.borrow_mut().items.insert(key, (index, value));
-        Ok(())
-    }
-
-    fn delitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<()> {
-        let key = index.as_hash_key().raise(interpreter)?;
-        self.borrow_mut().items.remove(&key);
-        Ok(())
-    }
-}
-
 #[derive(Clone)]
 struct NewBuiltin;
 #[derive(Clone)]
@@ -229,6 +198,12 @@ struct DictItemsBuiltin;
 struct DictKeysBuiltin;
 #[derive(Clone)]
 struct DictValuesBuiltin;
+#[derive(Clone)]
+struct GetItemBuiltin;
+#[derive(Clone)]
+struct SetItemBuiltin;
+#[derive(Clone)]
+struct DelItemBuiltin;
 
 impl Callable for DictItemsBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
@@ -350,5 +325,68 @@ impl Callable for GetBuiltin {
 
     fn name(&self) -> String {
         "get".into()
+    }
+}
+
+impl Callable for GetItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_dict()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+
+        let value = object.borrow().getitem(&index).raise(interpreter)?;
+        Ok(value)
+    }
+
+    fn name(&self) -> String {
+        Dunder::GetItem.into()
+    }
+}
+
+impl Callable for SetItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 2).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_dict()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+        let value = args.get_arg(1);
+
+        let key = index.as_hash_key().raise(interpreter)?;
+        object.borrow_mut().items.insert(key, (index, value));
+        Ok(TreewalkValue::None)
+    }
+
+    fn name(&self) -> String {
+        Dunder::SetItem.into()
+    }
+}
+
+impl Callable for DelItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_dict()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+
+        let key = index.as_hash_key().raise(interpreter)?;
+        object.borrow_mut().items.remove(&key);
+        Ok(TreewalkValue::None)
+    }
+
+    fn name(&self) -> String {
+        Dunder::DelItem.into()
     }
 }

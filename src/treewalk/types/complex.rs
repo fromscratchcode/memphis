@@ -70,7 +70,7 @@ impl Callable for NewBuiltin {
                 Err(_) => {
                     let input = &args
                         .get_arg(1)
-                        .as_str()
+                        .as_string()
                         .map_err(|_| {
                             Exception::type_error(format!(
                                 "complex() first argument must be a string or a number, not '{}'",

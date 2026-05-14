@@ -91,7 +91,7 @@ impl Callable for NewBuiltin {
             2 => unreachable!("type() with 1 arg is special-cased and handled eslewhere"),
             4 => {
                 let mcls = args.get_arg(0).as_class().raise(interpreter)?;
-                let name = args.get_arg(1).as_str().raise(interpreter)?;
+                let name = args.get_arg(1).as_string().raise(interpreter)?;
                 // Default to the `Type::Object` class.
                 let parent_classes = args
                     .get_arg(2)

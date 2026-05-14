@@ -5,7 +5,7 @@ use crate::{
     domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
         macros::*,
-        protocols::{Callable, IndexRead, IndexWrite, TryEvalFrom},
+        protocols::{Callable, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
         types::{Exception, Slice},
@@ -22,7 +22,15 @@ pub struct List {
 impl_typed!(List, Type::List);
 impl_method_provider!(
     List,
-    [NewBuiltin, AddBuiltin, AppendBuiltin, ExtendBuiltin,]
+    [
+        NewBuiltin,
+        AddBuiltin,
+        AppendBuiltin,
+        ExtendBuiltin,
+        GetItemBuiltin,
+        SetItemBuiltin,
+        DelItemBuiltin,
+    ]
 );
 impl_iterable!(ListIter);
 
@@ -39,7 +47,7 @@ impl List {
         Ok(self
             .items
             .iter()
-            .map(|v| v.as_str())
+            .map(|v| v.as_string())
             .collect::<DomainResult<Vec<_>>>()?
             .join(delim))
     }
@@ -76,68 +84,6 @@ impl List {
     fn slice(&self, slice: &Slice) -> Self {
         let sliced_items = slice.apply(self.len(), |i| self.get(i as usize));
         List::new(sliced_items)
-    }
-}
-
-impl IndexRead for Container<List> {
-    fn getitem(
-        &self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue> {
-        let value = match index {
-            TreewalkValue::Int(i) => self
-                .borrow()
-                .get_normalized(i)
-                .ok_or_else(|| Exception::index_error("list index out of range"))
-                .raise(interpreter)?,
-            TreewalkValue::Slice(s) => TreewalkValue::List(Container::new(self.borrow().slice(&s))),
-            _ => {
-                return Exception::type_error(format!(
-                    "list indices must be integers or slices, not {}",
-                    interpreter.state.type_name(&index)
-                ))
-                .raise(interpreter)
-            }
-        };
-
-        Ok(value)
-    }
-}
-
-impl IndexWrite for Container<List> {
-    fn setitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-        value: TreewalkValue,
-    ) -> TreewalkResult<()> {
-        match index {
-            TreewalkValue::Int(i) => {
-                let i = normalize_index(i, self.borrow().len())
-                    .ok_or_else(|| Exception::index_error("list assignment index out of range"))
-                    .raise(interpreter)?;
-                self.borrow_mut().set(i, value);
-            }
-            _ => {
-                return Exception::type_error(format!(
-                    "list indices must be integers or slices, not {}",
-                    interpreter.state.type_name(&index)
-                ))
-                .raise(interpreter)
-            }
-        }
-        Ok(())
-    }
-
-    fn delitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<()> {
-        let i = index.as_int().raise(interpreter)?;
-        self.borrow_mut().items.remove(i as usize);
-        Ok(())
     }
 }
 
@@ -216,6 +162,12 @@ struct AddBuiltin;
 struct AppendBuiltin;
 #[derive(Clone)]
 struct ExtendBuiltin;
+#[derive(Clone)]
+struct GetItemBuiltin;
+#[derive(Clone)]
+struct SetItemBuiltin;
+#[derive(Clone)]
+struct DelItemBuiltin;
 
 impl Callable for NewBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
@@ -296,5 +248,100 @@ impl Callable for ExtendBuiltin {
 
     fn name(&self) -> String {
         "extend".into()
+    }
+}
+
+impl Callable for GetItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_list()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+
+        let value = match index {
+            TreewalkValue::Int(i) => object
+                .borrow()
+                .get_normalized(i)
+                .ok_or_else(|| Exception::index_error("list index out of range"))
+                .raise(interpreter)?,
+            TreewalkValue::Slice(s) => {
+                TreewalkValue::List(Container::new(object.borrow().slice(&s)))
+            }
+            _ => {
+                return Exception::type_error(format!(
+                    "list indices must be integers or slices, not {}",
+                    interpreter.state.type_name(&index)
+                ))
+                .raise(interpreter)
+            }
+        };
+
+        Ok(value)
+    }
+
+    fn name(&self) -> String {
+        Dunder::GetItem.into()
+    }
+}
+
+impl Callable for SetItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 2).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_list()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+        let value = args.get_arg(1);
+
+        match index {
+            TreewalkValue::Int(i) => {
+                let i = normalize_index(i, object.borrow().len())
+                    .ok_or_else(|| Exception::index_error("list assignment index out of range"))
+                    .raise(interpreter)?;
+                object.borrow_mut().set(i, value);
+            }
+            _ => {
+                return Exception::type_error(format!(
+                    "list indices must be integers or slices, not {}",
+                    interpreter.state.type_name(&index)
+                ))
+                .raise(interpreter)
+            }
+        }
+
+        Ok(TreewalkValue::None)
+    }
+
+    fn name(&self) -> String {
+        Dunder::SetItem.into()
+    }
+}
+
+impl Callable for DelItemBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 1).raise(interpreter)?;
+
+        let object = args
+            .get_self()
+            .raise(interpreter)?
+            .as_list()
+            .raise(interpreter)?;
+        let index = args.get_arg(0);
+
+        // TODO what if this is a slice
+        let i = index.as_int().raise(interpreter)?;
+        object.borrow_mut().items.remove(i as usize);
+        Ok(TreewalkValue::None)
+    }
+
+    fn name(&self) -> String {
+        Dunder::DelItem.into()
     }
 }

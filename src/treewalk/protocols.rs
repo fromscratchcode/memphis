@@ -106,27 +106,3 @@ pub trait DataDescriptor: NonDataDescriptor {
         instance: TreewalkValue,
     ) -> TreewalkResult<()>;
 }
-
-pub trait IndexRead {
-    fn getitem(
-        &self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue>;
-}
-
-pub trait IndexWrite {
-    fn setitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-        value: TreewalkValue,
-    ) -> TreewalkResult<()>;
-    fn delitem(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-        index: TreewalkValue,
-    ) -> TreewalkResult<()>;
-}
-
-// pub trait IndexAccessor: IndexRead + IndexWrite {}

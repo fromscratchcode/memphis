@@ -40,7 +40,7 @@ impl TreewalkInterpreter {
                 KwargsOperation::Unpacking(expr) => {
                     let unpacked = self.evaluate_expr(expr)?;
                     for key_val in unpacked.clone().as_iterable().raise(self)? {
-                        let key = key_val.as_str().raise(self)?;
+                        let key = key_val.as_string().raise(self)?;
                         let value = self.load_index(&unpacked, &key_val)?;
                         insert_kwarg(&mut kwargs, &key, value).raise(self)?;
                     }
