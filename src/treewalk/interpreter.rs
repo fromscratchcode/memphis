@@ -12,20 +12,11 @@ use crate::{
     },
 };
 
-mod args;
-mod assignment;
-mod call;
-mod class;
-mod delete;
-mod evaluators;
-mod exception_handling;
-mod expr;
-mod function;
-mod import;
-mod load;
-mod object;
-mod stmt;
-mod store;
+// slice of the TreewalkInterpreter that does the actual treewalking, fully AST-aware
+mod execution;
+// slice of the TreewalkInterpreter that operates on fully-resolved objects, (i.e. no references to
+// parser or its utilities)
+mod runtime;
 
 #[derive(Clone)]
 pub struct TreewalkInterpreter {
@@ -881,9 +872,6 @@ c = 4 + 2.1
 d = 1.9 + 4
 e = d == 5.9
 f = d != 5.9
-g = float()
-h = float(3.99)
-i = float(3)
 "#;
         let ctx = run(input);
 
@@ -893,20 +881,19 @@ i = float(3)
         assert_read_eq!(ctx, "d", float!(5.9));
         assert_read_eq!(ctx, "e", bool!(true));
         assert_read_eq!(ctx, "f", bool!(false));
-        assert_read_eq!(ctx, "g", float!(0.0));
-        assert_read_eq!(ctx, "h", float!(3.99));
-        assert_read_eq!(ctx, "i", float!(3.0));
 
         let input = r#"
 def add(x, y):
     return x + y
 
-z = add(2.1, 3)
+add(2.1, 3)
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, float!(5.1));
+    }
 
-        assert_read_eq!(ctx, "z", float!(5.1));
-
+    #[test]
+    fn float_builtin() {
+        // The rest of these now live in crosscheck
         let input = r#"
 float(1, 1)
 "#;
@@ -4076,16 +4063,10 @@ c = object().__str__
     fn int_builtin() {
         let input = r#"
 a = int
-b = int()
-c = int(5)
-d = int('6')
 "#;
         let ctx = run(input);
-
         assert_type_eq!(ctx, "a", Type::Int);
-        assert_read_eq!(ctx, "b", int!(0));
-        assert_read_eq!(ctx, "c", int!(5));
-        assert_read_eq!(ctx, "d", int!(6));
+        // the rest of the functional tests now live in crosscheck
     }
 
     #[test]

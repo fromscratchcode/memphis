@@ -11,6 +11,7 @@ use crate::{
             iterators::GeneratorIter, Dict, Exception, Function, Generator, List, Set, Slice, Str,
             Tuple,
         },
+        value::RuntimeCallable,
         TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
     },
 };
@@ -415,6 +416,13 @@ impl TreewalkInterpreter {
         } else {
             // Base case: emit one value
             emit()
+        }
+    }
+
+    pub fn evaluate_callable(&self, callee: &Callee) -> TreewalkResult<RuntimeCallable> {
+        match callee {
+            Callee::Expr(callee) => self.evaluate_expr(callee)?.as_callable().raise(self),
+            Callee::Symbol(name) => self.load_callable(name.as_str()),
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::{
         result::Raise,
         types::Exception,
         utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -71,13 +71,24 @@ struct GtBuiltin;
 #[derive(Clone)]
 struct GeBuiltin;
 
+fn parse_int_constructor_arg(val: &TreewalkValue) -> DomainResult<i64> {
+    match val {
+        TreewalkValue::Int(i) => Ok(*i),
+        TreewalkValue::Float(f) => Ok(*f as i64),
+        TreewalkValue::Str(s) => s
+            .parse::<i64>()
+            .map_err(|_| Exception::value_error("Invalid int literal")),
+        _ => Err(Exception::type_error("Cannot coerce to an int")),
+    }
+}
+
 impl Callable for NewBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
 
         let int = match args.len() {
             1 => 0,
-            2 => args.get_arg(1).coerce_to_int().raise(interpreter)?,
+            2 => parse_int_constructor_arg(&args.get_arg(1)).raise(interpreter)?,
             _ => unreachable!(),
         };
 

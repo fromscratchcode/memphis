@@ -1,9 +1,8 @@
 use crate::{
     core::Container,
-    parser::types::Expr,
     treewalk::{
-        result::Raise, types::Function, utils::args, Scope, TreewalkDisruption,
-        TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
+        types::Function, Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
+        TreewalkSignal, TreewalkValue,
     },
 };
 
@@ -64,20 +63,5 @@ impl TreewalkInterpreter {
         if cross_module {
             self.state.pop_module();
         }
-    }
-
-    pub fn apply_decorators(
-        &self,
-        function: Container<Function>,
-        decorators: &[Expr],
-    ) -> TreewalkResult<TreewalkValue> {
-        let mut value = TreewalkValue::Function(function);
-
-        for deco_expr in decorators {
-            let decorator = self.evaluate_expr(deco_expr)?.as_callable().raise(self)?;
-            value = self.call(decorator, args![value])?;
-        }
-
-        Ok(value)
     }
 }

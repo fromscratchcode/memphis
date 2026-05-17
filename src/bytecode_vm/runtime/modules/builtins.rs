@@ -13,10 +13,11 @@ use crate::{
     domain::{Dunder, ModuleName, Type},
 };
 
-static BUILTINS: [(&str, BuiltinFn); 9] = [
+static BUILTINS: [(&str, BuiltinFn); 10] = [
     ("type", type_fn),
     ("bool", bool),
     ("int", int),
+    ("float", float),
     ("list", list),
     ("tuple", tuple),
     ("range", range),
@@ -33,7 +34,13 @@ fn register_builtin_types(runtime: &Runtime, module: &mut Module) {
         .filter(|t| {
             !matches!(
                 t,
-                Type::Bool | Type::Int | Type::List | Type::Tuple | Type::Range | Type::Type
+                Type::Bool
+                    | Type::Int
+                    | Type::List
+                    | Type::Tuple
+                    | Type::Range
+                    | Type::Type
+                    | Type::Float
             )
         })
     {
@@ -165,6 +172,24 @@ fn int(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 
     let type_ = vm.runtime.borrow().builtin_types.int;
     let obj = vm.new_object(type_, VmValue::Int(value));
+    Ok(obj)
+}
+
+fn float(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
+    let value = match args.len() {
+        0 => 0.0,
+        1 => vm.coerce_to_float(&vm.deref(args[0])).raise(vm)?,
+        _ => {
+            let msg = vm.intern_string(&format!(
+                "float expected at most 1 argument, got {}",
+                args.len()
+            ));
+            return Exception::type_error(msg).raise(vm);
+        }
+    };
+
+    let type_ = vm.runtime.borrow().builtin_types.float;
+    let obj = vm.new_object(type_, VmValue::Float(value));
     Ok(obj)
 }
 

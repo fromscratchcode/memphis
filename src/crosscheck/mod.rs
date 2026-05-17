@@ -1,5 +1,7 @@
 mod crosscheck_assignment;
 mod crosscheck_asyncio;
+mod crosscheck_builtins_float;
+mod crosscheck_builtins_int;
 mod crosscheck_closures;
 mod crosscheck_compare_op;
 mod crosscheck_control_flow;

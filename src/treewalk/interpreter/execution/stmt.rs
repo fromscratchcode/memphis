@@ -583,4 +583,19 @@ impl TreewalkInterpreter {
 
         Ok(())
     }
+
+    fn apply_decorators(
+        &self,
+        function: Container<Function>,
+        decorators: &[Expr],
+    ) -> TreewalkResult<TreewalkValue> {
+        let mut value = TreewalkValue::Function(function);
+
+        for deco_expr in decorators {
+            let decorator = self.evaluate_expr(deco_expr)?.as_callable().raise(self)?;
+            value = self.call(decorator, args![value])?;
+        }
+
+        Ok(value)
+    }
 }

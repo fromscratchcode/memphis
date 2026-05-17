@@ -3,7 +3,6 @@ use std::any::Any;
 use crate::{
     core::{log, Container, LogLevel},
     domain::FunctionType,
-    parser::types::Callee,
     treewalk::{
         result::Raise,
         type_system::CloneableCallable,
@@ -51,13 +50,6 @@ impl TreewalkInterpreter {
 
         let method = self.load_method(receiver, name)?;
         self.call(method, args)
-    }
-
-    pub fn evaluate_callable(&self, callee: &Callee) -> TreewalkResult<RuntimeCallable> {
-        match callee {
-            Callee::Expr(callee) => self.evaluate_expr(callee)?.as_callable().raise(self),
-            Callee::Symbol(name) => self.load_callable(name.as_str()),
-        }
     }
 
     pub fn expect_function(

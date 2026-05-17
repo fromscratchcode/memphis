@@ -281,16 +281,6 @@ impl TreewalkValue {
         Ok(value)
     }
 
-    pub fn coerce_to_int(&self) -> DomainResult<i64> {
-        match self {
-            TreewalkValue::Int(i) => Ok(*i),
-            TreewalkValue::Str(s) => s
-                .parse::<i64>()
-                .map_err(|_| Exception::value_error("Invalid int literal")),
-            _ => Err(Exception::type_error("Cannot coerce to an int")),
-        }
-    }
-
     pub fn coerce_to_float(&self) -> DomainResult<f64> {
         match self {
             TreewalkValue::Float(i) => Ok(*i),

@@ -6,7 +6,7 @@ use crate::{
         result::Raise,
         types::Exception,
         utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -47,13 +47,24 @@ struct GtBuiltin;
 #[derive(Clone)]
 struct GeBuiltin;
 
+fn parse_float_constructor_arg(val: &TreewalkValue) -> DomainResult<f64> {
+    match val {
+        TreewalkValue::Float(i) => Ok(*i),
+        TreewalkValue::Int(i) => Ok(*i as f64),
+        TreewalkValue::Str(s) => s
+            .parse::<f64>()
+            .map_err(|_| Exception::value_error("Invalid float literal")),
+        _ => Err(Exception::type_error("Cannot coerce to a float")),
+    }
+}
+
 impl Callable for NewBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
 
         let a = match args.len() {
             1 => 0.0,
-            2 => args.get_arg(1).coerce_to_float().raise(interpreter)?,
+            2 => parse_float_constructor_arg(&args.get_arg(1)).raise(interpreter)?,
             _ => unreachable!(),
         };
 

@@ -87,7 +87,7 @@
 |`eval`|||
 |`exec`|||
 |`filter`|||
-|`float`|✅||
+|`float`|✅|✅|
 |`format`|||
 |`frozenset`|✅||
 |`getattr`|✅||
@@ -130,7 +130,7 @@
 |`sum`|||
 |`super`|✅||
 |`tuple`|✅|✅|
-|`type`|✅||
+|`type`|✅|✅|
 |`vars`|||
 |`zip`|✅||
 |`__import__`|||

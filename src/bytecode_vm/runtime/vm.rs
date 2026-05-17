@@ -457,12 +457,28 @@ impl VirtualMachine {
     pub fn coerce_to_int(&mut self, value: &VmValue) -> DomainResult<i64> {
         match value {
             VmValue::Int(i) => Ok(*i),
+            VmValue::Float(f) => Ok(*f as i64),
             VmValue::Str(s) => s.parse::<i64>().map_err(|_| {
                 let msg = self.intern_string("Invalid int literal");
                 Exception::value_error(msg)
             }),
             _ => {
                 let msg = self.intern_string("Cannot coerce to an int");
+                Err(Exception::type_error(msg))
+            }
+        }
+    }
+
+    pub fn coerce_to_float(&mut self, value: &VmValue) -> DomainResult<f64> {
+        match value {
+            VmValue::Int(i) => Ok(*i as f64),
+            VmValue::Float(f) => Ok(*f),
+            VmValue::Str(s) => s.parse::<f64>().map_err(|_| {
+                let msg = self.intern_string("Invalid float literal");
+                Exception::value_error(msg)
+            }),
+            _ => {
+                let msg = self.intern_string("Cannot coerce to a float");
                 Err(Exception::type_error(msg))
             }
         }
