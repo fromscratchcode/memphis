@@ -6,23 +6,7 @@ use crate::{
     domain::Text,
     lexer::{Lexer, Token},
     wasm::repr::WasmCodeObject,
-    Engine, MemphisContext,
 };
-
-#[wasm_bindgen]
-pub fn greet() -> String {
-    "Hello from WebAssembly!".to_string()
-}
-
-#[wasm_bindgen]
-pub fn evaluate(code: String) -> String {
-    // Set the panic hook for better error messages in the browser console
-    set_once();
-
-    let mut context = MemphisContext::stdin(Engine::Treewalk);
-    let result = context.eval(Text::new(&code)).expect("Failed to evaluate.");
-    result.to_string()
-}
 
 #[wasm_bindgen]
 pub fn compile(text: String) -> Result<JsValue, JsValue> {
