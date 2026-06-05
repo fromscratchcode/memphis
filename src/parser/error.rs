@@ -2,6 +2,8 @@ use std::fmt::{Display, Error, Formatter};
 
 use crate::lexer::Token;
 
+pub type ParserResult<T> = Result<T, ParserError>;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum ParserError {
     ExpectedToken(Token, Token),

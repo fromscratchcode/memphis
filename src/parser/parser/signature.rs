@@ -2,12 +2,12 @@ use crate::{
     lexer::Token,
     parser::{
         types::{Param, Params},
-        Parser, ParserError,
+        Parser, ParserResult,
     },
 };
 
 impl Parser<'_> {
-    pub fn parse_function_def_args(&mut self, end_token: Token) -> Result<Params, ParserError> {
+    pub fn parse_function_def_args(&mut self, end_token: Token) -> ParserResult<Params> {
         let mut args = Vec::new();
         let mut args_var = None;
         let mut kwargs_var = None;
@@ -74,7 +74,7 @@ impl Parser<'_> {
         }
 
         Ok(Params {
-            args,
+            positional: args,
             args_var,
             kwargs_var,
         })

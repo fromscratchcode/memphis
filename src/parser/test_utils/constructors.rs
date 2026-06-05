@@ -309,7 +309,7 @@ macro_rules! param {
 macro_rules! params {
     ($($expr:expr),* $(,)?) => {
         $crate::parser::types::Params {
-            args: vec![$($expr),*],
+            positional: vec![$($expr),*],
             args_var: None,
             kwargs_var: None,
         }

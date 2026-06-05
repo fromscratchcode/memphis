@@ -2,12 +2,12 @@ use crate::{
     lexer::Token,
     parser::{
         types::{ast, Ast},
-        Parser, ParserError,
+        Parser, ParserResult,
     },
 };
 
 impl Parser<'_> {
-    pub fn parse_block(&mut self) -> Result<Ast, ParserError> {
+    pub fn parse_block(&mut self) -> ParserResult<Ast> {
         if self.current_token() == &Token::Newline {
             self.consume_current();
             self.parse_indented_block()
@@ -20,7 +20,7 @@ impl Parser<'_> {
         &mut self,
         is_terminator: F,
         is_separator: G,
-    ) -> Result<Ast, ParserError>
+    ) -> ParserResult<Ast>
     where
         F: Fn(&Token) -> bool,
         G: Fn(&Token) -> bool,
@@ -38,7 +38,7 @@ impl Parser<'_> {
         Ok(stmts)
     }
 
-    fn parse_indented_block(&mut self) -> Result<Ast, ParserError> {
+    fn parse_indented_block(&mut self) -> ParserResult<Ast> {
         self.consume(&Token::Indent)?;
         self.consume_newlines();
 
@@ -58,7 +58,7 @@ impl Parser<'_> {
     /// def four(): return 4
     /// class Foo: pass
     /// def a(): pass; pass
-    fn parse_single_line_block(&mut self) -> Result<Ast, ParserError> {
+    fn parse_single_line_block(&mut self) -> ParserResult<Ast> {
         let stmts = self.parse_statement_list_until(
             |tok| matches!(tok, Token::Newline),
             |tok| matches!(tok, Token::Semicolon),
@@ -75,6 +75,7 @@ mod tests {
     use crate::parser::{
         test_utils::*,
         types::{ast, ConditionalAst, StatementKind},
+        ParserError,
     };
 
     #[test]

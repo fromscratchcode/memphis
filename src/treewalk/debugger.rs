@@ -188,6 +188,7 @@ impl TreewalkDebugSession {
 mod tests {
     use crate::{
         domain::Text,
+        parser::Parser,
         treewalk::{
             debugger::TreewalkDebugSession, test_utils::*, TreewalkContext, TreewalkDisruption,
             TreewalkResult,
@@ -195,9 +196,10 @@ mod tests {
     };
 
     fn init(input: &str) -> TreewalkDebugSession {
-        let ctx = TreewalkContext::stdin();
-        let ast = ctx.parse(&Text::new(input)).expect("Failed to parse input");
-        ctx.interpreter().start_debug_session(ast)
+        let ast = Parser::parse_text(&Text::new(input)).expect("Failed to parse input");
+        TreewalkContext::stdin()
+            .interpreter()
+            .start_debug_session(ast)
     }
 
     #[test]

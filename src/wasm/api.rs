@@ -4,7 +4,8 @@ use wasm_bindgen::prelude::*;
 use crate::{
     bytecode_vm::{compiler::CodeObject, CompilerResult, VmContext},
     domain::Text,
-    lexer::{Lexer, Token},
+    lexer::Lexer,
+    parser::Parser,
     wasm::repr::WasmCodeObject,
 };
 
@@ -19,17 +20,19 @@ pub fn compile(text: String) -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn lex(text: String) -> JsValue {
     set_once();
-    let tokens = actually_lex(&text);
+    let tokens = Lexer::lex_text(&Text::new(&text));
     serde_wasm_bindgen::to_value(&tokens).expect("Corrupted token stream")
+}
+
+#[wasm_bindgen]
+pub fn parse(text: String) -> Result<JsValue, JsValue> {
+    set_once();
+    let ast =
+        Parser::parse_text(&Text::new(&text)).map_err(|e| JsValue::from_str(&e.debug_message()))?;
+    Ok(serde_wasm_bindgen::to_value(&ast).expect("Corrupted token stream"))
 }
 
 fn actually_compile(text: &str) -> CompilerResult<CodeObject> {
     let ctx = VmContext::stdin();
     ctx.compile(&Text::new(text))
-}
-
-fn actually_lex(text: &str) -> Vec<Token> {
-    let mut l = Lexer::script();
-    l.add_text(&Text::new(text));
-    l.collect()
 }

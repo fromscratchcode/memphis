@@ -8,6 +8,7 @@ use crate::{
 };
 
 pub struct MemphisContext {
+    engine: Engine,
     context: Box<dyn Interpreter>,
     state: Container<MemphisState>,
 }
@@ -33,6 +34,10 @@ impl MemphisContext {
         self.state.borrow_mut().io.take_output()
     }
 
+    pub fn engine(&self) -> &Engine {
+        &self.engine
+    }
+
     fn new(engine: Engine, origin: ModuleOrigin) -> Self {
         let state = Container::new(MemphisState::init(&origin));
         let context: Box<dyn Interpreter> = match engine {
@@ -41,6 +46,10 @@ impl MemphisContext {
             #[cfg(feature = "llvm_backend")]
             Engine::LlvmBackend => todo!(),
         };
-        Self { state, context }
+        Self {
+            engine,
+            state,
+            context,
+        }
     }
 }

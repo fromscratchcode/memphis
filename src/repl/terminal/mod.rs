@@ -6,7 +6,7 @@ use crossterm::{
 };
 
 use crate::{
-    repl::{ReplCore, ReplOutput, ReplResult, ReplStep},
+    repl::{ReplResult, ReplSession, ReplStep},
     Engine,
 };
 
@@ -14,34 +14,13 @@ mod io;
 
 use io::{CrosstermIO, TerminalIO};
 
-type ExitCode = i32;
-
 enum ReplControl {
     Continue,
-    Exit(ExitCode),
+    Exit,
 }
 
 /// These are ergonomic helpers specific to the terminal REPL.
 impl ReplStep {
-    pub fn initial() -> Self {
-        let output = ReplOutput {
-            stdout: String::from(""),
-            result: ReplResult::None,
-        };
-        Self::Complete(output)
-    }
-
-    pub fn indent_level(&self) -> usize {
-        match self {
-            ReplStep::Complete(_) => 0,
-            ReplStep::Incomplete { indent } => *indent,
-        }
-    }
-
-    pub fn is_complete(&self) -> bool {
-        matches!(self, ReplStep::Complete { .. })
-    }
-
     pub fn output(&self) -> Option<&ReplResult> {
         match self {
             ReplStep::Complete(output) => Some(&output.result),
@@ -86,39 +65,15 @@ fn install_custom_panic_hook() {
     }));
 }
 
-const INDENT_WIDTH: usize = 4;
-
 /// The Memphis Read-Evaluate-Print-Loop (REPL).
 pub struct TerminalRepl {
-    engine: Engine,
-
-    core: ReplCore,
-
-    last_step: ReplStep,
-
-    /// The current line being manipulated by the user.
-    current_line: String,
-
-    /// The current cursor position on the current line. This _excludes_ the prompt.
-    cursor_index: usize,
-
-    /// A list of all the lines (_not_ statements) recording during this REPL session.
-    history: Vec<String>,
-
-    /// If Up/Down has been pressed, the index in `history` the user is currently selecting.
-    history_index: Option<usize>,
+    session: ReplSession,
 }
 
 impl TerminalRepl {
     pub fn new(engine: Engine) -> Self {
         Self {
-            engine,
-            core: ReplCore::new(engine),
-            last_step: ReplStep::initial(),
-            current_line: String::new(),
-            cursor_index: 0,
-            history: Vec::new(),
-            history_index: None,
+            session: ReplSession::new(engine),
         }
     }
 
@@ -127,9 +82,9 @@ impl TerminalRepl {
     pub fn start(&mut self) {
         let terminal_io = &mut CrosstermIO;
         let _ = terminal_io.writeln(format!(
-            "memphis {} REPL (engine: {}) (Type 'exit()' to quit)",
-            env!("CARGO_PKG_VERSION"),
-            self.engine
+            "memphis {} REPL (engine: {})",
+            self.session.version(),
+            self.session.engine()
         ));
 
         // Enable raw mode to handle individual keypresses. This must be disabled during all
@@ -138,23 +93,21 @@ impl TerminalRepl {
         let _ = terminal::enable_raw_mode();
 
         self.redraw(terminal_io);
-        let exit_code = self.run_inner(terminal_io);
+        self.run_inner(terminal_io);
 
         let _ = terminal::disable_raw_mode();
         let _ = panic::take_hook();
-
-        process::exit(exit_code);
     }
 
-    fn run_inner<T: TerminalIO>(&mut self, terminal_io: &mut T) -> ExitCode {
+    fn run_inner<T: TerminalIO>(&mut self, terminal_io: &mut T) {
         loop {
             match terminal_io.read_event() {
                 Ok(Event::Key(event)) => match self.handle_key_event(terminal_io, event) {
                     ReplControl::Continue => {}
-                    ReplControl::Exit(code) => break code,
+                    ReplControl::Exit => break,
                 },
                 Ok(_) => {}
-                Err(_) => break 1,
+                Err(_) => break,
             }
         }
     }
@@ -167,99 +120,48 @@ impl TerminalRepl {
     ) -> ReplControl {
         match (event.modifiers, event.code) {
             (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
+                self.session.interrupt();
+
                 // CPython emits a `KeyboardInterrupt` here. We could do that and then
                 // probably handle it one level up? That could help for the other
                 // panics as well.
                 let _ = terminal_io.enter();
 
-                self.core.reset();
-                self.last_step = ReplStep::initial();
-
-                self.reset_input();
                 self.redraw(terminal_io);
                 return ReplControl::Continue;
             }
             (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
                 let _ = terminal_io.enter();
-                return ReplControl::Exit(0);
+                return ReplControl::Exit;
             }
             _ => {}
         }
 
         match event.code {
             KeyCode::Char(c) => {
-                self.current_line.insert(self.cursor_index, c);
-                self.cursor_index += 1;
+                self.session.insert(c);
             }
-            KeyCode::Backspace =>
-            {
-                #[allow(clippy::collapsible_match)]
-                if self.cursor_index > 0 {
-                    self.cursor_index -= 1;
-                    self.current_line.remove(self.cursor_index);
-                }
+            KeyCode::Backspace => {
+                self.session.backspace();
             }
             KeyCode::Enter => {
-                self.history.push(self.current_line.clone());
-                self.history_index = None;
-
-                let line = format!("{}\n", self.current_line);
-
+                let step = self.session.submit();
                 // We must virtually hit Enter before processing the line so any results will be
                 // displayed on the next line.
                 let _ = terminal_io.enter();
-                let control = self.process_line(terminal_io, &line);
-                if matches!(control, ReplControl::Exit(_)) {
-                    return control;
-                }
-
-                self.reset_input();
+                Self::handle_step(terminal_io, step);
             }
             KeyCode::Up => {
-                if let Some(index) = self.history_index {
-                    if index > 0 {
-                        self.history_index = Some(index - 1);
-                    }
-                } else if !self.history.is_empty() {
-                    self.history_index = Some(self.history.len() - 1);
-                }
-
-                if let Some(index) = self.history_index {
-                    self.current_line = self.history[index].clone();
-                    self.cursor_index = self.current_line.len();
-                }
+                self.session.history_up();
             }
             KeyCode::Down => {
-                if let Some(index) = self.history_index {
-                    if index < self.history.len() - 1 {
-                        self.history_index = Some(index + 1);
-                    } else {
-                        self.history_index = None;
-                        self.current_line.clear();
-                    }
-
-                    if let Some(index) = self.history_index {
-                        self.current_line = self.history[index].clone();
-                    } else {
-                        self.current_line.clear();
-                    }
-
-                    self.cursor_index = self.current_line.len();
-                }
+                self.session.history_down();
             }
-            KeyCode::Right =>
-            {
-                #[allow(clippy::collapsible_match)]
-                if self.cursor_index < self.current_line.len() {
-                    self.cursor_index += 1;
-                }
+            KeyCode::Right => {
+                self.session.move_right();
             }
-            KeyCode::Left =>
-            {
-                #[allow(clippy::collapsible_match)]
-                if self.cursor_index > 0 {
-                    self.cursor_index -= 1;
-                }
+            KeyCode::Left => {
+                self.session.move_left();
             }
             _ => {}
         }
@@ -268,55 +170,28 @@ impl TerminalRepl {
         ReplControl::Continue
     }
 
-    /// Gives the indicator for the start of the given line, based on whether or not the most
-    /// recent line provided by the user completed a statement or not.
-    fn prompt(&self) -> &str {
-        match self.last_step.is_complete() {
-            true => ">>> ",
-            false => "... ",
-        }
-    }
-
-    /// Clear the REPL prompt to prepare for user input.
-    fn reset_input(&mut self) {
-        self.current_line = " ".repeat(self.last_step.indent_level() * INDENT_WIDTH);
-        self.cursor_index = self.current_line.len();
-    }
-
     /// Clear the current input, redraw it, and align the cursor to the proper column.
     fn redraw<T: TerminalIO>(&self, terminal_io: &mut T) {
-        let output = format!("\r{}{}", self.prompt(), self.current_line);
+        let rendered_line = format!("\r{}{}", self.session.prompt(), self.session.current_line());
         // The cursor position depends on where in the current input we are, not its length.
-        let cursor_col = self.cursor_index + self.prompt().len();
-        let _ = terminal_io.redraw(output, cursor_col);
+        let cursor_col = self.session.prompt().len() + self.session.cursor_index();
+        let _ = terminal_io.redraw(rendered_line, cursor_col);
     }
 
     /// Append the provided line to the constructed statement and evaluate it.
-    fn process_line<T: TerminalIO>(&mut self, terminal_io: &mut T, line: &str) -> ReplControl {
-        if line.trim_end() == "exit()" {
-            return ReplControl::Exit(0);
-        }
-
-        let step = self.core.input_line(line);
-
+    fn handle_step<T: TerminalIO>(terminal_io: &mut T, step: &ReplStep) {
         if let Some(stdout) = step.stdout() {
             let _ = terminal_io.write(stdout);
         }
 
         if let Some(result) = step.output() {
             match result {
-                ReplResult::Ok(val) => {
+                ReplResult::Ok(val) | ReplResult::Err(val) => {
                     let _ = terminal_io.writeln(val);
-                }
-                ReplResult::Err(err) => {
-                    let _ = terminal_io.writeln(err);
                 }
                 ReplResult::None => {}
             }
         }
-
-        self.last_step = step;
-        ReplControl::Continue
     }
 }
 
@@ -326,35 +201,26 @@ mod tests {
 
     use super::*;
 
-    fn run_inner(engine: Engine, terminal: &mut MockTerminalIO) -> (ExitCode, String) {
-        let exit_code = TerminalRepl::new(engine).run_inner(terminal);
-        (exit_code, terminal.return_val())
+    fn run_inner(engine: Engine, terminal: &mut MockTerminalIO) -> String {
+        TerminalRepl::new(engine).run_inner(terminal);
+        terminal.return_val()
     }
 
     /// Run the complete flow, from input code string to return value string. If you need any Ctrl
     /// modifiers, do not use this!
     fn run(input: &str) -> String {
         let mut terminal = MockTerminalIO::from_str(input);
-        let (_, return_val) = run_inner(Engine::Treewalk, &mut terminal);
-        return_val
+        run_inner(Engine::Treewalk, &mut terminal)
     }
 
     fn run_vm(input: &str) -> String {
         let mut terminal = MockTerminalIO::from_str(input);
-        let (_, return_val) = run_inner(Engine::BytecodeVm, &mut terminal);
-        return_val
+        run_inner(Engine::BytecodeVm, &mut terminal)
     }
 
     fn run_events(events: Vec<Event>) -> String {
         let mut terminal = MockTerminalIO::new(events);
-        let (_, return_val) = run_inner(Engine::Treewalk, &mut terminal);
-        return_val
-    }
-
-    fn run_and_exit_code(events: Vec<Event>) -> ExitCode {
-        let mut terminal = MockTerminalIO::new(events);
-        let (exit_code, _) = run_inner(Engine::Treewalk, &mut terminal);
-        exit_code
+        run_inner(Engine::Treewalk, &mut terminal)
     }
 
     fn string_to_events(input: &str) -> Vec<Event> {
@@ -511,26 +377,13 @@ foo()
     }
 
     #[test]
-    fn test_repl_ctrl_d() {
+    fn test_repl_ctrl_d_does_not_panic() {
         let mut events = string_to_events("123");
         let ctrl_d = Event::Key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL));
         events.push(ctrl_d);
-        let exit_code = run_and_exit_code(events);
-        assert_eq!(exit_code, 0);
-    }
-
-    #[test]
-    fn test_repl_exit_function() {
-        let events = string_to_events("exit()\n");
-        let exit_code = run_and_exit_code(events);
-        assert_eq!(exit_code, 0);
-    }
-
-    #[test]
-    fn test_repl_exit_function_ignores_prior_errors() {
-        let events = string_to_events("undefined_var\nexit()\n");
-        let exit_code = run_and_exit_code(events);
-        assert_eq!(exit_code, 0);
+        let return_val = run_events(events);
+        // this isn't technically a return value, we never got one because we didn't hit enter \n
+        assert_eq!(return_val, "\r>>> 123");
     }
 
     #[test]

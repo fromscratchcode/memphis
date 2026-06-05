@@ -1,5 +1,8 @@
+#[cfg(feature = "wasm")]
+use serde::Serialize;
 use std::fmt::Display;
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier(String);
 

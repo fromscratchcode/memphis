@@ -3,8 +3,7 @@ use crate::domain::Source;
 use crate::{
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
-    lexer::Lexer,
-    parser::{types::Ast, Parser},
+    parser::Parser,
     runtime::MemphisState,
     treewalk::{
         types::{Exception, Module},
@@ -33,21 +32,11 @@ impl TreewalkContext {
     }
 
     pub fn eval_inner(&mut self, text: Text) -> Result<TreewalkValue, RaisedException> {
-        let ast = self.parse(&text)?;
-        self.interpreter.execute(ast)
-    }
-
-    pub fn parse(&self, text: &Text) -> Result<Ast, RaisedException> {
-        let mut lexer = Lexer::script();
-        lexer.add_text(text);
-
-        let mut parser = Parser::new(&mut lexer);
-        let ast = parser.parse().map_err(|e| {
+        let ast = Parser::parse_text(&text).map_err(|e| {
             self.interpreter
                 .raise(Exception::syntax_error(e.to_string()))
         })?;
-
-        Ok(ast)
+        self.interpreter.execute(ast)
     }
 
     fn init_state(

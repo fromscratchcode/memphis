@@ -54,7 +54,7 @@ impl TreewalkInterpreter {
     /// Evaluate the parameters a function is defined with, specifically any default values.
     pub fn evaluate_params(&self, call_params: &Params) -> TreewalkResult<RuntimeParams> {
         let runtime_params = call_params
-            .args
+            .positional
             .iter()
             .map(|param| {
                 let default = match &param.default {

@@ -287,7 +287,7 @@ impl Compiler {
         };
 
         let varnames = args
-            .args
+            .positional
             .iter()
             .map(|p| p.arg.to_string())
             .collect::<Vec<String>>();

@@ -7,12 +7,12 @@ use crate::{
             CompoundOperator, ConditionalAst, ExceptHandler, Expr, FromImportItem, FromImportMode,
             LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
         },
-        Parser, ParserError,
+        Parser, ParserError, ParserResult,
     },
 };
 
 impl Parser<'_> {
-    pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
+    pub fn parse_statement(&mut self) -> ParserResult<Statement> {
         log(LogLevel::Trace, || "parse_statement".to_string());
 
         let start_line = self.line_number;
@@ -70,7 +70,7 @@ impl Parser<'_> {
         Ok(Statement::new(start_line, stmt))
     }
 
-    fn parse_statement_without_starting_keyword(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_statement_without_starting_keyword(&mut self) -> ParserResult<StatementKind> {
         let left = self.parse_expr()?;
 
         if self.current_token() == &Token::Assign {
@@ -133,13 +133,13 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_delete(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_delete(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::Del)?;
         let exprs = self.parse_comma_separated_expr()?;
         Ok(StatementKind::Delete(exprs))
     }
 
-    fn parse_return(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_return(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::Return)?;
         let exprs = if self.end_of_statement() {
             vec![]
@@ -149,7 +149,7 @@ impl Parser<'_> {
         Ok(StatementKind::Return(exprs))
     }
 
-    fn parse_function_definition(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_function_definition(&mut self) -> ParserResult<StatementKind> {
         let mut decorators: Vec<Expr> = vec![];
 
         while self.current_token() == &Token::AtSign {
@@ -191,7 +191,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_class_definition(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_class_definition(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::Class)?;
         let name = self.parse_identifier()?;
 
@@ -238,7 +238,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_if_else(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_if_else(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::If)?;
         let condition = self.parse_simple_expr()?;
         self.consume(&Token::Colon)?;
@@ -270,7 +270,7 @@ impl Parser<'_> {
         })
     }
 
-    pub fn parse_loop_index(&mut self) -> Result<LoopIndex, ParserError> {
+    pub fn parse_loop_index(&mut self) -> ParserResult<LoopIndex> {
         // The parentheses are optional here, but if one is present, both must be present
         let mut need_rparen = false;
         if self.current_token() == &Token::LParen {
@@ -296,7 +296,7 @@ impl Parser<'_> {
         Ok(index)
     }
 
-    fn parse_for_in_loop(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_for_in_loop(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::For)?;
         let index = self.parse_loop_index()?;
         self.consume(&Token::In)?;
@@ -320,7 +320,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_try_except(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_try_except(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::Try)?;
         self.consume(&Token::Colon)?;
         let try_block = self.parse_block()?;
@@ -377,7 +377,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_regular_import(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_regular_import(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::Import)?;
 
         let mut items = vec![];
@@ -396,7 +396,7 @@ impl Parser<'_> {
         Ok(StatementKind::RegularImport(items))
     }
 
-    fn parse_selective_import(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_selective_import(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::From)?;
         let import_path = self.parse_import_path()?;
 
@@ -454,7 +454,7 @@ impl Parser<'_> {
         Ok(stmt)
     }
 
-    fn parse_context_manager(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_context_manager(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::With)?;
         let expr = self.parse_simple_expr()?;
 
@@ -474,7 +474,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_raise(&mut self) -> Result<StatementKind, ParserError> {
+    fn parse_raise(&mut self) -> ParserResult<StatementKind> {
         self.consume(&Token::Raise)?;
 
         if self.end_of_statement() {
@@ -504,7 +504,7 @@ impl Parser<'_> {
     /// We use `parse_simple_expr` here because we do not want to catch any Expr::Tuple, which
     /// would be returned for multiple inheritance if we used `parse_expr`.
     // TODO is this right?? I wonder if this should wait until runtime to throw an error.
-    fn parse_parent_class(&mut self) -> Result<Expr, ParserError> {
+    fn parse_parent_class(&mut self) -> ParserResult<Expr> {
         let parent = self.parse_simple_expr()?;
 
         if !matches!(parent, Expr::Variable(_) | Expr::MemberAccess { .. }) {
@@ -514,7 +514,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_comma_separated_expr(&mut self) -> Result<Vec<Expr>, ParserError> {
+    fn parse_comma_separated_expr(&mut self) -> ParserResult<Vec<Expr>> {
         let mut exprs = vec![];
         loop {
             let expr = self.parse_simple_expr()?;
@@ -529,7 +529,7 @@ impl Parser<'_> {
         Ok(exprs)
     }
 
-    fn parse_identifiers(&mut self) -> Result<Vec<Identifier>, ParserError> {
+    fn parse_identifiers(&mut self) -> ParserResult<Vec<Identifier>> {
         let mut items = vec![self.parse_identifier()?];
         while self.current_token() == &Token::Comma {
             self.consume(&Token::Comma)?;
@@ -1234,7 +1234,7 @@ def test_args(*args):
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_args"),
             args: Params {
-                args: vec![],
+                positional: vec![],
                 args_var: Some(ident("args")),
                 kwargs_var: None,
             },
@@ -1251,7 +1251,7 @@ def test_args(*args, **kwargs):
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_args"),
             args: Params {
-                args: vec![],
+                positional: vec![],
                 args_var: Some(ident("args")),
                 kwargs_var: Some(ident("kwargs")),
             },
@@ -1268,7 +1268,7 @@ def test_kwargs(**kwargs):
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_kwargs"),
             args: Params {
-                args: vec![],
+                positional: vec![],
                 args_var: None,
                 kwargs_var: Some(ident("kwargs")),
             },

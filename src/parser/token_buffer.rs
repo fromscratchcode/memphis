@@ -1,9 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{
-    lexer::{Lexer, Token},
-    parser::ParserError,
-};
+use crate::lexer::{Lexer, Token};
 
 pub struct TokenBuffer<'a> {
     lexer: &'a mut Lexer,
@@ -37,22 +34,6 @@ impl<'a> TokenBuffer<'a> {
     pub fn consume(&mut self) -> Option<Token> {
         self.fill_to(0);
         self.buffer.pop_front()
-    }
-
-    pub fn remaining_tokens(&mut self) -> &[Token] {
-        self.fill_to(usize::MAX); // grab everything
-        self.buffer.make_contiguous()
-    }
-
-    pub fn has(&mut self, target: &Token) -> bool {
-        self.remaining_tokens().contains(target)
-    }
-
-    pub fn num_away(&mut self, target: &Token) -> Result<usize, ParserError> {
-        self.remaining_tokens()
-            .iter()
-            .position(|t| t == target)
-            .ok_or(ParserError::ExpectedToken(target.clone(), Token::Eof))
     }
 
     pub fn peek_ahead_contains(&mut self, tokens: &[Token]) -> bool {

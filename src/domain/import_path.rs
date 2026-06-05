@@ -1,8 +1,11 @@
 use crate::domain::Identifier;
+#[cfg(feature = "wasm")]
+use serde::Serialize;
 
 /// A raw module path exactly as written by the user.
 /// No validation, no resolution, no filesystem meaning.
 /// Used only during parsing.
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Default, Debug, PartialEq, Clone, Eq, Hash)]
 pub struct ModulePath(Vec<Identifier>);
 
@@ -45,6 +48,7 @@ impl ModulePath {
 /// This specifically holds inside the brackets:
 /// from [a.b.c] import *
 /// from [.a.b] import *
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum FromImportPath {
     /// When an import begins with no dots, it is an absolute import and this just wraps a

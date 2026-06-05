@@ -1,8 +1,8 @@
 use crate::{
     core::{log, LogLevel},
-    domain::Identifier,
+    domain::{Identifier, Text},
     lexer::{Lexer, Token},
-    parser::{types::Ast, ParserError, TokenBuffer},
+    parser::{types::Ast, ParserError, ParserResult, TokenBuffer},
 };
 
 mod block;
@@ -19,6 +19,14 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    pub fn parse_text(text: &Text) -> ParserResult<Ast> {
+        let mut lexer = Lexer::script();
+        lexer.add_text(text);
+
+        let mut parser = Parser::new(&mut lexer);
+        parser.parse()
+    }
+
     pub fn new(lexer: &'a mut Lexer) -> Self {
         Parser {
             tokens: TokenBuffer::new(lexer),
@@ -28,7 +36,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Return the full AST. This will consume all the tokens.
-    pub fn parse(&mut self) -> Result<Ast, ParserError> {
+    pub fn parse(&mut self) -> ParserResult<Ast> {
         self.consume_newlines();
 
         let stmts = self.parse_statement_list_until(
@@ -87,7 +95,7 @@ impl<'a> Parser<'a> {
             .expect("Consuming the current token should not fail.");
     }
 
-    fn consume(&mut self, expected: &Token) -> Result<(), ParserError> {
+    fn consume(&mut self, expected: &Token) -> ParserResult<()> {
         let current = self.tokens.peek(0);
 
         log(LogLevel::Trace, || format!("Token: {current:?}"));
@@ -123,7 +131,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a `Token::Identifier` without any semantic analysis.
-    fn parse_identifier(&mut self) -> Result<Identifier, ParserError> {
+    fn parse_identifier(&mut self) -> ParserResult<Identifier> {
         match self.current_token().clone() {
             Token::Identifier(ident) => {
                 self.consume_current();

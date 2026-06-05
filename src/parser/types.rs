@@ -1,3 +1,5 @@
+#[cfg(feature = "wasm")]
+use serde::Serialize;
 use std::slice::Iter;
 
 use crate::{
@@ -5,6 +7,10 @@ use crate::{
     domain::{FromImportPath, Identifier, ModulePath},
 };
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
+// setting transparent here causes the serde type to just be the inner Vec (it ignores the struct
+// wrapper and field)
+#[cfg_attr(feature = "wasm", serde(transparent))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Ast {
     statements: Vec<Statement>,
@@ -78,12 +84,14 @@ macro_rules! ast {
 
 pub(crate) use ast;
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictOperation {
     Pair(Expr, Expr),
     Unpack(Expr),
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum TypeNode {
     Generic {
@@ -98,6 +106,7 @@ pub enum TypeNode {
 /// The three conversion modes supported in Python f-strings. These are specified by !s (the
 /// default), !r, and !a, respectively.
 /// Reference: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum FormatOption {
     Str,
@@ -108,24 +117,28 @@ pub enum FormatOption {
 /// A container for an [`Expr`] inside braces in an f-string and an optional conversion identifier
 /// `FormatOption`. It's not optional in this struct because the parser defaults to
 /// `FormatOption::Str`.
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct ExprFormat {
     pub expr: Box<Expr>,
     pub format: FormatOption,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum FStringPart {
     String(String),
     Expr(ExprFormat),
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct RegularImport {
     pub module_path: ModulePath,
     pub alias: Option<Identifier>,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum BinOp {
     Add,
@@ -143,6 +156,7 @@ pub enum BinOp {
     Expo,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum CompareOp {
     In,
@@ -157,6 +171,7 @@ pub enum CompareOp {
     NotEquals,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum UnaryOp {
     Not,
@@ -167,6 +182,7 @@ pub enum UnaryOp {
     DictUnpack, // double asterisk **
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum LogicalOp {
     And,
@@ -174,6 +190,7 @@ pub enum LogicalOp {
 }
 
 /// An individual function parameter and its optional default.
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub struct Param {
     pub arg: Identifier,
@@ -181,6 +198,7 @@ pub struct Param {
 }
 
 /// Function parameter list and any args/kwargs parameters.
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct Params {
     /// The variables for all the positional arguments.
@@ -188,7 +206,7 @@ pub struct Params {
     /// def foo(a, b):
     ///     ...
     /// ```
-    pub args: Vec<Param>,
+    pub positional: Vec<Param>,
 
     /// An optional variable to hold arguments passed in for variable arity.
     /// ```python
@@ -211,6 +229,7 @@ pub enum CallArg {
     Positional(Expr),
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 // This is similar to DictOperation, but where the keys are required to be strings. This matches
 // the Python rules and simplifies usage.
@@ -220,6 +239,7 @@ pub enum KwargsOperation {
 }
 
 /// Call-site argument list
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct CallArgs {
     /// Any args passed in positionally.
@@ -245,6 +265,7 @@ pub struct CallArgs {
     pub args_var: Option<Box<Expr>>,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub struct SliceParams {
     pub start: Option<Expr>,
@@ -252,6 +273,7 @@ pub struct SliceParams {
     pub step: Option<Expr>,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub struct ForClause {
     pub index: LoopIndex,
@@ -259,12 +281,14 @@ pub struct ForClause {
     pub condition: Option<Expr>,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Callee {
     Symbol(Identifier),
     Expr(Box<Expr>),
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     None,
@@ -363,6 +387,7 @@ impl Expr {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub enum RaiseKind {
     Reraise,
@@ -370,12 +395,14 @@ pub enum RaiseKind {
     RaiseFrom { exception: Expr, cause: Expr },
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub struct ExceptHandler {
     pub kind: HandlerKind,
     pub block: Ast,
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub enum HandlerKind {
     /// Default handler: `except:` (must be last)
@@ -406,6 +433,7 @@ impl ExceptHandler {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub struct ConditionalAst {
     pub condition: Expr,
@@ -418,6 +446,7 @@ impl ConditionalAst {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum FromImportMode {
     All, // represents '*'
@@ -430,6 +459,7 @@ pub enum FromImportMode {
 /// ```python
 /// from module_a import one, two as three, four
 /// ```
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct FromImportItem {
     symbol: Identifier,
@@ -462,6 +492,7 @@ impl FromImportItem {
 
 /// Indicate whether a single variable or a `Tuple` of variable should be unpacked on each
 /// iteration of a `for` loop.
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum LoopIndex {
     /// Used when the range returns a single value.
@@ -480,6 +511,7 @@ pub enum LoopIndex {
 }
 
 /// Perform the listed operation before assigning the result.
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum CompoundOperator {
     Add,
@@ -517,6 +549,7 @@ impl From<&CompoundOperator> for BinOp {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Statement {
     pub start_line: usize,
@@ -529,6 +562,7 @@ impl Statement {
     }
 }
 
+#[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum StatementKind {
     Expression(Expr),

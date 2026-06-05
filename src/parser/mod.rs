@@ -6,6 +6,6 @@ pub mod test_utils;
 mod token_buffer;
 pub mod types;
 
-pub use error::ParserError;
+pub use error::{ParserError, ParserResult};
 pub use parser::Parser;
 pub use token_buffer::TokenBuffer;

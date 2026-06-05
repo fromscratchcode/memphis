@@ -77,6 +77,13 @@ impl Iterator for Lexer {
 }
 
 impl Lexer {
+    #[cfg(any(test, feature = "wasm"))]
+    pub fn lex_text(text: &Text) -> Vec<Token> {
+        let mut l = Lexer::script();
+        l.add_text(text);
+        l.collect()
+    }
+
     pub fn new(mode: LexerMode) -> Lexer {
         Lexer {
             mode,
@@ -644,10 +651,7 @@ mod tests {
 
     fn tokenize(input: &str) -> Vec<Token> {
         let trimmed = input.trim_matches('\n');
-
-        let mut lexer = Lexer::script();
-        lexer.add_text(&Text::new(trimmed));
-        lexer.collect()
+        Lexer::lex_text(&Text::new(trimmed))
     }
 
     macro_rules! tokenize_incremental {

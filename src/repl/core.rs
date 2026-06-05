@@ -1,25 +1,11 @@
 use crate::{
     domain::Text,
-    repl::parser::{self, ParseStep},
+    repl::{
+        parser::{self, ParseStep},
+        ReplOutput, ReplResult, ReplStep,
+    },
     Engine, MemphisContext,
 };
-
-#[derive(Debug, PartialEq)]
-pub enum ReplResult {
-    None,
-    Ok(String),
-    Err(String),
-}
-
-pub struct ReplOutput {
-    pub stdout: String,
-    pub result: ReplResult,
-}
-
-pub enum ReplStep {
-    Complete(ReplOutput),
-    Incomplete { indent: usize },
-}
 
 pub struct ReplCore {
     /// The current statement being constructed.
@@ -34,6 +20,10 @@ impl ReplCore {
             input: String::new(),
             context: MemphisContext::stdin(engine),
         }
+    }
+
+    pub fn engine(&self) -> &Engine {
+        self.context.engine()
     }
 
     pub fn reset(&mut self) {

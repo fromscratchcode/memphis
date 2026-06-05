@@ -1,11 +1,11 @@
 use crate::{
     domain::{FromImportPath, Identifier, ModulePath},
     lexer::Token,
-    parser::{Parser, ParserError},
+    parser::{Parser, ParserResult},
 };
 
 impl Parser<'_> {
-    pub fn parse_module_path(&mut self) -> Result<ModulePath, ParserError> {
+    pub fn parse_module_path(&mut self) -> ParserResult<ModulePath> {
         if !matches!(self.current_token(), Token::Identifier(_)) {
             return Ok(ModulePath::default());
         }
@@ -18,7 +18,7 @@ impl Parser<'_> {
         Ok(ModulePath::new(path))
     }
 
-    pub fn parse_import_path(&mut self) -> Result<FromImportPath, ParserError> {
+    pub fn parse_import_path(&mut self) -> ParserResult<FromImportPath> {
         match self.current_token() {
             Token::Dot => {
                 let mut levels = 0;
@@ -38,7 +38,7 @@ impl Parser<'_> {
         }
     }
 
-    pub fn parse_optional_alias(&mut self) -> Result<Option<Identifier>, ParserError> {
+    pub fn parse_optional_alias(&mut self) -> ParserResult<Option<Identifier>> {
         if self.current_token() == &Token::As {
             self.consume(&Token::As)?;
             let alias = self.parse_identifier()?;

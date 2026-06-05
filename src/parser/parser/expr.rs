@@ -8,7 +8,7 @@ use crate::{
             FStringPart, ForClause, FormatOption, KwargsOperation, LogicalOp, SliceParams,
             TypeNode, UnaryOp,
         },
-        Parser, ParserError,
+        Parser, ParserError, ParserResult,
     },
 };
 
@@ -24,7 +24,7 @@ impl Parser<'_> {
     /// ```
     ///
     /// All other expression parsing is immediately delegated to `parse_simple_expr`.
-    pub fn parse_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_expr(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_expr".to_string());
         let left = self.parse_simple_expr()?;
 
@@ -51,7 +51,7 @@ impl Parser<'_> {
 
     /// Parse an expression where open tuples are not expected. If you need to support this in a
     /// given context (i.e. a = 4, 5), try `parse_expr`.
-    pub fn parse_simple_expr(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse_simple_expr(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_simple_expr".to_string());
         if self.current_token() == &Token::Await {
             self.parse_await_expr()
@@ -60,7 +60,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_await_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_await_expr(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_await_expr".to_string());
         self.consume(&Token::Await)?;
         let right = self.parse_ternary_expr()?;
@@ -80,7 +80,7 @@ impl Parser<'_> {
     /// - Bitwise Shifts (<<, >>) - `parse_bitwise_shift`
     /// - Bitwise AND (&), OR (|), XOR (^) - `parse_binary_expr`
     /// - Ternary Expression (inline-if) - `parse_ternary_expr`
-    fn parse_ternary_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_ternary_expr(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_ternary_expr".to_string());
         let if_value = self.parse_binary_expr()?;
 
@@ -100,7 +100,7 @@ impl Parser<'_> {
         Ok(if_value)
     }
 
-    fn parse_binary_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_binary_expr(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_binary_expr".to_string());
         let mut left = self.parse_bitwise_shift()?;
 
@@ -121,7 +121,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_add_sub(&mut self) -> Result<Expr, ParserError> {
+    fn parse_add_sub(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_add_sub".to_string());
         let mut left = self.parse_logical_term()?;
 
@@ -139,7 +139,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_bitwise_shift(&mut self) -> Result<Expr, ParserError> {
+    fn parse_bitwise_shift(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_bitwise_shift".to_string());
         let mut left = self.parse_add_sub()?;
 
@@ -157,7 +157,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_member_access(&mut self, left: Expr) -> Result<Expr, ParserError> {
+    fn parse_member_access(&mut self, left: Expr) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_member_access".to_string());
         self.consume(&Token::Dot)?;
         let field = self.parse_identifier()?;
@@ -168,58 +168,87 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_index_access(&mut self, left: Expr) -> Result<Expr, ParserError> {
+    fn parse_index_access(&mut self, left: Expr) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_index_access".to_string());
         self.consume(&Token::LBracket)?;
-        // [::2]
-        let params = if self
-            .tokens
-            .peek_ahead_contains(&[Token::Colon, Token::Colon])
-        {
-            self.consume(&Token::Colon)?;
-            self.consume(&Token::Colon)?;
-            let step = Some(self.parse_simple_expr()?);
-            (true, None, None, step)
-            // [:] - this syntax is useful to replace the items in a list without changing the
-            // list's reference
-        } else if self
-            .tokens
-            .peek_ahead_contains(&[Token::Colon, Token::RBracket])
-        {
-            self.consume(&Token::Colon)?;
-            (true, None, None, None)
-            // [:2]
-        } else if self.tokens.peek_ahead_contains(&[Token::Colon]) {
-            self.consume(&Token::Colon)?;
-            let stop = Some(self.parse_simple_expr()?);
-            (true, None, stop, None)
-            // [2:]
-            // if there is a Colon immediately before the next RBracket
-        } else if self.tokens.has(&Token::Colon)
-            && self.tokens.num_away(&Token::Colon)? + 1 == self.tokens.num_away(&Token::RBracket)?
-        {
-            let start = Some(self.parse_simple_expr()?);
-            self.consume(&Token::Colon)?;
-            (true, start, None, None)
-            // [1:1:1] or [2:5]
-            // if there is a Colon before the next RBracket
-        } else if self.tokens.has(&Token::Colon)
-            && self.tokens.num_away(&Token::Colon)? < self.tokens.num_away(&Token::RBracket)?
-        {
-            let start = Some(self.parse_simple_expr()?);
-            self.consume(&Token::Colon)?;
-            let stop = Some(self.parse_simple_expr()?);
-            let step = if self.current_token() == &Token::Colon {
+
+        let params = match self.current_token() {
+            Token::Colon => {
                 self.consume(&Token::Colon)?;
-                Some(self.parse_simple_expr()?)
-            } else {
-                None
-            };
-            (true, start, stop, step)
-            // [1]
-        } else {
-            let index = Some(self.parse_simple_expr()?);
-            (false, index, None, None)
+                match self.current_token() {
+                    Token::Colon => {
+                        self.consume(&Token::Colon)?;
+                        let step = Some(self.parse_simple_expr()?);
+                        // [::2]
+                        (true, None, None, step)
+                    }
+                    Token::RBracket => {
+                        // [:] useful to replace the items in a list without changing the
+                        // list's reference
+                        (true, None, None, None)
+                    }
+                    _ => {
+                        let stop = Some(self.parse_simple_expr()?);
+                        // [:2]
+                        (true, None, stop, None)
+                    }
+                }
+            }
+            _ => {
+                let start = Some(self.parse_simple_expr()?);
+                match self.current_token() {
+                    Token::Colon => {
+                        self.consume(&Token::Colon)?;
+                        match self.current_token() {
+                            Token::Colon => {
+                                self.consume(&Token::Colon)?;
+                                match self.current_token() {
+                                    Token::RBracket => {
+                                        // [2::]
+                                        (true, start, None, None)
+                                    }
+                                    _ => {
+                                        let step = Some(self.parse_simple_expr()?);
+                                        // [1::1]
+                                        (true, start, None, step)
+                                    }
+                                }
+                            }
+                            Token::RBracket => {
+                                // [2:]
+                                (true, start, None, None)
+                            }
+                            _ => {
+                                let stop = Some(self.parse_simple_expr()?);
+                                match self.current_token() {
+                                    Token::Colon => {
+                                        self.consume(&Token::Colon)?;
+                                        let step = Some(self.parse_simple_expr()?);
+                                        // [1:1:1]
+                                        (true, start, stop, step)
+                                    }
+                                    Token::RBracket => {
+                                        // [2:5]
+                                        (true, start, stop, None)
+                                    }
+                                    _ => {
+                                        return Err(ParserError::UnexpectedToken(
+                                            self.current_token().clone(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Token::RBracket => {
+                        // [2]
+                        (false, start, None, None)
+                    }
+                    _ => {
+                        return Err(ParserError::UnexpectedToken(self.current_token().clone()));
+                    }
+                }
+            }
         };
         self.consume(&Token::RBracket)?;
 
@@ -241,7 +270,7 @@ impl Parser<'_> {
     }
 
     /// This is recursive to the right to create a right-associativity binary operator.
-    fn parse_exponentiation(&mut self) -> Result<Expr, ParserError> {
+    fn parse_exponentiation(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_exponentiation".to_string());
         let mut left = self.parse_factor()?;
 
@@ -258,7 +287,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_access_operations(&mut self) -> Result<Expr, ParserError> {
+    fn parse_access_operations(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_access_operations".to_string());
         let mut left = self.parse_exponentiation()?;
 
@@ -283,7 +312,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_logical_term(&mut self) -> Result<Expr, ParserError> {
+    fn parse_logical_term(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_logical_term".to_string());
         let mut left = self.parse_term()?;
 
@@ -301,7 +330,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_term(&mut self) -> Result<Expr, ParserError> {
+    fn parse_term(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_term".to_string());
         let mut left = self.parse_access_operations()?;
 
@@ -366,7 +395,7 @@ impl Parser<'_> {
         Ok(left)
     }
 
-    fn parse_minus(&mut self) -> Result<Expr, ParserError> {
+    fn parse_minus(&mut self) -> ParserResult<Expr> {
         self.consume(&Token::Minus)?;
         match self.current_token().clone() {
             Token::Integer(i) => {
@@ -389,7 +418,7 @@ impl Parser<'_> {
 
     /// The unary plus operator is a no-op for integers and floats, but exists to provide custom
     /// behaviors using `Dunder::Pos`.
-    fn parse_plus(&mut self) -> Result<Expr, ParserError> {
+    fn parse_plus(&mut self) -> ParserResult<Expr> {
         self.consume(&Token::Plus)?;
         match self.current_token().clone() {
             Token::Integer(i) => {
@@ -410,7 +439,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_factor(&mut self) -> Result<Expr, ParserError> {
+    fn parse_factor(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || {
             format!("parse_factor: {:?}", self.current_token())
         });
@@ -537,7 +566,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_binary_literal(&mut self, literal: String) -> Result<Expr, ParserError> {
+    fn parse_binary_literal(&mut self, literal: String) -> ParserResult<Expr> {
         self.consume(&Token::BinaryLiteral(literal.clone()))?;
 
         let result = i64::from_str_radix(&literal[2..], 2)
@@ -545,7 +574,7 @@ impl Parser<'_> {
         Ok(Expr::Integer(result))
     }
 
-    fn parse_octal_literal(&mut self, literal: String) -> Result<Expr, ParserError> {
+    fn parse_octal_literal(&mut self, literal: String) -> ParserResult<Expr> {
         self.consume(&Token::OctalLiteral(literal.clone()))?;
 
         let result = i64::from_str_radix(&literal[2..], 8)
@@ -553,7 +582,7 @@ impl Parser<'_> {
         Ok(Expr::Integer(result))
     }
 
-    fn parse_hex_literal(&mut self, literal: String) -> Result<Expr, ParserError> {
+    fn parse_hex_literal(&mut self, literal: String) -> ParserResult<Expr> {
         self.consume(&Token::HexLiteral(literal.clone()))?;
 
         let result = i64::from_str_radix(&literal[2..], 16)
@@ -561,7 +590,7 @@ impl Parser<'_> {
         Ok(Expr::Integer(result))
     }
 
-    fn parse_lambda(&mut self) -> Result<Expr, ParserError> {
+    fn parse_lambda(&mut self) -> ParserResult<Expr> {
         self.consume(&Token::Lambda)?;
         let args = self.parse_function_def_args(Token::Colon)?;
         self.consume(&Token::Colon)?;
@@ -581,7 +610,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_list(&mut self) -> Result<Expr, ParserError> {
+    fn parse_list(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_list".to_string());
         let mut items = Vec::new();
 
@@ -620,7 +649,7 @@ impl Parser<'_> {
         Ok(Expr::List(vec![]))
     }
 
-    fn parse_f_string(&mut self) -> Result<Expr, ParserError> {
+    fn parse_f_string(&mut self) -> ParserResult<Expr> {
         self.consume(&Token::FStringStart)?;
 
         let mut parts = vec![];
@@ -672,7 +701,7 @@ impl Parser<'_> {
         Ok(Expr::FString(parts))
     }
 
-    fn parse_set(&mut self) -> Result<Expr, ParserError> {
+    fn parse_set(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_set".to_string());
         let mut pairs = vec![];
         let mut set = vec![];
@@ -762,7 +791,7 @@ impl Parser<'_> {
     /// (4) => int(4)
     /// (4,) => Expr::Tuple(vec!\[int(4)\])
     ///
-    fn parse_tuple(&mut self) -> Result<Expr, ParserError> {
+    fn parse_tuple(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_tuple".to_string());
         self.consume(&Token::LParen)?;
 
@@ -796,7 +825,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_function_call_args(&mut self) -> Result<CallArgs, ParserError> {
+    fn parse_function_call_args(&mut self) -> ParserResult<CallArgs> {
         self.consume(&Token::LParen)?;
 
         let mut args = Vec::new();
@@ -869,7 +898,7 @@ impl Parser<'_> {
     /// An argument in a function call can be either variable `a` or contain an equals such as
     /// `a = 4`. We originally (and ignorantly) called `parse_statement` but that contains too many
     /// other cases to be safely used inside function call parsing.
-    fn parse_function_call_arg(&mut self) -> Result<CallArg, ParserError> {
+    fn parse_function_call_arg(&mut self) -> ParserResult<CallArg> {
         let expr = self.parse_simple_expr()?;
         match self.current_token() {
             Token::Assign => {
@@ -889,7 +918,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_generator_comprehension(&mut self, body: &Expr) -> Result<Expr, ParserError> {
+    fn parse_generator_comprehension(&mut self, body: &Expr) -> ParserResult<Expr> {
         let clauses = self.parse_comprehension_clauses()?;
         Ok(Expr::GeneratorComprehension {
             body: Box::new(body.clone()),
@@ -897,7 +926,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_comprehension_clauses(&mut self) -> Result<Vec<ForClause>, ParserError> {
+    fn parse_comprehension_clauses(&mut self) -> ParserResult<Vec<ForClause>> {
         let mut clauses = vec![];
         while self.current_token() == &Token::For {
             clauses.push(self.parse_comprehension_clause()?);
@@ -905,7 +934,7 @@ impl Parser<'_> {
         Ok(clauses)
     }
 
-    fn parse_comprehension_clause(&mut self) -> Result<ForClause, ParserError> {
+    fn parse_comprehension_clause(&mut self) -> ParserResult<ForClause> {
         self.consume(&Token::For)?;
         let index = self.parse_loop_index()?;
         self.consume(&Token::In)?;
@@ -930,7 +959,7 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_type_node(&mut self) -> Result<TypeNode, ParserError> {
+    fn parse_type_node(&mut self) -> ParserResult<TypeNode> {
         let mut nodes = vec![];
 
         loop {
@@ -1646,6 +1675,14 @@ tuple((1,
 
         let input = "a[2:5]";
         let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), Some(int!(5)), None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[2::5]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), None, Some(int!(5))));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[2::]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), None, None));
         assert_expr_eq!(input, expected_ast);
 
         let input = "a[:5]";

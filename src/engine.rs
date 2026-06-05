@@ -17,15 +17,26 @@ impl Engine {
 
     pub fn from_env() -> Self {
         if let Ok(mode) = env::var("MEMPHIS_ENGINE") {
-            match mode.to_lowercase().as_str() {
-                "bytecode_vm" => Engine::BytecodeVm,
-                #[cfg(feature = "llvm_backend")]
-                "llvm_backend" => Engine::LlvmBackend,
-                "treewalk" => Engine::Treewalk,
-                _ => panic!("Unsupported engine: {mode}"),
+            match Engine::try_from(mode.to_lowercase().as_str()) {
+                Ok(e) => e,
+                Err(_) => panic!("Unsupported engine: {mode}"),
             }
         } else {
             Self::DEFAULT_ENGINE
+        }
+    }
+}
+
+impl TryFrom<&str> for Engine {
+    type Error = ();
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        match value {
+            "bytecode_vm" => Ok(Engine::BytecodeVm),
+            #[cfg(feature = "llvm_backend")]
+            "llvm_backend" => Ok(Engine::LlvmBackend),
+            "treewalk" => Ok(Engine::Treewalk),
+            _ => Err(()),
         }
     }
 }
@@ -34,9 +45,9 @@ impl Display for Engine {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Engine::Treewalk => write!(f, "treewalk"),
-            Engine::BytecodeVm => write!(f, "bytecode VM"),
+            Engine::BytecodeVm => write!(f, "bytecode_vm"),
             #[cfg(feature = "llvm_backend")]
-            Engine::LlvmBackend => write!(f, "LLVM backend"),
+            Engine::LlvmBackend => write!(f, "llvm_backend"),
         }
     }
 }
