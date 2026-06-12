@@ -359,9 +359,10 @@ impl Callable for SetItemBuiltin {
             .raise(interpreter)?;
         let index = args.get_arg(0);
         let value = args.get_arg(1);
-
-        let key = index.as_hash_key().raise(interpreter)?;
-        object.borrow_mut().items.insert(key, (index, value));
+        object
+            .borrow_mut()
+            .insert(index, value)
+            .raise(interpreter)?;
         Ok(TreewalkValue::None)
     }
 

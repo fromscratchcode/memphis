@@ -165,22 +165,24 @@ impl VirtualMachine {
             return self.intern_string(s);
         }
 
+        if let Constant::None = constant {
+            return self.runtime.borrow().builtin_instances.none;
+        }
+
         let payload = match constant {
-            Constant::None => VmValue::None,
             Constant::Boolean(i) => VmValue::Bool(i),
             Constant::Int(i) => VmValue::Int(i),
             Constant::Float(i) => VmValue::Float(i),
             Constant::Code(ref i) => VmValue::Code(i.clone()),
-            Constant::String(_) => unreachable!(),
+            Constant::String(_) | Constant::None => unreachable!(),
         };
 
         let class_ref = match constant {
-            Constant::None => self.runtime.borrow().builtin_types.none,
             Constant::Int(_) => self.runtime.borrow().builtin_types.int,
             Constant::Boolean(_) => self.runtime.borrow().builtin_types.bool,
             Constant::Float(_) => self.runtime.borrow().builtin_types.float,
             Constant::Code(_) => self.runtime.borrow().builtin_types.code,
-            Constant::String(_) => unreachable!(),
+            Constant::String(_) | Constant::None => unreachable!(),
         };
 
         self.new_object(class_ref, payload)

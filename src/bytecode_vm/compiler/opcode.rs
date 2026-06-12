@@ -26,6 +26,9 @@ pub enum Opcode {
     /// Pop the top two values off the stack, perform dynamic type conversion,
     /// and push their quotient back onto the stack. This is NOT integer division.
     Div,
+    /// Pop the top two values off the stack, perform dynamic type conversion,
+    /// and push their modulo back onto the stack.
+    Mod,
     /// Pop the top two values off the stack, compare their semantic equality, and push the
     /// result onto the stack.
     Eq,
@@ -121,6 +124,10 @@ pub enum Opcode {
     /// Conditional jump to an offset based on the value on the top of the stack. This is signed
     /// because you can jump in reverse.
     JumpIfTrue(SignedOffset),
+    /// Conditional jump to an offset based on the value on the top of the stack. This is signed
+    /// because you can jump in reverse.
+    /// This will throw away the top of the stack! Useful for statement-level control (if/while),
+    /// but not expression-level (AND/OR) short-circuiting.
     PopJumpIfFalse(SignedOffset),
     /// Discard the top value on the stack.
     PopTop,
@@ -202,6 +209,7 @@ impl Opcode {
             BinOp::Sub => Opcode::Sub,
             BinOp::Mul => Opcode::Mul,
             BinOp::Div => Opcode::Div,
+            BinOp::Mod => Opcode::Mod,
             _ => return None,
         })
     }
@@ -231,6 +239,7 @@ impl Display for Opcode {
             Opcode::Sub => write!(f, "SUB"),
             Opcode::Mul => write!(f, "MUL"),
             Opcode::Div => write!(f, "DIV"),
+            Opcode::Mod => write!(f, "MOD"),
             Opcode::Eq => write!(f, "EQ"),
             Opcode::Ne => write!(f, "NE"),
             Opcode::BinarySubscr => write!(f, "BINARY_SUBSCR"),

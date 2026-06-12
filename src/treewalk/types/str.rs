@@ -249,30 +249,49 @@ impl Callable for JoinBuiltin {
     }
 }
 
+fn collect_parts<'a>(iter: impl Iterator<Item = &'a str>) -> Vec<TreewalkValue> {
+    iter.map(|s| TreewalkValue::Str(Str::new(s))).collect()
+}
+
 impl Callable for SplitBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+        check_args(&args, |len| [0, 1, 2].contains(&len)).raise(interpreter)?;
 
         let text = args
             .get_self()
             .raise(interpreter)?
             .as_string()
             .raise(interpreter)?;
-        let delim = args.get_arg(0).as_string().raise(interpreter)?;
 
-        // We must use dynamic dispatch because split and splitn return different types.
-        let iter: Box<dyn Iterator<Item = &str>> = match args.len() {
-            1 => Box::new(text.split(&delim)),
-            2 => {
-                let max_split = args.get_arg(1).as_int().raise(interpreter)?;
-                // Python's value for maxsplit is the number of splits done, while Rust interprets
-                // it as the number of items in the resulting list. Therefore, we add one.
-                Box::new(text.splitn((max_split as usize) + 1, &delim))
+        // This first clause is essentially saying the first positional arg has a default.
+        // str.split(sep=None, maxsplit=-1)
+        // But we don't have a great way to model that on builtins right now.
+        let parts = if args.is_empty() || args.get_arg(0).is(&TreewalkValue::None) {
+            collect_parts(text.split_whitespace())
+        } else {
+            let delim = args.get_arg(0).as_string().raise(interpreter)?;
+            if delim.is_empty() {
+                return Exception::value_error("empty separator").raise(interpreter);
             }
-            _ => unreachable!(),
-        };
 
-        let parts: Vec<_> = iter.map(|i| TreewalkValue::Str(Str::new(i))).collect();
+            // TODO this whole thing would be a lot simpler if we had a way to handle default
+            // arguments on builtin function signatures
+            let max_split = args
+                .get_arg_optional(1)
+                .map(|i| i.as_int())
+                .transpose()
+                .raise(interpreter)?;
+            match max_split {
+                // Negative values for max split are ignored
+                None | Some(..=-1) => collect_parts(text.split(&delim)),
+                Some(max_split) => {
+                    // Python's value for maxsplit is the number of splits done, while Rust
+                    // interprets it as the number of items in the resulting list. Therefore,
+                    // we must add one.
+                    collect_parts(text.splitn((max_split as usize) + 1, &delim))
+                }
+            }
+        };
 
         Ok(TreewalkValue::List(Container::new(List::new(parts))))
     }

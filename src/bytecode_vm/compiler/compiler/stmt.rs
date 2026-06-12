@@ -145,7 +145,7 @@ impl Compiler {
         self.compile_expr(&cond_ast.condition)?;
 
         self.frame_mut()
-            .emit_jump_to(loop_end, JumpKind::JumpIfFalse);
+            .emit_jump_to(loop_end, JumpKind::PopJumpIfFalse);
 
         self.compile_ast(&cond_ast.ast)?;
 
@@ -225,7 +225,7 @@ impl Compiler {
             .or(else_label)
             .unwrap_or(end_label);
         self.frame_mut()
-            .emit_jump_to(false_target, JumpKind::JumpIfFalse);
+            .emit_jump_to(false_target, JumpKind::PopJumpIfFalse);
         self.compile_ast(&if_part.ast)?;
 
         // Jump over any elifs/else if we got this far (meaning the condition was true)
@@ -249,7 +249,7 @@ impl Compiler {
                 .or(else_label)
                 .unwrap_or(end_label);
             self.frame_mut()
-                .emit_jump_to(false_target, JumpKind::JumpIfFalse);
+                .emit_jump_to(false_target, JumpKind::PopJumpIfFalse);
             self.compile_ast(&elif.ast)?;
 
             // Only emit a jump if this is not the last elif or else
@@ -635,7 +635,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::LessThan,
-                Opcode::JumpIfFalse(1),
+                Opcode::PopJumpIfFalse(1),
                 Opcode::Jump(-5),
             ]
         );
@@ -683,7 +683,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::LessThan,
-                Opcode::JumpIfFalse(2),
+                Opcode::PopJumpIfFalse(2),
                 Opcode::LoadConst(Index::new(2)),
                 Opcode::StoreGlobal(Index::new(0)),
             ]
@@ -707,7 +707,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::LessThan,
-                Opcode::JumpIfFalse(2),
+                Opcode::PopJumpIfFalse(2),
                 Opcode::LoadConst(Index::new(2)),
                 Opcode::StoreGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(3)),
@@ -737,7 +737,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::GreaterThan,
-                Opcode::JumpIfFalse(3), // jump to elif condition
+                Opcode::PopJumpIfFalse(3), // jump to elif condition
                 Opcode::LoadConst(Index::new(2)),
                 Opcode::StoreGlobal(Index::new(0)),
                 Opcode::Jump(6), // skip rest
@@ -745,7 +745,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::GreaterThan,
-                Opcode::JumpIfFalse(2), // jump past elif block if false
+                Opcode::PopJumpIfFalse(2), // jump past elif block if false
                 Opcode::LoadConst(Index::new(3)),
                 Opcode::StoreGlobal(Index::new(0)),
             ]
@@ -773,7 +773,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::GreaterThan,
-                Opcode::JumpIfFalse(3), // jump to elif condition
+                Opcode::PopJumpIfFalse(3), // jump to elif condition
                 Opcode::LoadConst(Index::new(2)),
                 Opcode::StoreGlobal(Index::new(0)),
                 Opcode::Jump(9), // skip rest
@@ -781,7 +781,7 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::GreaterThan,
-                Opcode::JumpIfFalse(3), // jump past elif block if false
+                Opcode::PopJumpIfFalse(3), // jump past elif block if false
                 Opcode::LoadConst(Index::new(3)),
                 Opcode::StoreGlobal(Index::new(0)),
                 Opcode::Jump(2), // skip else

@@ -232,6 +232,19 @@ i, s
     }
 
     #[test]
+    fn for_in_loop_range_with_modulo() {
+        let text = r#"
+s = 0
+for i in range(100):
+    if i % 3 == 0:
+        s = s + i
+
+i, s
+"#;
+        assert_eval_eq!(text, tuple![int!(99), int!(1683)]);
+    }
+
+    #[test]
     fn for_in_loop_range_with_inner_function() {
         let text = r#"
 def test():

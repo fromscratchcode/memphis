@@ -4,7 +4,7 @@ use crate::{
     core::Container,
     domain::ModuleName,
     treewalk::{
-        modules::{asyncio, net},
+        modules::{asyncio, net, time},
         types::Module,
     },
 };
@@ -25,6 +25,7 @@ impl ModuleStore {
 
     pub fn load_native_modules(&mut self, type_registry: &TypeRegistry) {
         asyncio::import(self);
+        time::import(self);
         net::import(self, type_registry);
     }
 

@@ -63,6 +63,14 @@ impl VirtualMachine {
                     return self.raise_step(exp);
                 }
             }
+            Opcode::Mod => {
+                let result = self.binary_op(opcode, |a, b| a % b, false);
+                if result.is_err() {
+                    let msg = self.intern_string("unsupported operand type(s) for %");
+                    let exp = Exception::type_error(msg);
+                    return self.raise_step(exp);
+                }
+            }
             Opcode::Div => {
                 let result = self.binary_op(opcode, |a, b| a / b, true);
                 match result {
