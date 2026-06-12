@@ -53,4 +53,4 @@ If you’re building something similar or just want to chat, feel free to reach 
 **Important Notice:** This project is currently in active development and is still considered experimental. As such, it is not recommended for use in production environments.
 
 ## License
-Free use of this software is granted under the terms of the GNU Lesser General Public License (LGPL). For details see the files `LICENSE` and `LICENSE.LESSER` included with the source distribution. All copyrights are owned by their respective authors.
+This project is licensed under the MIT License. See `LICENSE` for details.
