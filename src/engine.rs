@@ -7,8 +7,6 @@ use std::{
 pub enum Engine {
     Treewalk,
     BytecodeVm,
-    #[cfg(feature = "llvm_backend")]
-    LlvmBackend,
 }
 
 impl Engine {
@@ -33,8 +31,6 @@ impl TryFrom<&str> for Engine {
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         match value {
             "bytecode_vm" => Ok(Engine::BytecodeVm),
-            #[cfg(feature = "llvm_backend")]
-            "llvm_backend" => Ok(Engine::LlvmBackend),
             "treewalk" => Ok(Engine::Treewalk),
             _ => Err(()),
         }
@@ -46,8 +42,6 @@ impl Display for Engine {
         match self {
             Engine::Treewalk => write!(f, "treewalk"),
             Engine::BytecodeVm => write!(f, "bytecode_vm"),
-            #[cfg(feature = "llvm_backend")]
-            Engine::LlvmBackend => write!(f, "llvm_backend"),
         }
     }
 }

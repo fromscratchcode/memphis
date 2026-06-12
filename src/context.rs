@@ -43,8 +43,6 @@ impl MemphisContext {
         let context: Box<dyn Interpreter> = match engine {
             Engine::Treewalk => Box::new(TreewalkContext::new(state.clone(), origin)),
             Engine::BytecodeVm => Box::new(VmContext::new(state.clone(), origin)),
-            #[cfg(feature = "llvm_backend")]
-            Engine::LlvmBackend => todo!(),
         };
         Self {
             engine,

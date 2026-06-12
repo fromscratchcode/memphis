@@ -4,7 +4,7 @@
 features=(
     ""
     "repl"
-    "llvm_backend" # test this by itself for now just to ensure we didn't break it
+    "wasm"
 )
 
 for feature_set in "${features[@]}"; do

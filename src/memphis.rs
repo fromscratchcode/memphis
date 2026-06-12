@@ -1,7 +1,5 @@
 use std::process;
 
-#[cfg(feature = "llvm_backend")]
-use crate::llvm_backend::compile_ast_to_llvm;
 #[cfg(feature = "repl")]
 use crate::repl::TerminalRepl;
 use crate::{core::memphis_utils, domain::Source, Engine, MemphisContext};
@@ -22,10 +20,6 @@ impl Memphis {
                 let _ = MemphisContext::script(engine, source.clone())
                     .eval(source.text().clone())
                     .map_err(|err| memphis_utils::exit(err));
-            }
-            #[cfg(feature = "llvm_backend")]
-            Engine::LlvmBackend => {
-                compile_ast_to_llvm();
             }
         }
     }

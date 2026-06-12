@@ -12,7 +12,7 @@ The REPL is useful for interactive mode. It is currently gated behind a feature 
 cargo run --features repl
 ```
 ## Feature Flags
-Feature flags are needed to enable REPL support or the experimental LLVM backend.
+Feature flags are needed to enable REPL support or the WASM interface.
 ```bash
 # script to run all combinations of feature flags
 ./test_features.sh
@@ -21,7 +21,7 @@ Feature flags are needed to enable REPL support or the experimental LLVM backend
 To compare runtime, we can build in release mode and use the different engines.
 ```bash
 cargo install --path . --all-features
-hyperfine "memphis examples/loop_perf.py" "MEMPHIS_ENGINE=bytecode_vm memphis examples/loop_perf.py" "MEMPHIS_ENGINE=llvm_backend memphis examples/loop_perf.py" --warmup 5
+hyperfine "memphis examples/loop_perf.py" "MEMPHIS_ENGINE=bytecode_vm memphis examples/loop_perf.py" --warmup 5
 ```
 ### Flamegraph
 This is a cool way to visualize why a bytecode VM is more performant than a treewalk interpreter.
@@ -31,7 +31,6 @@ cargo build --all-features
 # we require debug symbols to produce a flamegraph, hence invoking the binary from `target/debug`.
 sudo flamegraph -v -o tw.svg -- target/debug/memphis examples/loop_perf.py
 sudo flamegraph -v -o vm.svg -- MEMPHIS_ENGINE=bytecode_vm target/debug/memphis examples/loop_perf.py
-sudo flamegraph -v -o llvm.svg -- MEMPHIS_ENGINE=llvm_backend target/debug/memphis examples/loop_perf.py
 ```
 
 ## WebAssembly
