@@ -296,6 +296,9 @@ c = type(a.join)
         let input = r#""HELlO".lower()"#;
         assert_eval_eq!(input, str!("hello"));
 
+        let input = r#""HELlO".upper()"#;
+        assert_eval_eq!(input, str!("HELLO"));
+
         let input = r#""\r\n".join(["a", "b"])"#;
         assert_eval_eq!(input, str!("a\r\nb"));
 
@@ -5228,29 +5231,5 @@ b = 2; c = 3
 
         let output = run_script("examples/builtins.py");
         assert_eq!(output, include_str!("../../examples/builtins.stdout"));
-    }
-
-    #[test]
-    fn word_count() {
-        let input = r#"
-def word_count(text):
-    counts = {}
-
-    for word in text.split():
-        if word in counts:
-            counts[word] += 1
-            print("a", counts)
-        else:
-            counts[word] = 1
-            print("b", counts)
-
-    return counts
-
-word_count("rust python rust")
-"#;
-        assert_eval_eq!(
-            input,
-            dict!({ str!("rust") => int!(2), str!("python") => int!(1) })
-        );
     }
 }

@@ -27,6 +27,7 @@ impl_method_provider!(
         JoinBuiltin,
         SplitBuiltin,
         LowerBuiltin,
+        UpperBuiltin,
         EncodeBuiltin,
         GetItemBuiltin,
     ]
@@ -148,6 +149,8 @@ struct JoinBuiltin;
 struct SplitBuiltin;
 #[derive(Clone)]
 struct LowerBuiltin;
+#[derive(Clone)]
+struct UpperBuiltin;
 #[derive(Clone)]
 struct EncodeBuiltin;
 #[derive(Clone)]
@@ -314,6 +317,22 @@ impl Callable for LowerBuiltin {
 
     fn name(&self) -> String {
         "lower".into()
+    }
+}
+
+impl Callable for UpperBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| len == 0).raise(interpreter)?;
+        let text = args
+            .get_self()
+            .raise(interpreter)?
+            .as_string()
+            .raise(interpreter)?;
+        Ok(TreewalkValue::Str(Str::from(text.to_uppercase())))
+    }
+
+    fn name(&self) -> String {
+        "upper".into()
     }
 }
 

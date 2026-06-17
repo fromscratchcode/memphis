@@ -13,6 +13,7 @@ mod modules;
 pub mod pausable;
 pub mod protocols;
 mod raised_error;
+mod real_world;
 mod result;
 mod scope;
 mod scope_manager;
