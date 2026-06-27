@@ -4,6 +4,7 @@ use crate::{
     core::Container,
     domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
+        iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
@@ -52,8 +53,10 @@ impl List {
             .join(delim))
     }
 
-    pub fn extend(&mut self, items: Box<dyn CloneableIterable>) {
-        self.items.extend(items)
+    pub fn extend(&mut self, iter: Box<dyn CloneableIterable>) -> TreewalkResult<()> {
+        let items = collect(iter)?;
+        self.items.extend(items);
+        Ok(())
     }
 
     /// Use this when you need a `pop_front` method.
@@ -103,7 +106,8 @@ impl TryEvalFrom for List {
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Self> {
         let iter = value.as_iterator().raise(interpreter)?;
-        Ok(List::new(iter.collect()))
+        let items = collect(iter)?;
+        Ok(List::new(items))
     }
 }
 
@@ -236,12 +240,8 @@ impl Callable for ExtendBuiltin {
             .raise(interpreter)?
             .as_list()
             .raise(interpreter)?;
-        list.borrow_mut().extend(
-            args.get_arg(0)
-                .as_iterable()
-                .raise(interpreter)?
-                .into_iter(),
-        );
+        let iter = args.get_arg(0).as_iterator().raise(interpreter)?;
+        list.borrow_mut().extend(iter)?;
 
         Ok(TreewalkValue::None)
     }

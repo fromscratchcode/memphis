@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
+        iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
@@ -40,7 +41,8 @@ impl TryEvalFrom for FrozenSet {
         value: TreewalkValue,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Self> {
-        let items: Vec<_> = value.as_iterator().raise(interpreter)?.collect();
+        let iter = value.as_iterator().raise(interpreter)?;
+        let items = collect(iter)?;
         let set = FrozenSet::from_items(items).raise(interpreter)?;
         Ok(set)
     }

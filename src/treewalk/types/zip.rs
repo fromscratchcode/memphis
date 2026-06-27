@@ -1,8 +1,9 @@
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
+        iterator::count,
         macros::*,
-        protocols::Callable,
+        protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableIterable,
         types::{Exception, Tuple},
@@ -23,43 +24,40 @@ impl Clone for ZipIterator {
 
 impl_typed!(ZipIterator, Type::Zip);
 impl_method_provider!(ZipIterator, [NewBuiltin]);
-impl_iterable!(ZipIterator);
 
 impl ZipIterator {
     pub fn new(items: Vec<Box<dyn CloneableIterable>>) -> Self {
         Self(items)
     }
 
-    fn lengths(&self) -> Vec<usize> {
+    fn lengths(&self) -> TreewalkResult<Vec<usize>> {
         self.0
             .iter()
-            .map(|i| safe_clone(i).count())
-            .collect::<Vec<usize>>()
+            .map(|i| count(safe_clone(i)))
+            .collect::<TreewalkResult<Vec<usize>>>()
     }
 }
 
-impl Iterator for ZipIterator {
-    type Item = TreewalkValue;
-
-    /// Return the next item from each of the composite iterators in a tuple until the shortest
-    /// iterator has been exhausted, then return `None`.
-    fn next(&mut self) -> Option<Self::Item> {
-        // Advance all the composite iterators
-        let results = self
-            .0
-            .iter_mut()
-            .map(|i| i.next())
-            .collect::<Vec<Option<TreewalkValue>>>();
-
-        if results.iter().all(|r| r.is_some()) {
-            let r = results
-                .iter()
-                .map(|i| i.clone().unwrap())
-                .collect::<Vec<TreewalkValue>>();
-            Some(TreewalkValue::Tuple(Tuple::new(r)))
-        } else {
-            None
+impl Iterable for ZipIterator {
+    // We cannot use the boilerplate impl_iterable! here because some of the composite iterators
+    // may fail, not swallow them the way Iterator::next does.
+    fn try_next(&mut self) -> TreewalkResult<NextResult> {
+        // Python advances child iterators left-to-right for each next() call.
+        // If one iterator is exhausted, earlier iterators may already have advanced,
+        // but later iterators should not be touched. This is true regardless how many times next
+        // is called.
+        let mut results = vec![];
+        for i in self.0.iter_mut() {
+            let next = i.try_next()?;
+            match next {
+                NextResult::Exhausted(val) => return Ok(NextResult::Exhausted(val)),
+                NextResult::Yielded(val) => results.push(val),
+            }
         }
+
+        Ok(NextResult::Yielded(TreewalkValue::Tuple(Tuple::new(
+            results,
+        ))))
     }
 }
 
@@ -94,7 +92,7 @@ impl Callable for NewBuiltin {
                     .get_kwarg("strict")
                     .is_some_and(|k| k == TreewalkValue::Bool(true))
                 {
-                    let lengths = zip.lengths();
+                    let lengths = zip.lengths()?;
                     let all_equal = lengths.is_empty() || lengths.iter().all(|&x| x == lengths[0]);
 
                     if !all_equal {

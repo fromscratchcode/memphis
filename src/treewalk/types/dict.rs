@@ -4,6 +4,7 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        iterator::{collect, for_each_mut},
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
@@ -141,7 +142,7 @@ impl TryEvalFrom for Container<Dict> {
             TreewalkValue::Dict(i) => Ok(i.clone()),
             val if val.clone().as_iterable().is_ok() => {
                 let iter = val.as_iterator().raise(interpreter)?;
-                let items = build_dict_items_from_iterable(iter).raise(interpreter)?;
+                let items = build_dict_items_from_iterable(iter, interpreter)?;
                 let dict = Dict::from_items(items).raise(interpreter)?;
                 Ok(Container::new(dict))
             }
@@ -152,24 +153,33 @@ impl TryEvalFrom for Container<Dict> {
 
 fn build_dict_items_from_iterable(
     iter: Box<dyn CloneableIterable>,
-) -> DomainResult<Vec<(TreewalkValue, TreewalkValue)>> {
+    interpreter: &TreewalkInterpreter,
+) -> TreewalkResult<Vec<(TreewalkValue, TreewalkValue)>> {
     let mut pairs: Vec<(TreewalkValue, TreewalkValue)> = vec![];
-    for (index, item) in iter.enumerate() {
+    let mut index = 0;
+    for_each_mut(iter, &mut |item| {
         // The item is often a tuple, but can really be any iterable which yields 2 values.
-        let pair: Vec<_> = item.as_iterator()?.collect();
+        let inner_iter = item.as_iterator().raise(interpreter)?;
+        let pair = collect(inner_iter)?;
 
         // We cannot convert directly from a Vec to a tuple, we must first attempt to convert
         // to an array of a known and fixed length of 2.
-        let pair_arr: [TreewalkValue; 2] = pair.clone().try_into().map_err(|_| {
-            Exception::value_error(format!(
-                "dictionary update sequence element #{} has length {}; 2 is required",
-                index,
-                pair.len()
-            ))
-        })?;
+        let pair_arr: [TreewalkValue; 2] = pair
+            .clone()
+            .try_into()
+            .map_err(|_| {
+                Exception::value_error(format!(
+                    "dictionary update sequence element #{} has length {}; 2 is required",
+                    index,
+                    pair.len()
+                ))
+            })
+            .raise(interpreter)?;
 
         pairs.push(pair_arr.into());
-    }
+        index += 1;
+        Ok(())
+    })?;
 
     Ok(pairs)
 }

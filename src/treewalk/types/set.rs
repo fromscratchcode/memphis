@@ -4,6 +4,7 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
@@ -45,7 +46,8 @@ impl TryEvalFrom for Set {
         value: TreewalkValue,
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Self> {
-        let items: Vec<_> = value.as_iterator().raise(interpreter)?.collect();
+        let iter = value.as_iterator().raise(interpreter)?;
+        let items = collect(iter)?;
         let set = Set::from_items(items).raise(interpreter)?;
         Ok(set)
     }

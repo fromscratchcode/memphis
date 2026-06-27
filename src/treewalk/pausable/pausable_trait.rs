@@ -1,7 +1,7 @@
 use crate::{
     core::Container,
     parser::types::Statement,
-    treewalk::{DomainResult, Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue},
+    treewalk::{Scope, TreewalkInterpreter, TreewalkResult},
 };
 
 use super::{PausableStack, StepResult};
@@ -15,10 +15,6 @@ pub trait Pausable {
 
     /// A getter for the [`Scope`] of a pausable function.
     fn scope(&self) -> Container<Scope>;
-
-    /// A handle to perform any necessary cleanup once this function returns, including set its
-    /// return value.
-    fn finish(&mut self, result: TreewalkValue) -> DomainResult<TreewalkValue>;
 
     /// A handle to invoke the discrete operation of evaluating an individual statement and
     /// producing a [`PausableStepResult`] based on the control flow instructions and or the

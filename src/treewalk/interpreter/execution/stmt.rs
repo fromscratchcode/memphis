@@ -6,6 +6,7 @@ use crate::{
         HandlerKind, LoopIndex, Params, RaiseKind, RegularImport, Statement, StatementKind,
     },
     treewalk::{
+        iterator::{try_for_each_mut, LoopControl},
         result::Raise,
         types::{Exception, Function, Tuple},
         utils::{args, Args},
@@ -315,19 +316,21 @@ impl TreewalkInterpreter {
     ) -> TreewalkResult<()> {
         let mut encountered_break = false;
 
-        for val_for_iteration in self.evaluate_expr(range)?.as_iterable().raise(self)? {
+        let iter = self.evaluate_expr(range)?.as_iterator().raise(self)?;
+        try_for_each_mut(iter, &mut |val_for_iteration| {
             self.execute_loop_index_assignment(index, val_for_iteration)?;
 
             match self.execute_ast(body) {
                 Err(TreewalkDisruption::Signal(TreewalkSignal::Break)) => {
                     encountered_break = true;
-                    break;
+                    return Ok(LoopControl::Break);
                 }
                 Err(TreewalkDisruption::Signal(TreewalkSignal::Continue)) => {}
                 Err(e) => return Err(e),
                 _ => {}
             }
-        }
+            Ok(LoopControl::Continue)
+        })?;
 
         if !encountered_break {
             if let Some(else_block) = else_block {

@@ -49,8 +49,11 @@ macro_rules! impl_iterable {
         impl $crate::treewalk::protocols::Iterable for $iter_name {
             fn try_next(
                 &mut self,
-            ) -> $crate::treewalk::TreewalkResult<Option<$crate::treewalk::TreewalkValue>> {
-                Ok(Iterator::next(self))
+            ) -> $crate::treewalk::TreewalkResult<$crate::treewalk::protocols::NextResult> {
+                match Iterator::next(self) {
+                    Some(val) => Ok($crate::treewalk::protocols::NextResult::Yielded(val)),
+                    None => Ok($crate::treewalk::protocols::NextResult::Exhausted(None)),
+                }
             }
         }
     };

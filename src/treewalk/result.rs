@@ -1,6 +1,12 @@
-use crate::treewalk::{types::Exception, RaisedException, TreewalkInterpreter, TreewalkValue};
+use crate::{
+    core::Container,
+    treewalk::{
+        types::{Coroutine, Exception},
+        RaisedException, TreewalkInterpreter, TreewalkValue,
+    },
+};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum TreewalkDisruption {
     Signal(TreewalkSignal), // Control flow (not errors)
     Error(RaisedException), // Actual Python runtime errors
@@ -16,14 +22,14 @@ impl TreewalkDisruption {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum TreewalkSignal {
     Return(TreewalkValue),
     Yield(TreewalkValue),
     YieldFrom(TreewalkValue),
     Raise,
-    Await,
-    Sleep,
+    Await(Container<Coroutine>),
+    Sleep(f64),
     Break,
     Continue,
 }

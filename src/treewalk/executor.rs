@@ -3,8 +3,9 @@ use std::mem::take;
 use crate::{
     core::Container,
     treewalk::{
-        pausable::Pausable, types::Coroutine, TreewalkDisruption, TreewalkInterpreter,
-        TreewalkResult, TreewalkSignal, TreewalkValue,
+        pausable::{Completion, FrameExit, Pausable, Suspension},
+        types::Coroutine,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -13,8 +14,6 @@ pub struct Executor {
     current_coroutine: Option<Container<Coroutine>>,
     running: Vec<Container<Coroutine>>,
     spawned: Vec<Container<Coroutine>>,
-    to_wait: Vec<(Container<Coroutine>, Container<Coroutine>)>,
-    sleep_indicator: Option<f64>,
 }
 
 impl Default for Executor {
@@ -30,17 +29,11 @@ impl Executor {
             current_coroutine: None,
             running: vec![],
             spawned: vec![],
-            to_wait: vec![],
-            sleep_indicator: None,
         }
     }
 
     pub fn current_coroutine(&self) -> &Option<Container<Coroutine>> {
         &self.current_coroutine
-    }
-
-    pub fn set_wait_on(&mut self, first: Container<Coroutine>, second: Container<Coroutine>) {
-        self.to_wait.push((first.clone(), second.clone()));
     }
 
     /// The main interface to the `Executor` event loop. An `TreewalkValue` will be returned once
@@ -62,15 +55,6 @@ impl Executor {
             }
             // Push them back in for the next round
             self.running.extend(to_run);
-
-            // Same pattern for to_wait, except we don't need to push them back
-            let to_wait = take(&mut self.to_wait);
-            for (first, second) in &to_wait {
-                first.borrow_mut().wait_on(second.clone());
-                if !second.borrow().has_started() {
-                    self.spawn(second.clone())?;
-                }
-            }
 
             // Same pattern for spawned, which we also don't need to push back
             let new_spawns = take(&mut self.spawned);
@@ -95,11 +79,6 @@ impl Executor {
         Ok(TreewalkValue::Coroutine(coroutine))
     }
 
-    pub fn sleep(&mut self, duration: f64) -> TreewalkResult<TreewalkValue> {
-        self.sleep_indicator = Some(duration);
-        Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep))
-    }
-
     /// Do the next piece of work on a given `Coroutine`. After its work is done, check to
     /// see if it was put to sleep and handle it accordingly.
     fn step_coroutine(
@@ -108,10 +87,29 @@ impl Executor {
         coroutine: Container<Coroutine>,
     ) -> TreewalkResult<()> {
         self.current_coroutine = Some(coroutine.clone());
-        coroutine.borrow_mut().run_until_pause(interpreter)?;
 
-        if let Some(duration) = self.sleep_indicator.take() {
-            coroutine.borrow_mut().sleep(duration);
+        // Run the coroutine in a separate block to avoid lock contention
+        let exit = { coroutine.borrow_mut().run_until_pause(interpreter)? };
+
+        match exit {
+            FrameExit::Completed(Completion::Return(val)) => {
+                coroutine.borrow_mut().set_return_val(val);
+            }
+            FrameExit::Completed(Completion::Finished) => {
+                coroutine.borrow_mut().set_return_val(TreewalkValue::None);
+            }
+            FrameExit::Suspended(Suspension::Yield(_)) => unimplemented!(
+                "Async generators are currently not supported in the treewalk engine"
+            ),
+            FrameExit::Suspended(Suspension::Sleep(f)) => {
+                coroutine.borrow_mut().sleep(f);
+            }
+            FrameExit::Suspended(Suspension::Await(c)) => {
+                coroutine.borrow_mut().wait_on(c.clone());
+                if !c.borrow().has_started() {
+                    self.spawn(c.clone())?;
+                }
+            }
         }
 
         self.current_coroutine = None;

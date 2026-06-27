@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     parser::types::{CallArgs, KwargsOperation, Params},
     treewalk::{
+        iterator::for_each_mut,
         protocols::TryEvalFrom,
         result::Raise,
         types::{
@@ -39,11 +40,13 @@ impl TreewalkInterpreter {
                 }
                 KwargsOperation::Unpacking(expr) => {
                     let unpacked = self.evaluate_expr(expr)?;
-                    for key_val in unpacked.clone().as_iterable().raise(self)? {
+                    let iter = unpacked.clone().as_iterator().raise(self)?;
+                    for_each_mut(iter, &mut |key_val| {
                         let key = key_val.as_string().raise(self)?;
                         let value = self.load_index(&unpacked, &key_val)?;
                         insert_kwarg(&mut kwargs, &key, value).raise(self)?;
-                    }
+                        Ok(())
+                    })?;
                 }
             }
         }

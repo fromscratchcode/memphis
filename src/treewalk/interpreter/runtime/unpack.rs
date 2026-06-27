@@ -1,5 +1,6 @@
 use crate::treewalk::{
-    result::Raise, types::Exception, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+    iterator::collect, result::Raise, types::Exception, TreewalkInterpreter, TreewalkResult,
+    TreewalkValue,
 };
 
 impl TreewalkInterpreter {
@@ -8,8 +9,8 @@ impl TreewalkInterpreter {
         value: TreewalkValue,
         expected_len: usize,
     ) -> TreewalkResult<Vec<TreewalkValue>> {
-        let iter = value.as_iterable().raise(self)?.into_iter();
-        let items: Vec<_> = iter.collect();
+        let iter = value.as_iterator().raise(self)?;
+        let items = collect(iter)?;
 
         let actual_len = items.len();
 

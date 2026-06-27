@@ -44,12 +44,17 @@ impl PartialEq for dyn Callable {
     }
 }
 
+pub enum NextResult {
+    Yielded(TreewalkValue),
+    Exhausted(Option<TreewalkValue>),
+}
+
 /// This represents the Python `__iter__` protocol. It differs from the Rust `Iterator` because it
 /// is falliable (i.e.e certain calls to `next()` may throw a runtime error).
 ///
 /// For ergonomics, we implement both `Iterable` and `Iterator` for our builitin types.
 pub trait Iterable {
-    fn try_next(&mut self) -> TreewalkResult<Option<TreewalkValue>>;
+    fn try_next(&mut self) -> TreewalkResult<NextResult>;
 }
 
 pub trait MemberRead {

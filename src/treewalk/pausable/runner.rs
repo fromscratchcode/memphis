@@ -1,10 +1,10 @@
 use crate::{
     parser::types::{Statement, StatementKind},
     treewalk::{
-        pausable::{Completion, FrameExit, Suspension},
-        protocols::Iterable,
+        pausable::{Completion, FrameExit},
+        protocols::{Iterable, NextResult},
         result::Raise,
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        TreewalkInterpreter, TreewalkResult,
     },
 };
 
@@ -17,7 +17,7 @@ impl PausableRunner {
     pub fn run_until_pause<P: Pausable>(
         pausable: &mut P,
         interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<TreewalkValue> {
+    ) -> TreewalkResult<FrameExit> {
         Self::on_entry(pausable, interpreter);
 
         loop {
@@ -29,7 +29,7 @@ impl PausableRunner {
                 PausableState::Running => {
                     if pausable.context().frame().is_finished() {
                         Self::on_exit(interpreter);
-                        return pausable.finish(TreewalkValue::None).raise(interpreter);
+                        return Ok(FrameExit::Completed(Completion::Finished));
                     }
                 }
                 PausableState::InForLoop { index, iterable } => {
@@ -39,7 +39,7 @@ impl PausableRunner {
                             .as_iterator_strict()
                             .raise(interpreter)?
                             .try_next()?;
-                        if let Some(item) = item {
+                        if let NextResult::Yielded(item) = item {
                             interpreter.execute_loop_index_assignment(index, item)?;
                             pausable.context_mut().frame_mut().restart();
                         } else {
@@ -70,16 +70,7 @@ impl PausableRunner {
                 StepResult::Continue => {}
                 StepResult::Exit(exit) => {
                     Self::on_exit(interpreter);
-                    return match exit {
-                        FrameExit::Completed(completion) => match completion {
-                            Completion::Return(val) => pausable.finish(val).raise(interpreter),
-                        },
-                        FrameExit::Suspended(suspension) => match suspension {
-                            Suspension::Yield(val) => Ok(val),
-                            Suspension::Await => Ok(TreewalkValue::None),
-                            Suspension::Sleep => Ok(TreewalkValue::None),
-                        },
-                    };
+                    return Ok(exit);
                 }
             }
         }

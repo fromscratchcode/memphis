@@ -19,7 +19,7 @@ pub enum PausableState {
 
 /// The context that allows a `Pausable` to be paused and resumed. This represents an individual
 /// `Frame` and its current `PausableState`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PausableFrame {
     frame: Frame,
     state: PausableState,
@@ -33,6 +33,7 @@ impl PausableFrame {
 
 /// The context that allows a `Pausable` to be paused and resumed. This represents a stack of
 /// `PausableToken` objects.
+#[derive(Debug)]
 pub struct PausableStack(Vec<PausableFrame>);
 
 impl PausableStack {

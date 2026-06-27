@@ -6,6 +6,7 @@ use crate::{
         FormatOption, LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
+        iterator::for_each_mut,
         result::Raise,
         types::{
             iterators::GeneratorIter, Dict, Exception, Function, Generator, List, Set, Slice, Str,
@@ -103,11 +104,13 @@ impl TreewalkInterpreter {
                 }
                 DictOperation::Unpack(expr) => {
                     let unpacked = self.evaluate_expr(expr)?;
-                    for key in unpacked.clone().as_iterable().raise(self)? {
+                    let iter = unpacked.clone().as_iterator().raise(self)?;
+                    for_each_mut(iter, &mut |key| {
                         let value = self.load_index(&unpacked, &key)?;
                         // later keys overwrite earlier ones
                         dict.insert(key, value).raise(self)?;
-                    }
+                        Ok(())
+                    })?;
                 }
             }
         }
@@ -124,9 +127,11 @@ impl TreewalkInterpreter {
                     op: UnaryOp::Unpack,
                     ..
                 } => {
-                    for elem in evaluated.as_iterable().raise(self)? {
-                        results.push(elem);
-                    }
+                    let iter = evaluated.as_iterator().raise(self)?;
+                    for_each_mut(iter, &mut |val| {
+                        results.push(val);
+                        Ok(())
+                    })?;
                 }
                 _ => {
                     results.push(evaluated);
@@ -238,19 +243,14 @@ impl TreewalkInterpreter {
     }
 
     fn evaluate_await(&self, expr: &Expr) -> TreewalkResult<TreewalkValue> {
-        let coroutine_to_await = self.evaluate_expr(expr)?.as_coroutine().raise(self)?;
+        let coroutine = self.evaluate_expr(expr)?.as_coroutine().raise(self)?;
 
-        if let Some(result) = coroutine_to_await.clone().borrow().is_finished_with() {
+        if let Some(result) = coroutine.clone().borrow().is_finished_with() {
             Ok(result)
-        } else if let Some(ref current_coroutine) =
-            self.with_executor(|exec| exec.current_coroutine().clone())
-        {
-            self.with_executor(|exec| {
-                exec.set_wait_on(current_coroutine.clone(), coroutine_to_await)
-            });
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Await))
+        } else if self.with_executor(|exec| exec.current_coroutine().is_some()) {
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Await(coroutine)))
         } else {
-            Exception::type_error("Expected a coroutine").raise(self)
+            Exception::type_error("await used outside coroutine").raise(self)
         }
     }
 
@@ -397,20 +397,22 @@ impl TreewalkInterpreter {
                 condition,
             } = clause;
 
-            for i in self.evaluate_expr(iterable)?.as_iterable().raise(self)? {
+            let iter = self.evaluate_expr(iterable)?.as_iterator().raise(self)?;
+            for_each_mut(iter, &mut |i| {
                 // Bind variables
                 self.execute_loop_index_assignment(index, i)?;
 
                 // Condition
                 if let Some(condition) = condition {
                     if !self.evaluate_expr(condition)?.coerce_to_bool() {
-                        continue;
+                        return Ok(());
                     }
                 }
 
                 // Recurse
                 self.evaluate_comprehension(remaining, emit)?;
-            }
+                Ok(())
+            })?;
 
             Ok(())
         } else {

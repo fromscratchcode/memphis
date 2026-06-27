@@ -1,23 +1,29 @@
 use crate::{
     core::Container,
-    domain::Type,
     parser::types::{Ast, ConditionalAst, Expr, ForClause, Statement, StatementKind},
     treewalk::{
         pausable::{
-            Frame, FrameExit, Pausable, PausableRunner, PausableStack, StepResult, Suspension,
+            Completion, Frame, FrameExit, Pausable, PausableRunner, PausableStack, StepResult,
+            Suspension,
         },
-        protocols::Iterable,
+        protocols::{Iterable, NextResult},
         result::Raise,
         type_system::CloneableIterable,
-        types::{Exception, Function},
-        DomainResult, Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
-        TreewalkSignal, TreewalkState, TreewalkValue,
+        types::Function,
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkState, TreewalkValue,
     },
 };
 
 enum GeneratorSuspend {
     None,
     Delegating(Box<dyn CloneableIterable>),
+}
+
+impl GeneratorSuspend {
+    fn is_delegating(&self) -> bool {
+        matches!(self, GeneratorSuspend::Delegating(_))
+    }
 }
 
 pub struct Generator {
@@ -37,32 +43,19 @@ impl Generator {
         }
     }
 
-    fn resume_delegation(
-        &mut self,
-        interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<Option<TreewalkValue>> {
+    fn step_delegation(&mut self, interpreter: &TreewalkInterpreter) -> TreewalkResult<NextResult> {
         let GeneratorSuspend::Delegating(delegated) = &mut self.suspend else {
-            return Ok(None);
+            panic!("step_delegation called without active delegation");
         };
 
-        match delegated.try_next() {
-            Ok(Some(val)) => Ok(Some(val)),
-            Ok(None) => {
-                self.suspend = GeneratorSuspend::None;
-                interpreter
-                    .state
-                    .set_current_yield_from_result(TreewalkValue::None);
-                Ok(None)
-            }
-            Err(TreewalkDisruption::Error(e)) if e.exception.get_type() == Type::StopIteration => {
-                self.suspend = GeneratorSuspend::None;
-                interpreter
-                    .state
-                    .set_current_yield_from_result(e.exception.first_arg_or_none());
-                Ok(None)
-            }
-            Err(e) => Err(e),
+        let next = delegated.try_next()?;
+        if let NextResult::Exhausted(ref val) = next {
+            self.suspend = GeneratorSuspend::None;
+            interpreter
+                .state
+                .set_current_yield_from_result(val.clone().unwrap_or(TreewalkValue::None));
         }
+        Ok(next)
     }
 
     pub fn new_from_comprehension(
@@ -78,14 +71,24 @@ impl Generator {
     pub fn run_until_pause(
         &mut self,
         interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<TreewalkValue> {
+    ) -> TreewalkResult<NextResult> {
         // `yield from` delegation is generator-specific behavior layered on top of the shared
         // pausable state machine.
-        if let Some(val) = self.resume_delegation(interpreter)? {
-            return Ok(val);
+        if self.suspend.is_delegating() {
+            match self.step_delegation(interpreter)? {
+                NextResult::Yielded(val) => return Ok(NextResult::Yielded(val)),
+                NextResult::Exhausted(_) => {}
+            }
         }
 
-        PausableRunner::run_until_pause(self, interpreter)
+        match PausableRunner::run_until_pause(self, interpreter)? {
+            FrameExit::Completed(Completion::Return(i)) => Ok(NextResult::Exhausted(Some(i))),
+            FrameExit::Completed(Completion::Finished) => Ok(NextResult::Exhausted(None)),
+            FrameExit::Suspended(Suspension::Yield(i)) => Ok(NextResult::Yielded(i)),
+            FrameExit::Suspended(Suspension::Await(_) | Suspension::Sleep(_)) => {
+                unimplemented!("Async generators currently unsupported in the treewalk engine")
+            }
+        }
     }
 
     // This is a utility which takes the parsed elements found in a generator comprehension and
@@ -146,10 +149,6 @@ impl Pausable for Generator {
         self.scope.clone()
     }
 
-    fn finish(&mut self, _result: TreewalkValue) -> DomainResult<TreewalkValue> {
-        Err(Exception::stop_iteration())
-    }
-
     /// Only yield statements will cause a value to be returned.
     fn execute_statement(
         &mut self,
@@ -158,26 +157,26 @@ impl Pausable for Generator {
     ) -> TreewalkResult<StepResult> {
         let step_result = match interpreter.evaluate_statement(stmt) {
             Ok(_) => Ok(StepResult::Continue),
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => {
-                Exception::stop_iteration_with(val).raise(interpreter)
-            }
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => Ok(StepResult::Exit(
+                FrameExit::Completed(Completion::Return(val)),
+            )),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Yield(val))) => Ok(StepResult::Exit(
                 FrameExit::Suspended(Suspension::Yield(val)),
             )),
             Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(val))) => {
-                if matches!(self.suspend, GeneratorSuspend::None) {
+                if !self.suspend.is_delegating() {
                     self.suspend =
                         GeneratorSuspend::Delegating(val.as_iterator().raise(interpreter)?);
                 }
 
-                match self.resume_delegation(interpreter)? {
-                    Some(val) => {
+                match self.step_delegation(interpreter)? {
+                    NextResult::Exhausted(_) => Ok(StepResult::Continue),
+                    NextResult::Yielded(val) => {
                         // yield and do _not_ advance PC
                         return Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Yield(
                             val,
                         ))));
                     }
-                    None => Ok(StepResult::Continue),
                 }
             }
             Err(e) => Err(e),
@@ -202,7 +201,7 @@ impl GeneratorIter {
         }
     }
 
-    pub fn run_until_pause(&mut self) -> TreewalkResult<TreewalkValue> {
+    pub fn run_until_pause(&mut self) -> TreewalkResult<NextResult> {
         self.interpreter.state.push_yield_from_result_frame();
         let result = self
             .generator
@@ -216,11 +215,7 @@ impl GeneratorIter {
 impl Iterable for GeneratorIter {
     // We cannot use the boilerplate impl_iterable! here because we want to surface any
     // StopIteration errors, not swallow them the way Iterator::next does.
-    fn try_next(&mut self) -> TreewalkResult<Option<TreewalkValue>> {
-        match self.run_until_pause() {
-            // is this right?
-            Ok(r) => Ok(Some(r)),
-            Err(e) => Err(e),
-        }
+    fn try_next(&mut self) -> TreewalkResult<NextResult> {
+        self.run_until_pause()
     }
 }

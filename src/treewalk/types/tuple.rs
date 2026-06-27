@@ -2,6 +2,7 @@ use crate::{
     core::Container,
     domain::{utils::normalize_index, Dunder, Type},
     treewalk::{
+        iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
@@ -65,7 +66,8 @@ impl TryEvalFrom for Tuple {
         interpreter: &TreewalkInterpreter,
     ) -> TreewalkResult<Self> {
         let iter = value.as_iterator().raise(interpreter)?;
-        Ok(Tuple::new(iter.collect()))
+        let items = collect(iter)?;
+        Ok(Tuple::new(items))
     }
 }
 

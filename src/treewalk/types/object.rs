@@ -4,6 +4,7 @@ use crate::{
     core::{log, Container, LogLevel},
     domain::{Dunder, Type},
     treewalk::{
+        iterator::any,
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
@@ -355,8 +356,8 @@ impl Callable for ContainsBuiltin {
         let left = args.get_self().raise(interpreter)?;
         let right = args.get_arg(0);
 
-        let mut iterable = left.as_iterator().raise(interpreter)?;
-        Ok(TreewalkValue::Bool(iterable.any(|i| i == right)))
+        let iter = left.as_iterator().raise(interpreter)?;
+        Ok(TreewalkValue::Bool(any(iter, |i| i == right)?))
     }
 
     fn name(&self) -> String {

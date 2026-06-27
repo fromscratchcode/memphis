@@ -1,46 +1,71 @@
-use crate::{
-    core::memphis_utils,
-    domain::Type,
-    treewalk::{
-        protocols::Iterable, type_system::CloneableIterable, TreewalkDisruption, TreewalkResult,
-        TreewalkValue,
-    },
+use crate::treewalk::{
+    protocols::{Iterable, NextResult},
+    type_system::CloneableIterable,
+    TreewalkResult, TreewalkValue,
 };
 
 impl Iterable for Box<dyn CloneableIterable> {
     /// This should surface any `StopIteration` errors. Use `Iterator` to swallow them.
-    fn try_next(&mut self) -> TreewalkResult<Option<TreewalkValue>> {
+    fn try_next(&mut self) -> TreewalkResult<NextResult> {
         self.as_mut().try_next()
     }
 }
 
-impl Iterator for Box<dyn CloneableIterable> {
-    type Item = TreewalkValue;
-
-    /// This should stop at any `StopIteration` errors. Use `Iterable` to surface them.
-    fn next(&mut self) -> Option<Self::Item> {
-        match Iterable::try_next(self) {
-            Ok(v) => v,
-            Err(TreewalkDisruption::Error(e)) if e.exception.get_type() == Type::StopIteration => {
-                None
-            }
-            Err(TreewalkDisruption::Error(e)) => {
-                // We must use the hard exit here because the Iterator trait doesn't give us
-                // an interface to surface a runtime error.
-                memphis_utils::exit(e.into());
-            }
-            Err(TreewalkDisruption::Signal(_)) => panic!("Unexpected signal during Iterator eval"),
-        }
-    }
+pub fn collect(iter: Box<dyn CloneableIterable>) -> TreewalkResult<Vec<TreewalkValue>> {
+    let mut l = vec![];
+    for_each_mut(iter, &mut |val| {
+        l.push(val);
+        Ok(())
+    })?;
+    Ok(l)
 }
 
-impl IntoIterator for TreewalkValue {
-    type Item = TreewalkValue;
-    type IntoIter = Box<dyn CloneableIterable>;
+pub fn count(iter: Box<dyn CloneableIterable>) -> TreewalkResult<usize> {
+    let mut c = 0;
+    for_each_mut(iter, &mut |_| {
+        c += 1;
+        Ok(())
+    })?;
+    Ok(c)
+}
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.clone()
-            .as_iterator()
-            .unwrap_or_else(|_| panic!("attempted to call IntoIterator on a {}!", self.get_type()))
+pub fn any<F>(mut iter: Box<dyn CloneableIterable>, f: F) -> TreewalkResult<bool>
+where
+    F: Fn(TreewalkValue) -> bool,
+{
+    while let NextResult::Yielded(val) = iter.try_next()? {
+        if f(val) {
+            return Ok(true);
+        }
     }
+
+    Ok(false)
+}
+
+pub enum LoopControl {
+    Continue,
+    Break,
+}
+
+pub fn try_for_each_mut<F>(mut iter: Box<dyn CloneableIterable>, f: &mut F) -> TreewalkResult<()>
+where
+    F: FnMut(TreewalkValue) -> TreewalkResult<LoopControl>,
+{
+    while let NextResult::Yielded(val) = iter.try_next()? {
+        match f(val)? {
+            LoopControl::Continue => {}
+            LoopControl::Break => break,
+        }
+    }
+    Ok(())
+}
+
+pub fn for_each_mut<F>(iter: Box<dyn CloneableIterable>, f: &mut F) -> TreewalkResult<()>
+where
+    F: FnMut(TreewalkValue) -> TreewalkResult<()>,
+{
+    try_for_each_mut(iter, &mut |v| {
+        f(v)?;
+        Ok(LoopControl::Continue)
+    })
 }

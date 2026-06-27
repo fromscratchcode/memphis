@@ -2,6 +2,7 @@ use crate::{
     core::Container,
     domain::Type,
     treewalk::{
+        iterator::for_each_mut,
         result::Raise,
         types::{Class, Exception},
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
@@ -28,13 +29,15 @@ impl TreewalkInterpreter {
             TreewalkValue::Class(c) => vec![c.clone()],
             TreewalkValue::Tuple(_) => {
                 let mut items = vec![];
-                for item in result {
+                let iter = result.as_iterator().raise(self)?;
+                for_each_mut(iter, &mut |item| {
                     items.push(
                         item.as_class()
                             .map_err(|_| Exception::type_error_must_inherit_base_exception())
                             .raise(self)?,
                     );
-                }
+                    Ok(())
+                })?;
                 items
             }
             _ => Exception::type_error_must_inherit_base_exception().raise(self)?,

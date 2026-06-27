@@ -1,4 +1,7 @@
-use crate::treewalk::TreewalkValue;
+use crate::{
+    core::Container,
+    treewalk::{types::Coroutine, TreewalkValue},
+};
 
 pub enum StepResult {
     Continue,
@@ -16,11 +19,12 @@ pub enum FrameExit {
 // system.
 pub enum Completion {
     Return(TreewalkValue),
+    Finished,
 }
 
 #[derive(Debug)]
 pub enum Suspension {
     Yield(TreewalkValue),
-    Await,
-    Sleep,
+    Await(Container<Coroutine>),
+    Sleep(f64),
 }

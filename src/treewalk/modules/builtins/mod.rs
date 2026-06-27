@@ -2,7 +2,8 @@ use crate::{
     core::Container,
     domain::{Dunder, MemphisValue, ModuleName},
     treewalk::{
-        protocols::{Callable, Iterable},
+        iterator::{collect, count},
+        protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableCallable,
         types::{Exception, List, Module, Str},
@@ -280,8 +281,9 @@ impl Callable for PrintBuiltin {
 impl Callable for LenBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| len == 1).raise(interpreter)?;
-        let iterator = args.get_arg(0).as_iterator().raise(interpreter)?;
-        Ok(TreewalkValue::Int(iterator.count() as i64))
+        let iter = args.get_arg(0).as_iterator().raise(interpreter)?;
+        let count = count(iter)?;
+        Ok(TreewalkValue::Int(count as i64))
     }
 
     fn name(&self) -> String {
@@ -293,10 +295,12 @@ impl Callable for NextBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| len == 1).raise(interpreter)?;
         let mut iterator = args.get_arg(0).as_iterator_strict().raise(interpreter)?;
-        match iterator.try_next() {
-            Ok(Some(val)) => Ok(val),
-            Ok(None) => Exception::stop_iteration().raise(interpreter),
-            Err(e) => Err(e),
+        match iterator.try_next()? {
+            NextResult::Yielded(val) => Ok(val),
+            NextResult::Exhausted(None) => Exception::stop_iteration().raise(interpreter),
+            NextResult::Exhausted(Some(val)) => {
+                Exception::stop_iteration_with(val).raise(interpreter)
+            }
         }
     }
 
@@ -319,7 +323,8 @@ impl Callable for IterBuiltin {
 impl Callable for SortedBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
         check_args(&args, |len| len == 1).raise(interpreter)?;
-        let mut items: Vec<_> = args.get_arg(0).as_iterator().raise(interpreter)?.collect();
+        let iter = args.get_arg(0).as_iterator().raise(interpreter)?;
+        let mut items = collect(iter)?;
         interpreter.python_sort(&mut items)?;
         Ok(TreewalkValue::List(Container::new(List::new(items))))
     }

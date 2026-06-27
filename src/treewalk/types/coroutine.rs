@@ -14,13 +14,14 @@ use crate::{
         result::Raise,
         types::Function,
         utils::{check_args, Args},
-        DomainResult, Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
-        TreewalkSignal, TreewalkValue,
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue,
     },
 };
 
 /// Stateful encapsulation of a pausable `Function` with a `Scope`. This must be run by an
 /// `Executor`.
+#[derive(Debug)]
 pub struct Coroutine {
     scope: Container<Scope>,
     context: PausableStack,
@@ -86,7 +87,7 @@ impl Coroutine {
     pub fn run_until_pause(
         &mut self,
         interpreter: &TreewalkInterpreter,
-    ) -> TreewalkResult<TreewalkValue> {
+    ) -> TreewalkResult<FrameExit> {
         PausableRunner::run_until_pause(self, interpreter)
     }
 }
@@ -104,11 +105,6 @@ impl Pausable for Coroutine {
         self.scope.clone()
     }
 
-    fn finish(&mut self, result: TreewalkValue) -> DomainResult<TreewalkValue> {
-        self.set_return_val(result.clone());
-        Ok(TreewalkValue::None)
-    }
-
     fn execute_statement(
         &mut self,
         interpreter: &TreewalkInterpreter,
@@ -116,12 +112,12 @@ impl Pausable for Coroutine {
     ) -> TreewalkResult<StepResult> {
         let step_result = match interpreter.evaluate_statement(stmt) {
             Ok(_) => Ok(StepResult::Continue),
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep)) => {
-                Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Sleep)))
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep(s))) => {
+                Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Sleep(s))))
             }
-            Err(TreewalkDisruption::Signal(TreewalkSignal::Await)) => {
+            Err(TreewalkDisruption::Signal(TreewalkSignal::Await(c))) => {
                 // suspend and do _not_ advance PC
-                return Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Await)));
+                return Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Await(c))));
             }
             Err(TreewalkDisruption::Signal(TreewalkSignal::Return(result))) => Ok(
                 StepResult::Exit(FrameExit::Completed(Completion::Return(result))),

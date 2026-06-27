@@ -3628,6 +3628,62 @@ h = [ i for i in zip([1,2,3], [4,5,6], strict=False) ]
     }
 
     #[test]
+    fn zip_child_generator() {
+        let input = r#"
+def gen():
+    yield 1
+    return 42
+
+z = zip(gen(), [10])
+
+a = next(z)
+
+b = None
+try:
+    next(z)
+except StopIteration as e:
+    b = e.value
+
+a, b
+"#;
+        assert_eval_eq!(input, tuple![tuple![int!(1), int!(10)], int!(42)]);
+    }
+
+    #[test]
+    fn zip_post_exhaustion_behavior() {
+        let input = r#"
+it = iter([1, 2, 3, 4])
+it2 = iter([100, 200, 300, 400])
+z = zip(it, [10], it2)
+
+a = next(z)
+
+try:
+    next(z)
+except StopIteration:
+    pass
+try:
+    next(z)
+except StopIteration:
+    pass
+
+b = list(it)
+c = list(it2)
+a, b, c
+"#;
+        // During the 2 next calls where the [10] is exhausted, we keep advancing `it`, but we do
+        // not advance `it2`.
+        assert_eval_eq!(
+            input,
+            tuple![
+                tuple![int!(1), int!(10), int!(100)],
+                list![int!(4)],
+                list![int!(200), int!(300), int!(400)]
+            ]
+        );
+    }
+
+    #[test]
     fn type_class() {
         let input = r#"
 a = type
