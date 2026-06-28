@@ -44,10 +44,17 @@ impl Exception {
         Self::new_from_str(ExceptionKind::TypeError, msg)
     }
 
-    pub fn type_error_must_inherit_base_exception() -> Self {
+    pub fn catching_classes_must_inherit_base_exception() -> Self {
         Self::new_from_str(
             ExceptionKind::TypeError,
             "catching classes that do not inherit from BaseException is not allowed",
+        )
+    }
+
+    pub fn exceptions_must_inherit_base_exception() -> Self {
+        Self::new_from_str(
+            ExceptionKind::TypeError,
+            "exceptions must derive from BaseException",
         )
     }
 

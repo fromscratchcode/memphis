@@ -10,9 +10,10 @@ use crate::{
         },
         types::{
             iterators::{ReversedIter, ZipIterator},
-            Bool, ByteArray, Bytes, Class, Classmethod, Complex, Coroutine, Dict, Exception, Float,
-            FrozenSet, Function, Int, List, MappingProxy, Memoryview, Object, Property, Range, Set,
-            Slice, Staticmethod, StopIteration, Str, Super, Traceback, Tuple, TypeClass, TypeError,
+            BaseException, Bool, ByteArray, Bytes, Class, Classmethod, Complex, Coroutine, Dict,
+            Exception, Float, FrozenSet, Function, Int, List, MappingProxy, Memoryview, Object,
+            Property, Range, Set, Slice, Staticmethod, StopIteration, Str, Super, Traceback, Tuple,
+            TypeClass,
         },
         TreewalkValue,
     },
@@ -76,8 +77,7 @@ fn builtin_methods() -> HashMap<Type, Vec<Box<dyn CloneableCallable>>> {
     register_methods::<Classmethod>(&mut methods);
     register_methods::<Staticmethod>(&mut methods);
     register_methods::<Property>(&mut methods);
-    register_methods::<TypeError>(&mut methods);
-    register_methods::<StopIteration>(&mut methods);
+    register_methods::<BaseException>(&mut methods);
 
     methods
 }

@@ -1,6 +1,6 @@
 use crate::{
     core::{log, Container, LogLevel},
-    domain::{resolve_absolute_path, Dunder, FromImportPath, Identifier},
+    domain::{resolve_absolute_path, Dunder, FromImportPath, Identifier, Type},
     parser::types::{
         Ast, BinOp, CompoundOperator, ConditionalAst, ExceptHandler, Expr, FromImportMode,
         HandlerKind, LoopIndex, Params, RaiseKind, RegularImport, Statement, StatementKind,
@@ -532,7 +532,15 @@ impl TreewalkInterpreter {
                 } else {
                     value
                 };
-                let exception = exc_instance.as_exception().raise(self)?;
+                let cls = self.state.class_of(&exc_instance);
+                let base_exception = self.state.class_of_type(&Type::BaseException);
+                if !cls.is_subclass_of(&base_exception) {
+                    return Exception::exceptions_must_inherit_base_exception().raise(self);
+                }
+                let exception = exc_instance.as_exception()
+                    .expect(
+                        "This shouldn't fail, because we're checking for BaseException right above this."
+                    );
                 exception.raise(self)
             }
             RaiseKind::RaiseFrom { exception, cause } => {

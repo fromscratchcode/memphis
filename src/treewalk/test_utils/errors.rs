@@ -86,6 +86,60 @@ macro_rules! assert_type_error_args {
     }};
 }
 
+macro_rules! assert_exception {
+    ($exc:expr) => {{
+        match &$exc {
+            $crate::treewalk::types::Exception {
+                kind: $crate::domain::ExceptionKind::Exception,
+                payload,
+            } => {
+                assert!(
+                    payload.is_empty(),
+                    "Expected Exception with no message, got payload: {:?}",
+                    payload
+                );
+            }
+            _ => panic!("Expected Exception, got: {:?}", &$exc),
+        }
+    }};
+}
+
+macro_rules! assert_base_exception {
+    ($exc:expr) => {{
+        match &$exc {
+            $crate::treewalk::types::Exception {
+                kind: $crate::domain::ExceptionKind::BaseException,
+                payload,
+            } => {
+                assert!(
+                    payload.is_empty(),
+                    "Expected BaseException with no message, got payload: {:?}",
+                    payload
+                );
+            }
+            _ => panic!("Expected BaseException, got: {:?}", &$exc),
+        }
+    }};
+}
+
+macro_rules! assert_io_error {
+    ($exc:expr) => {{
+        match &$exc {
+            $crate::treewalk::types::Exception {
+                kind: $crate::domain::ExceptionKind::IOError,
+                payload,
+            } => {
+                assert!(
+                    payload.is_empty(),
+                    "Expected IOError with no message, got payload: {:?}",
+                    payload
+                );
+            }
+            _ => panic!("Expected IOError, got: {:?}", &$exc),
+        }
+    }};
+}
+
 macro_rules! assert_value_error {
     ($exc:expr) => {{
         match &$exc {
@@ -519,9 +573,12 @@ macro_rules! assert_lookup_error {
 
 pub(crate) use assert_assertion_error;
 pub(crate) use assert_attribute_error;
+pub(crate) use assert_base_exception;
 pub(crate) use assert_div_by_zero_error;
+pub(crate) use assert_exception;
 #[allow(unused_imports)]
 pub(crate) use assert_index_error;
+pub(crate) use assert_io_error;
 pub(crate) use assert_key_error;
 pub(crate) use assert_lookup_error;
 pub(crate) use assert_name_error;

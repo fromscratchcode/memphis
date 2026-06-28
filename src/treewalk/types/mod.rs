@@ -1,3 +1,4 @@
+mod base_exception;
 mod bool;
 mod bytearray;
 mod bytes;
@@ -34,9 +35,9 @@ mod super_type;
 mod traceback;
 mod tuple;
 mod r#type;
-mod type_error;
 mod zip;
 
+pub use base_exception::BaseException;
 pub use bool::Bool;
 pub use bytearray::ByteArray;
 pub use bytes::Bytes;
@@ -72,7 +73,6 @@ pub use str::Str;
 pub use super_type::Super;
 pub use traceback::Traceback;
 pub use tuple::Tuple;
-pub use type_error::TypeError;
 
 pub mod iterators {
     pub use super::dict_items::DictItemsIter;

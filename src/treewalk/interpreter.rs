@@ -3030,6 +3030,49 @@ raise TypeError('type is no good')
 "#;
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "type is no good");
+
+        let input = r#"
+raise ValueError('value is no good')
+"#;
+        let e = eval_expect_error(input);
+        assert_value_error!(e.exception, "value is no good");
+
+        let input = r#"
+raise Exception()
+"#;
+        let e = eval_expect_error(input);
+        assert_exception!(e.exception);
+
+        let input = r#"
+raise BaseException()
+"#;
+        let e = eval_expect_error(input);
+        assert_base_exception!(e.exception);
+
+        let input = r#"
+raise IOError()
+"#;
+        let e = eval_expect_error(input);
+        assert_io_error!(e.exception);
+
+        let input = r#"
+raise 4
+"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "exceptions must derive from BaseException");
+    }
+
+    #[test]
+    #[ignore]
+    fn raise_instance_user_defined() {
+        let input = r#"
+class MyError(Exception):
+    pass
+
+raise MyError()
+"#;
+        let e = eval_expect_error(input);
+        assert_io_error!(e.exception);
     }
 
     #[test]

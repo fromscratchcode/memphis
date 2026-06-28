@@ -4,6 +4,9 @@ use crate::domain::{DebugCallStack, MemphisValue, Type};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExceptionKind {
+    Exception,
+    BaseException,
+    IOError,
     RuntimeError,
     ImportError,
     TypeError,
@@ -22,6 +25,9 @@ pub enum ExceptionKind {
 impl ExceptionKind {
     pub fn get_type(&self) -> Type {
         match self {
+            Self::Exception => Type::Exception,
+            Self::BaseException => Type::BaseException,
+            Self::IOError => Type::IOError,
             Self::TypeError => Type::TypeError,
             Self::StopIteration => Type::StopIteration,
             Self::DivisionByZero => Type::ZeroDivisionError,
@@ -35,6 +41,28 @@ impl ExceptionKind {
             Self::AttributeError => Type::AttributeError,
             Self::AssertionError => Type::AssertionError,
             Self::SyntaxError => Type::SyntaxError,
+        }
+    }
+
+    pub fn from_type(type_: &Type) -> Self {
+        match type_ {
+            Type::Exception => Self::Exception,
+            Type::BaseException => Self::BaseException,
+            Type::IOError => Self::IOError,
+            Type::TypeError => Self::TypeError,
+            Type::StopIteration => Self::StopIteration,
+            Type::ZeroDivisionError => Self::DivisionByZero,
+            Type::RuntimeError => Self::RuntimeError,
+            Type::ImportError => Self::ImportError,
+            Type::LookupError => Self::LookupError,
+            Type::KeyError => Self::KeyError,
+            Type::IndexError => Self::IndexError,
+            Type::ValueError => Self::ValueError,
+            Type::NameError => Self::NameError,
+            Type::AttributeError => Self::AttributeError,
+            Type::AssertionError => Self::AssertionError,
+            Type::SyntaxError => Self::SyntaxError,
+            _ => panic!("Not an error kind"),
         }
     }
 
