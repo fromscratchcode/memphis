@@ -510,45 +510,6 @@ pub enum LoopIndex {
     Tuple(Vec<Identifier>),
 }
 
-/// Perform the listed operation before assigning the result.
-#[cfg_attr(feature = "wasm", derive(Serialize))]
-#[derive(Debug, PartialEq, Clone)]
-pub enum CompoundOperator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    BitwiseAnd,
-    BitwiseOr,
-    BitwiseXor,
-    IntegerDiv,
-    LeftShift,
-    RightShift,
-    Mod,
-    MatMul,
-    Expo,
-}
-
-impl From<&CompoundOperator> for BinOp {
-    fn from(value: &CompoundOperator) -> Self {
-        match value {
-            CompoundOperator::Add => BinOp::Add,
-            CompoundOperator::Subtract => BinOp::Sub,
-            CompoundOperator::Multiply => BinOp::Mul,
-            CompoundOperator::Divide => BinOp::Div,
-            CompoundOperator::BitwiseAnd => BinOp::BitwiseAnd,
-            CompoundOperator::BitwiseOr => BinOp::BitwiseOr,
-            CompoundOperator::BitwiseXor => BinOp::BitwiseXor,
-            CompoundOperator::IntegerDiv => BinOp::IntegerDiv,
-            CompoundOperator::LeftShift => BinOp::LeftShift,
-            CompoundOperator::RightShift => BinOp::RightShift,
-            CompoundOperator::Mod => BinOp::Mod,
-            CompoundOperator::MatMul => BinOp::MatMul,
-            CompoundOperator::Expo => BinOp::Expo,
-        }
-    }
-}
-
 #[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Statement {
@@ -588,8 +549,8 @@ pub enum StatementKind {
         right: Expr,
     },
     CompoundAssignment {
-        operator: CompoundOperator,
         target: Box<Expr>,
+        op: BinOp,
         value: Box<Expr>,
     },
     FunctionDef {

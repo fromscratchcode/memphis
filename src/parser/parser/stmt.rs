@@ -4,8 +4,8 @@ use crate::{
     lexer::Token,
     parser::{
         types::{
-            CompoundOperator, ConditionalAst, ExceptHandler, Expr, FromImportItem, FromImportMode,
-            LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
+            BinOp, ConditionalAst, ExceptHandler, Expr, FromImportItem, FromImportMode, LoopIndex,
+            RaiseKind, RegularImport, Statement, StatementKind,
         },
         Parser, ParserError, ParserResult,
     },
@@ -104,28 +104,28 @@ impl Parser<'_> {
                 }
             }
         } else if self.current_token().is_compound_assign() {
-            let operator = match self.current_token() {
-                Token::PlusEquals => CompoundOperator::Add,
-                Token::MinusEquals => CompoundOperator::Subtract,
-                Token::AsteriskEquals => CompoundOperator::Multiply,
-                Token::SlashEquals => CompoundOperator::Divide,
-                Token::BitwiseAndEquals => CompoundOperator::BitwiseAnd,
-                Token::BitwiseOrEquals => CompoundOperator::BitwiseOr,
-                Token::BitwiseXorEquals => CompoundOperator::BitwiseXor,
-                Token::DoubleSlashEquals => CompoundOperator::IntegerDiv,
-                Token::LeftShiftEquals => CompoundOperator::LeftShift,
-                Token::RightShiftEquals => CompoundOperator::RightShift,
-                Token::ModEquals => CompoundOperator::Mod,
-                Token::MatMulEquals => CompoundOperator::MatMul,
-                Token::ExpoEquals => CompoundOperator::Expo,
+            let op = match self.current_token() {
+                Token::PlusEquals => BinOp::Add,
+                Token::MinusEquals => BinOp::Sub,
+                Token::AsteriskEquals => BinOp::Mul,
+                Token::SlashEquals => BinOp::Div,
+                Token::BitwiseAndEquals => BinOp::BitwiseAnd,
+                Token::BitwiseOrEquals => BinOp::BitwiseOr,
+                Token::BitwiseXorEquals => BinOp::BitwiseXor,
+                Token::DoubleSlashEquals => BinOp::IntegerDiv,
+                Token::LeftShiftEquals => BinOp::LeftShift,
+                Token::RightShiftEquals => BinOp::RightShift,
+                Token::ModEquals => BinOp::Mod,
+                Token::MatMulEquals => BinOp::MatMul,
+                Token::ExpoEquals => BinOp::Expo,
                 _ => unreachable!(),
             };
             self.consume_current();
 
             let value = self.parse_simple_expr()?;
             Ok(StatementKind::CompoundAssignment {
-                operator,
                 target: Box::new(left),
+                op,
                 value: Box::new(value),
             })
         } else {
@@ -545,7 +545,7 @@ mod tests {
 
     use crate::parser::{
         test_utils::*,
-        types::{ast, CompoundOperator, ExceptHandler, Params, StatementKind},
+        types::{ast, ExceptHandler, Params, StatementKind},
     };
 
     fn ident(input: &str) -> Identifier {
@@ -1370,107 +1370,55 @@ with open('test.txt'):
     #[test]
     fn compound_operator() {
         let input = "a += 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::Add,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), Add, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a -= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::Subtract,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), Sub, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a *= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::Multiply,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), Mul, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a /= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::Divide,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), Div, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a &= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::BitwiseAnd,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), BitwiseAnd, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a |= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::BitwiseOr,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), BitwiseOr, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a ^= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::BitwiseXor,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), BitwiseXor, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a //= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::IntegerDiv,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), IntegerDiv, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a <<= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::LeftShift,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), LeftShift, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a >>= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::RightShift,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), RightShift, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a %= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::Mod,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), Mod, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a @= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::MatMul,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), MatMul, int!(1));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "a **= 1";
-        let expected_ast = stmt!(StatementKind::CompoundAssignment {
-            operator: CompoundOperator::Expo,
-            target: Box::new(var!("a")),
-            value: Box::new(int!(1)),
-        });
+        let expected_ast = stmt_compound_assign!(var!("a"), Expo, int!(1));
         assert_stmt_eq!(input, expected_ast);
     }
 

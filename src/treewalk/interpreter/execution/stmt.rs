@@ -2,8 +2,8 @@ use crate::{
     core::{log, Container, LogLevel},
     domain::{resolve_absolute_path, Dunder, FromImportPath, Identifier, Type},
     parser::types::{
-        Ast, BinOp, CompoundOperator, ConditionalAst, ExceptHandler, Expr, FromImportMode,
-        HandlerKind, LoopIndex, Params, RaiseKind, RegularImport, Statement, StatementKind,
+        Ast, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex,
+        Params, RaiseKind, RegularImport, Statement, StatementKind,
     },
     treewalk::{
         iterator::{try_for_each_mut, LoopControl},
@@ -43,11 +43,9 @@ impl TreewalkInterpreter {
             StatementKind::UnpackingAssignment { left, right } => {
                 self.evaluate_unpacking_assignment(left, right)
             }
-            StatementKind::CompoundAssignment {
-                operator,
-                target,
-                value,
-            } => self.evaluate_compound_assignment(operator, target, value),
+            StatementKind::CompoundAssignment { target, op, value } => {
+                self.evaluate_compound_assignment(target, op, value)
+            }
             StatementKind::FunctionDef {
                 name,
                 args,
@@ -212,14 +210,13 @@ impl TreewalkInterpreter {
 
     fn evaluate_compound_assignment(
         &self,
-        operator: &CompoundOperator,
         target: &Expr,
+        op: &BinOp,
         value: &Expr,
     ) -> TreewalkResult<()> {
-        let bin_op = BinOp::from(operator);
         let expr = Expr::BinaryOperation {
             left: Box::new(target.clone()),
-            op: bin_op,
+            op: op.clone(),
             right: Box::new(value.clone()),
         };
         let result = self.evaluate_expr(&expr)?;

@@ -48,7 +48,7 @@ For builtin functions, builtin types, and per-type method/operator inventory, se
 |Decorators|✅|✅|
 |Descriptor protocol|✅||
 |Context managers|✅||
-|Compound assignment (`+=`) for integers|✅||
+|Compound assignment (`+=`, etc)|✅|✅|
 |Comparison operator chaining|✅|✅|
 |Unpacking assignment|✅|✅|
 |Multiple assignment|✅||

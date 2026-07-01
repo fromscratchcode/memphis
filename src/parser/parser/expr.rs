@@ -108,7 +108,12 @@ impl Parser<'_> {
             self.current_token(),
             Token::BitwiseAnd | Token::BitwiseOr | Token::BitwiseXor
         ) {
-            let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
+            let op = match self.current_token() {
+                Token::BitwiseAnd => BinOp::BitwiseAnd,
+                Token::BitwiseOr => BinOp::BitwiseOr,
+                Token::BitwiseXor => BinOp::BitwiseXor,
+                _ => unreachable!(),
+            };
             self.consume_current();
             let right = self.parse_bitwise_shift()?;
             left = Expr::BinaryOperation {
@@ -126,7 +131,11 @@ impl Parser<'_> {
         let mut left = self.parse_logical_term()?;
 
         while matches!(self.current_token(), Token::Plus | Token::Minus) {
-            let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
+            let op = match self.current_token() {
+                Token::Plus => BinOp::Add,
+                Token::Minus => BinOp::Sub,
+                _ => unreachable!(),
+            };
             self.consume_current();
             let right = self.parse_logical_term()?;
             left = Expr::BinaryOperation {
@@ -144,7 +153,11 @@ impl Parser<'_> {
         let mut left = self.parse_add_sub()?;
 
         while matches!(self.current_token(), Token::LeftShift | Token::RightShift) {
-            let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
+            let op = match self.current_token() {
+                Token::LeftShift => BinOp::LeftShift,
+                Token::RightShift => BinOp::RightShift,
+                _ => unreachable!(),
+            };
             self.consume_current();
             let right = self.parse_add_sub()?;
             left = Expr::BinaryOperation {
@@ -338,7 +351,14 @@ impl Parser<'_> {
             self.current_token(),
             Token::Asterisk | Token::Slash | Token::DoubleSlash | Token::Modulo | Token::AtSign
         ) {
-            let op = BinOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
+            let op = match self.current_token() {
+                Token::Asterisk => BinOp::Mul,
+                Token::Slash => BinOp::Div,
+                Token::DoubleSlash => BinOp::IntegerDiv,
+                Token::Modulo => BinOp::Mod,
+                Token::AtSign => BinOp::MatMul,
+                _ => unreachable!(),
+            };
             self.consume_current();
             let right = self.parse_access_operations()?;
             left = Expr::BinaryOperation {

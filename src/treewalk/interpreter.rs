@@ -3318,102 +3318,63 @@ a = type(iter(bytes()))
     }
 
     #[test]
+    // The operators not tested here have been moved to crosscheck_compound_assignment.rs.
     fn compound_operator() {
-        let input = r#"
-a = 5
-a += 1
-"#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(6));
-
-        let input = r#"
-a = 5
-a -= 1
-"#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(4));
-
-        let input = r#"
-a = 5
-a *= 2
-"#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(10));
-
-        let input = r#"
-a = 5
-a /= 2
-"#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", float!(2.5));
-
         let input = r#"
 a = 0b0101
 a &= 0b0100
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(4));
+        assert_eval_eq!(input, int!(4));
 
         let input = r#"
 a = 0b0101
 a |= 0b1000
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(13));
+        assert_eval_eq!(input, int!(13));
 
         let input = r#"
 a = 0b0101
 a ^= 0b0100
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(1));
+        assert_eval_eq!(input, int!(1));
 
         let input = r#"
 a = 5
 a //= 2
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(2));
+        assert_eval_eq!(input, int!(2));
 
         let input = r#"
 a = 0b0101
 a <<= 1
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(10));
+        assert_eval_eq!(input, int!(10));
 
         let input = r#"
 a = 0b0101
 a >>= 1
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(2));
+        assert_eval_eq!(input, int!(2));
 
         let input = r#"
 a = 11
 a %= 2
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(1));
+        assert_eval_eq!(input, int!(1));
 
         let input = r#"
 a = 2
 a **= 3
+a
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(8));
+        assert_eval_eq!(input, int!(8));
     }
 
     #[test]

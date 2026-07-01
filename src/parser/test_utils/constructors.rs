@@ -123,6 +123,18 @@ macro_rules! stmt_assign {
     };
 }
 
+macro_rules! stmt_compound_assign {
+    ($target:expr, $op:ident, $value:expr) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::CompoundAssignment {
+                target: Box::new($target),
+                op: $crate::parser::types::BinOp::$op,
+                value: Box::new($value),
+            }
+        )
+    };
+}
+
 macro_rules! stmt_expr {
     ($left:expr) => {
         $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Expression($left))
@@ -487,6 +499,7 @@ pub(crate) use slice;
 pub(crate) use slice_op;
 pub(crate) use stmt;
 pub(crate) use stmt_assign;
+pub(crate) use stmt_compound_assign;
 pub(crate) use stmt_expr;
 pub(crate) use stmt_from_import;
 pub(crate) use stmt_pass;

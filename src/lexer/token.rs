@@ -1,6 +1,6 @@
 use crate::{
     domain::Identifier,
-    parser::types::{BinOp, CompareOp, LogicalOp},
+    parser::types::{CompareOp, LogicalOp},
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -112,30 +112,6 @@ pub enum Token {
     UnterminatedString(String),
     // we got to the end of input while still inside a triple-quoted string
     UnterminatedMultilineString(String),
-}
-
-impl TryFrom<&Token> for BinOp {
-    type Error = ();
-
-    fn try_from(value: &Token) -> Result<Self, Self::Error> {
-        let op = match value {
-            Token::BitwiseAnd => BinOp::BitwiseAnd,
-            Token::BitwiseOr => BinOp::BitwiseOr,
-            Token::BitwiseXor => BinOp::BitwiseXor,
-            Token::Plus => BinOp::Add,
-            Token::Minus => BinOp::Sub,
-            Token::LeftShift => BinOp::LeftShift,
-            Token::RightShift => BinOp::RightShift,
-            Token::Asterisk => BinOp::Mul,
-            Token::Slash => BinOp::Div,
-            Token::DoubleSlash => BinOp::IntegerDiv,
-            Token::Modulo => BinOp::Mod,
-            Token::AtSign => BinOp::MatMul,
-            _ => return Err(()),
-        };
-
-        Ok(op)
-    }
 }
 
 impl TryFrom<&Token> for CompareOp {

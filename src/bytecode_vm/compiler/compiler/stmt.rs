@@ -5,8 +5,8 @@ use crate::{
     },
     domain::{resolve_import_path, FromImportPath, FunctionType, Identifier},
     parser::types::{
-        Ast, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex, Params,
-        RaiseKind, RegularImport, Statement, StatementKind,
+        Ast, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex,
+        Params, RaiseKind, RegularImport, Statement, StatementKind,
     },
 };
 
@@ -70,6 +70,9 @@ impl Compiler {
             } => self.compiler_try_except(try_block, handlers, else_block, finally_block)?,
             StatementKind::UnpackingAssignment { left, right } => {
                 self.compile_unpacking_assignment(left, right)?
+            }
+            StatementKind::CompoundAssignment { target, op, value } => {
+                self.compile_compound_assignment(target, op, value)?
             }
             _ => {
                 return Err(CompilerError::Unsupported(format!(
@@ -505,6 +508,25 @@ impl Compiler {
         for lhs in left.iter().rev() {
             self.compile_assignment_lhs(lhs)?;
         }
+        Ok(())
+    }
+
+    fn compile_compound_assignment(
+        &mut self,
+        target: &Expr,
+        op: &BinOp,
+        value: &Expr,
+    ) -> CompilerResult<()> {
+        self.compile_expr(target)?;
+        self.compile_expr(value)?;
+
+        // TODO to support __iadd__ vs __add__, this should not emit the same opcode as a normal
+        // bin op.
+        let opcode = Opcode::try_from_bin_op(op)
+            .ok_or_else(|| CompilerError::Unsupported(format!("binary op: {op:?}")))?;
+        self.emit(opcode);
+
+        self.compile_assignment_lhs(target)?;
         Ok(())
     }
 
@@ -984,6 +1006,21 @@ mod tests_bytecode_stmt {
                 Opcode::UnpackSequence(2),
                 Opcode::StoreGlobal(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
+            ]
+        );
+    }
+
+    #[test]
+    fn compound_assignment() {
+        let stmt = stmt_compound_assign!(var!("a"), Add, int!(1));
+        let bytecode = compile_stmt(stmt);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::Add,
+                Opcode::StoreGlobal(Index::new(0)),
             ]
         );
     }
