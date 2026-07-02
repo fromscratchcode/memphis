@@ -15,7 +15,7 @@ See [SUPPORTED.md](docs/SUPPORTED.md) for details on specific features.
 ## Design Goals
 - Minimal dependencies. Uses zero dependencies by default. This means you can run Python code which does not call the stdlib (limiting, I know) through the treewalk interpreter or bytecode VM using no third-party Rust code. I find this kinda neat and worth preserving. The following crates are used behind feature flags for certain interfaces.
   - `wasm-bindgen`/`serde`: Only needed for WASM interface.
-  - `crossterm`: Only needed for Terminal REPL support.
+  - the `memphis-cli` crate uses `crossterm` for terminal REPL support.
 - No shortcuts. This is a learning exercise, so try to do things the "right" way, even if it takes a few tries.
 - Functionality first, readability second, performance third. Don't do anything obviously wasteful, but there are dozens of non-optimal performance decisions in here in the name of a simple implementation.
 
@@ -24,20 +24,20 @@ Installation requires a 2021 edition of `rustc` (version `1.56.0` or higher).
 ```bash
 git clone https://github.com/fromscratchcode/memphis
 cd memphis
-cargo install --path .
+cargo install --path memphis-cli
 ```
 ## Usage
 Use `memphis` as if it were `python`/`python3` and provide the path to a Python module.
 ```bash
-memphis examples/test.py
+memphis examples/async.py
 
 # or run using the bytecode VM (WARNING: many features currently unsupported)
-MEMPHIS_ENGINE=bytecode_vm memphis examples/test.py
+MEMPHIS_ENGINE=bytecode_vm memphis examples/async.py
 ```
-Or launch the REPL (requires a build with the `repl` feature flag).
+Or launch the REPL.
 ```bash
 > memphis
-memphis 0.1.0 REPL (engine: treewalk) (Type 'exit()' to quit)
+memphis 0.1.0 REPL (engine: treewalk)
 >>>
 ```
 See [DEVELOPING.md](docs/DEVELOPING.md) for instructions on local development.

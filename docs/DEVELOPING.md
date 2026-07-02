@@ -4,23 +4,17 @@ This project will live and die by `cargo`.
 ```bash
 cargo build
 cargo test
-cargo run examples/test.py
+cargo run examples/async.py
 ```
 ## REPL
-The REPL is useful for interactive mode. It is currently gated behind a feature flag because it pulls in crossterm.
+The REPL is useful for interactive mode.
 ```bash
-cargo run --features repl
-```
-## Feature Flags
-Feature flags are needed to enable REPL support or the WASM interface.
-```bash
-# script to run all combinations of feature flags
-./test_features.sh
+cargo run
 ```
 ## Benchmarking
 To compare runtime, we can build in release mode and use the different engines.
 ```bash
-cargo install --path . --all-features
+cargo install --path memphis-cli
 hyperfine "memphis examples/loop_perf.py" "MEMPHIS_ENGINE=bytecode_vm memphis examples/loop_perf.py" --warmup 5
 ```
 ### Flamegraph

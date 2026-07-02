@@ -1,0 +1,36 @@
+[package]
+name = "memphis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A starter Python interpreter written in Rust."
+
+[lib]
+# cdylib: compiles the code as a C-compatible dynamic library. Used when you want to link Rust code
+# with other languages (like C or C++), or when you need to produce WebAssembly (Wasm) for use in
+# JavaScript environments. When targeting Wasm, the `cdylib` crate type is required because it
+# directs the Rust compiler to produce a binary compatible with the Wasm runtime, without including
+# Rust-specific metadata and symbols that would otherwise be generated.
+
+# rlib: compiles code as a Rust-specific library. The default library type that includes all Rust
+# metadata, allowing for full compatibility when linking with other Rust crates. If you're only
+# using your library in other Rust code, you don’t usually need to specify crate-type = ["rlib"]
+# explicitly, as this is the default. We only need it here because we specified `cdylib`.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+[features]
+interactive = []
+wasm = [
+  "interactive",
+  "serde",
+  "serde-wasm-bindgen",
+  "wasm-bindgen",
+  "console_error_panic_hook",
+]

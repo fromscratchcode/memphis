@@ -1,0 +1,15 @@
+[package]
+name = "memphis-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI for the Memphis Python interpreter."
+
+[[bin]]
+name = "memphis"
+path = "src/main.rs"
+
+[dependencies]
+memphis = { path = "../memphis" }
+crossterm = "0.28.1"

@@ -1,0 +1,1919 @@
+use crate::{
+    core::{log, LogLevel},
+    domain::Identifier,
+    lexer::Token,
+    parser::{
+        types::{
+            BinOp, CallArg, CallArgs, Callee, CompareOp, DictOperation, Expr, ExprFormat,
+            FStringPart, ForClause, FormatOption, KwargsOperation, LogicalOp, SliceParams,
+            TypeNode, UnaryOp,
+        },
+        Parser, ParserError, ParserResult,
+    },
+};
+
+impl Parser<'_> {
+    /// Parse an expression in a context where tuples may be expected. A good option if you're not
+    /// sure. By tuples here, we mean those that are not indicated by parentheses (those are
+    /// handled by detecting a LParen in `parse_factor`).
+    ///
+    /// ```python
+    /// 4, 5
+    /// a = 4, 5
+    /// a = 1,
+    /// ```
+    ///
+    /// All other expression parsing is immediately delegated to `parse_simple_expr`.
+    pub fn parse_expr(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_expr".to_string());
+        let left = self.parse_simple_expr()?;
+
+        if self.current_token() == &Token::Comma {
+            let mut items = vec![left];
+            while self.current_token() == &Token::Comma {
+                self.consume(&Token::Comma)?;
+
+                // We need this for the case of a trailing comma, which is most often used for a
+                // tuple with a single element.
+                //
+                // The [`Token::Assign`] is when this happens on the LHS.
+                if self.end_of_statement() || self.current_token() == &Token::Assign {
+                    break;
+                }
+                items.push(self.parse_simple_expr()?);
+            }
+
+            Ok(Expr::Tuple(items))
+        } else {
+            Ok(left)
+        }
+    }
+
+    /// Parse an expression where open tuples are not expected. If you need to support this in a
+    /// given context (i.e. a = 4, 5), try `parse_expr`.
+    pub fn parse_simple_expr(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_simple_expr".to_string());
+        if self.current_token() == &Token::Await {
+            self.parse_await_expr()
+        } else {
+            self.parse_ternary_expr()
+        }
+    }
+
+    fn parse_await_expr(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_await_expr".to_string());
+        self.consume(&Token::Await)?;
+        let right = self.parse_ternary_expr()?;
+        Ok(Expr::Await(Box::new(right)))
+    }
+
+    /// Implements the Python precedence order in reverse call stack order, meaning the operators
+    /// evaluated last will be detected first during this recursive descent.
+    ///
+    /// Python precedence order is:
+    /// - Exponentiation (**) - `parse_exponentiation`
+    /// - Literals, Identifiers - `parse_factor`
+    /// - Member Access, Index Access - `parse_access_operations`
+    /// - Multiplication, Division, Modulo, and Comparison Operators - `parse_term`
+    /// - Logical operators (AND/OR) - `parse_logical_term`
+    /// - Addition, Subtraction - `parse_add_sub`
+    /// - Bitwise Shifts (<<, >>) - `parse_bitwise_shift`
+    /// - Bitwise AND (&), OR (|), XOR (^) - `parse_binary_expr`
+    /// - Ternary Expression (inline-if) - `parse_ternary_expr`
+    fn parse_ternary_expr(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_ternary_expr".to_string());
+        let if_value = self.parse_binary_expr()?;
+
+        if self.current_token() == &Token::If {
+            self.consume(&Token::If)?;
+            let condition = self.parse_binary_expr()?;
+            self.consume(&Token::Else)?;
+            let else_value = self.parse_binary_expr()?;
+
+            return Ok(Expr::TernaryOp {
+                condition: Box::new(condition),
+                if_value: Box::new(if_value),
+                else_value: Box::new(else_value),
+            });
+        }
+
+        Ok(if_value)
+    }
+
+    fn parse_binary_expr(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_binary_expr".to_string());
+        let mut left = self.parse_bitwise_shift()?;
+
+        while matches!(
+            self.current_token(),
+            Token::BitwiseAnd | Token::BitwiseOr | Token::BitwiseXor
+        ) {
+            let op = match self.current_token() {
+                Token::BitwiseAnd => BinOp::BitwiseAnd,
+                Token::BitwiseOr => BinOp::BitwiseOr,
+                Token::BitwiseXor => BinOp::BitwiseXor,
+                _ => unreachable!(),
+            };
+            self.consume_current();
+            let right = self.parse_bitwise_shift()?;
+            left = Expr::BinaryOperation {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_add_sub(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_add_sub".to_string());
+        let mut left = self.parse_logical_term()?;
+
+        while matches!(self.current_token(), Token::Plus | Token::Minus) {
+            let op = match self.current_token() {
+                Token::Plus => BinOp::Add,
+                Token::Minus => BinOp::Sub,
+                _ => unreachable!(),
+            };
+            self.consume_current();
+            let right = self.parse_logical_term()?;
+            left = Expr::BinaryOperation {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_bitwise_shift(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_bitwise_shift".to_string());
+        let mut left = self.parse_add_sub()?;
+
+        while matches!(self.current_token(), Token::LeftShift | Token::RightShift) {
+            let op = match self.current_token() {
+                Token::LeftShift => BinOp::LeftShift,
+                Token::RightShift => BinOp::RightShift,
+                _ => unreachable!(),
+            };
+            self.consume_current();
+            let right = self.parse_add_sub()?;
+            left = Expr::BinaryOperation {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_member_access(&mut self, left: Expr) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_member_access".to_string());
+        self.consume(&Token::Dot)?;
+        let field = self.parse_identifier()?;
+
+        Ok(Expr::MemberAccess {
+            object: Box::new(left),
+            field,
+        })
+    }
+
+    fn parse_index_access(&mut self, left: Expr) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_index_access".to_string());
+        self.consume(&Token::LBracket)?;
+
+        let params = match self.current_token() {
+            Token::Colon => {
+                self.consume(&Token::Colon)?;
+                match self.current_token() {
+                    Token::Colon => {
+                        self.consume(&Token::Colon)?;
+                        let step = Some(self.parse_simple_expr()?);
+                        // [::2]
+                        (true, None, None, step)
+                    }
+                    Token::RBracket => {
+                        // [:] useful to replace the items in a list without changing the
+                        // list's reference
+                        (true, None, None, None)
+                    }
+                    _ => {
+                        let stop = Some(self.parse_simple_expr()?);
+                        // [:2]
+                        (true, None, stop, None)
+                    }
+                }
+            }
+            _ => {
+                let start = Some(self.parse_simple_expr()?);
+                match self.current_token() {
+                    Token::Colon => {
+                        self.consume(&Token::Colon)?;
+                        match self.current_token() {
+                            Token::Colon => {
+                                self.consume(&Token::Colon)?;
+                                match self.current_token() {
+                                    Token::RBracket => {
+                                        // [2::]
+                                        (true, start, None, None)
+                                    }
+                                    _ => {
+                                        let step = Some(self.parse_simple_expr()?);
+                                        // [1::1]
+                                        (true, start, None, step)
+                                    }
+                                }
+                            }
+                            Token::RBracket => {
+                                // [2:]
+                                (true, start, None, None)
+                            }
+                            _ => {
+                                let stop = Some(self.parse_simple_expr()?);
+                                match self.current_token() {
+                                    Token::Colon => {
+                                        self.consume(&Token::Colon)?;
+                                        let step = Some(self.parse_simple_expr()?);
+                                        // [1:1:1]
+                                        (true, start, stop, step)
+                                    }
+                                    Token::RBracket => {
+                                        // [2:5]
+                                        (true, start, stop, None)
+                                    }
+                                    _ => {
+                                        return Err(ParserError::UnexpectedToken(
+                                            self.current_token().clone(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Token::RBracket => {
+                        // [2]
+                        (false, start, None, None)
+                    }
+                    _ => {
+                        return Err(ParserError::UnexpectedToken(self.current_token().clone()));
+                    }
+                }
+            }
+        };
+        self.consume(&Token::RBracket)?;
+
+        if !params.0 {
+            Ok(Expr::IndexAccess {
+                object: Box::new(left),
+                index: Box::new(params.1.unwrap()),
+            })
+        } else {
+            Ok(Expr::SliceOperation {
+                object: Box::new(left),
+                params: Box::new(SliceParams {
+                    start: params.1,
+                    stop: params.2,
+                    step: params.3,
+                }),
+            })
+        }
+    }
+
+    /// This is recursive to the right to create a right-associativity binary operator.
+    fn parse_exponentiation(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_exponentiation".to_string());
+        let mut left = self.parse_factor()?;
+
+        while self.current_token() == &Token::DoubleAsterisk {
+            self.consume(&Token::DoubleAsterisk)?;
+            let right = self.parse_exponentiation()?;
+            left = Expr::BinaryOperation {
+                left: Box::new(left),
+                op: BinOp::Expo,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_access_operations(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_access_operations".to_string());
+        let mut left = self.parse_exponentiation()?;
+
+        while matches!(
+            self.current_token(),
+            Token::Dot | Token::LBracket | Token::LParen
+        ) {
+            left = match self.current_token() {
+                Token::Dot => self.parse_member_access(left)?,
+                Token::LBracket => self.parse_index_access(left)?,
+                Token::LParen => {
+                    let args = self.parse_function_call_args()?;
+                    Expr::FunctionCall {
+                        callee: Callee::Expr(Box::new(left)),
+                        args,
+                    }
+                }
+                _ => unreachable!(),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_logical_term(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_logical_term".to_string());
+        let mut left = self.parse_term()?;
+
+        while matches!(self.current_token(), Token::And | Token::Or) {
+            let op = LogicalOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
+            self.consume_current();
+            let right = self.parse_term()?;
+            left = Expr::LogicalOperation {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_term(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_term".to_string());
+        let mut left = self.parse_access_operations()?;
+
+        while matches!(
+            self.current_token(),
+            Token::Asterisk | Token::Slash | Token::DoubleSlash | Token::Modulo | Token::AtSign
+        ) {
+            let op = match self.current_token() {
+                Token::Asterisk => BinOp::Mul,
+                Token::Slash => BinOp::Div,
+                Token::DoubleSlash => BinOp::IntegerDiv,
+                Token::Modulo => BinOp::Mod,
+                Token::AtSign => BinOp::MatMul,
+                _ => unreachable!(),
+            };
+            self.consume_current();
+            let right = self.parse_access_operations()?;
+            left = Expr::BinaryOperation {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            };
+        }
+
+        let mut cmp_ops = vec![];
+        while matches!(
+            self.current_token(),
+            Token::LessThan
+                | Token::LessThanOrEqual
+                | Token::GreaterThan
+                | Token::GreaterThanOrEqual
+                | Token::Equal
+                | Token::NotEqual
+                | Token::In
+                | Token::Is
+        ) || self.tokens.peek_ahead_contains(&[Token::Not, Token::In])
+            || self.tokens.peek_ahead_contains(&[Token::Is, Token::Not])
+        {
+            // Handle two tokens to produce one `BinOp::NotIn` operation. If this gets too messy,
+            // we could look to move multi-word tokens into the lexer.
+            let op = if self.tokens.peek_ahead_contains(&[Token::Not, Token::In]) {
+                self.consume(&Token::Not)?;
+                self.consume(&Token::In)?;
+                CompareOp::NotIn
+            } else if self.tokens.peek_ahead_contains(&[Token::Is, Token::Not]) {
+                self.consume(&Token::Is)?;
+                self.consume(&Token::Not)?;
+                CompareOp::IsNot
+            } else {
+                let op =
+                    CompareOp::try_from(self.current_token()).unwrap_or_else(|_| unreachable!());
+                self.consume_current();
+                op
+            };
+
+            // Since we are building a flat loop of compare ops, we call the next level down, NOT
+            // parse_term again.
+            let right = self.parse_access_operations()?;
+            cmp_ops.push((op, right));
+        }
+
+        if !cmp_ops.is_empty() {
+            left = Expr::ComparisonChain {
+                left: Box::new(left),
+                ops: cmp_ops,
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_minus(&mut self) -> ParserResult<Expr> {
+        self.consume(&Token::Minus)?;
+        match self.current_token().clone() {
+            Token::Integer(i) => {
+                self.consume(&Token::Integer(i))?;
+                Ok(Expr::Integer(-(i as i64)))
+            }
+            Token::FloatingPoint(i) => {
+                self.consume(&Token::FloatingPoint(i))?;
+                Ok(Expr::Float(-i))
+            }
+            _ => {
+                let right = self.parse_term()?;
+                Ok(Expr::UnaryOperation {
+                    op: UnaryOp::Minus,
+                    right: Box::new(right),
+                })
+            }
+        }
+    }
+
+    /// The unary plus operator is a no-op for integers and floats, but exists to provide custom
+    /// behaviors using `Dunder::Pos`.
+    fn parse_plus(&mut self) -> ParserResult<Expr> {
+        self.consume(&Token::Plus)?;
+        match self.current_token().clone() {
+            Token::Integer(i) => {
+                self.consume(&Token::Integer(i))?;
+                Ok(Expr::Integer(i as i64))
+            }
+            Token::FloatingPoint(i) => {
+                self.consume(&Token::FloatingPoint(i))?;
+                Ok(Expr::Float(i))
+            }
+            _ => {
+                let right = self.parse_term()?;
+                Ok(Expr::UnaryOperation {
+                    op: UnaryOp::Plus,
+                    right: Box::new(right),
+                })
+            }
+        }
+    }
+
+    fn parse_factor(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || {
+            format!("parse_factor: {:?}", self.current_token())
+        });
+        match self.current_token().clone() {
+            Token::Minus => self.parse_minus(),
+            Token::Plus => self.parse_plus(),
+            Token::Asterisk => {
+                self.consume(&Token::Asterisk)?;
+                let right = self.parse_simple_expr()?;
+                Ok(Expr::UnaryOperation {
+                    op: UnaryOp::Unpack,
+                    right: Box::new(right),
+                })
+            }
+            Token::DoubleAsterisk => {
+                self.consume(&Token::DoubleAsterisk)?;
+                let right = self.parse_simple_expr()?;
+                Ok(Expr::UnaryOperation {
+                    op: UnaryOp::DictUnpack,
+                    right: Box::new(right),
+                })
+            }
+            Token::Yield => {
+                self.consume(&Token::Yield)?;
+
+                if self.current_token() == &Token::From {
+                    self.consume(&Token::From)?;
+                    let expr = self.parse_simple_expr()?;
+                    Ok(Expr::YieldFrom(Box::new(expr)))
+                // The [`Token::RParen`] can be found on generator lambdas.
+                } else if self.end_of_statement() || self.current_token() == &Token::RParen {
+                    Ok(Expr::Yield(None))
+                } else {
+                    let expr = self.parse_simple_expr()?;
+                    Ok(Expr::Yield(Some(Box::new(expr))))
+                }
+            }
+            Token::Not => {
+                self.consume(&Token::Not)?;
+                let right = self.parse_term()?;
+                Ok(Expr::UnaryOperation {
+                    op: UnaryOp::Not,
+                    right: Box::new(right),
+                })
+            }
+            Token::BitwiseNot => {
+                self.consume(&Token::BitwiseNot)?;
+                let right = self.parse_term()?;
+                Ok(Expr::UnaryOperation {
+                    op: UnaryOp::BitwiseNot,
+                    right: Box::new(right),
+                })
+            }
+            Token::None => {
+                self.consume(&Token::None)?;
+                Ok(Expr::None)
+            }
+            Token::NotImplemented => {
+                self.consume(&Token::NotImplemented)?;
+                Ok(Expr::NotImplemented)
+            }
+            Token::Ellipsis => {
+                self.consume(&Token::Ellipsis)?;
+                Ok(Expr::Ellipsis)
+            }
+            Token::Integer(i) => {
+                self.consume(&Token::Integer(i))?;
+                Ok(Expr::Integer(i as i64))
+            }
+            Token::FloatingPoint(i) => {
+                self.consume(&Token::FloatingPoint(i))?;
+                Ok(Expr::Float(i))
+            }
+            Token::BooleanLiteral(b) => {
+                self.consume(&Token::BooleanLiteral(b))?;
+                Ok(Expr::Boolean(b))
+            }
+            Token::Identifier(_) => {
+                if self.tokens.peek(1) == &Token::LParen {
+                    let name = self.parse_identifier()?;
+                    let args = self.parse_function_call_args()?;
+
+                    Ok(Expr::FunctionCall {
+                        callee: Callee::Symbol(name),
+                        args,
+                    })
+                } else if self.current_token().is_type() {
+                    let type_node = self.parse_type_node()?;
+
+                    match type_node {
+                        TypeNode::Basic(type_) => Ok(Expr::Variable(type_)),
+                        _ => Ok(Expr::TypeNode(type_node)),
+                    }
+                } else {
+                    Ok(Expr::Variable(self.parse_identifier()?))
+                }
+            }
+            Token::LParen => self.parse_tuple(),
+            Token::LBracket => self.parse_list(),
+            Token::LBrace => self.parse_set(),
+            Token::Lambda => self.parse_lambda(),
+            Token::StringLiteral(literal) => {
+                self.consume(&Token::StringLiteral(literal.clone()))?;
+                Ok(Expr::StringLiteral(literal))
+            }
+            Token::RawStringLiteral(literal) => {
+                // TODO store the raw-ness here so that we do not escape characters
+                self.consume(&Token::RawStringLiteral(literal.clone()))?;
+                Ok(Expr::StringLiteral(literal))
+            }
+            Token::BytesLiteral(bytes) => {
+                self.consume(&Token::BytesLiteral(bytes.clone()))?;
+                Ok(Expr::BytesLiteral(bytes))
+            }
+            Token::BinaryLiteral(literal) => self.parse_binary_literal(literal),
+            Token::OctalLiteral(literal) => self.parse_octal_literal(literal),
+            Token::HexLiteral(literal) => self.parse_hex_literal(literal),
+            Token::FStringStart => self.parse_f_string(),
+            Token::UnterminatedString(_) => {
+                Err(ParserError::syntax_error("unterminated string literal"))
+            }
+            Token::UnterminatedMultilineString(_) => Err(ParserError::UnterminatedMultilineString),
+            _ => Err(ParserError::UnexpectedToken(self.current_token().clone())),
+        }
+    }
+
+    fn parse_binary_literal(&mut self, literal: String) -> ParserResult<Expr> {
+        self.consume(&Token::BinaryLiteral(literal.clone()))?;
+
+        let result = i64::from_str_radix(&literal[2..], 2)
+            .map_err(|_| ParserError::syntax_error("invalid binary literal"))?;
+        Ok(Expr::Integer(result))
+    }
+
+    fn parse_octal_literal(&mut self, literal: String) -> ParserResult<Expr> {
+        self.consume(&Token::OctalLiteral(literal.clone()))?;
+
+        let result = i64::from_str_radix(&literal[2..], 8)
+            .map_err(|_| ParserError::syntax_error("invalid octal literal"))?;
+        Ok(Expr::Integer(result))
+    }
+
+    fn parse_hex_literal(&mut self, literal: String) -> ParserResult<Expr> {
+        self.consume(&Token::HexLiteral(literal.clone()))?;
+
+        let result = i64::from_str_radix(&literal[2..], 16)
+            .map_err(|_| ParserError::syntax_error("invalid hex literal"))?;
+        Ok(Expr::Integer(result))
+    }
+
+    fn parse_lambda(&mut self) -> ParserResult<Expr> {
+        self.consume(&Token::Lambda)?;
+        let args = self.parse_function_def_args(Token::Colon)?;
+        self.consume(&Token::Colon)?;
+
+        let expr = if self.current_token() == &Token::LParen {
+            self.consume(&Token::LParen)?;
+            let expr = self.parse_simple_expr()?;
+            self.consume(&Token::RParen)?;
+            expr
+        } else {
+            self.parse_simple_expr()?
+        };
+
+        Ok(Expr::Lambda {
+            args,
+            expr: Box::new(expr),
+        })
+    }
+
+    fn parse_list(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_list".to_string());
+        let mut items = Vec::new();
+
+        self.consume(&Token::LBracket)?;
+        while self.current_token() != &Token::RBracket {
+            let expr = self.parse_simple_expr()?;
+            items.push(expr.clone());
+
+            if self.current_token() == &Token::Comma {
+                self.consume(&Token::Comma)?;
+
+                // Handle trailing comma
+                if self.current_token() == &Token::RBracket {
+                    self.consume(&Token::RBracket)?;
+                    return Ok(Expr::List(items));
+                }
+            } else if self.current_token() == &Token::RBracket {
+                self.consume(&Token::RBracket)?;
+                return Ok(Expr::List(items));
+            }
+
+            if self.current_token() == &Token::For {
+                let clauses = self.parse_comprehension_clauses()?;
+                self.consume(&Token::RBracket)?;
+
+                return Ok(Expr::ListComprehension {
+                    body: Box::new(expr),
+                    clauses,
+                });
+            }
+        }
+
+        // You should only get here if this was an empty literal.
+        assert_eq!(items.len(), 0);
+        self.consume(&Token::RBracket)?;
+        Ok(Expr::List(vec![]))
+    }
+
+    fn parse_f_string(&mut self) -> ParserResult<Expr> {
+        self.consume(&Token::FStringStart)?;
+
+        let mut parts = vec![];
+        while self.current_token() != &Token::FStringEnd {
+            match self.current_token().clone() {
+                Token::StringLiteral(s) => {
+                    self.consume(&Token::StringLiteral(s.to_string()))?;
+                    parts.push(FStringPart::String(s.to_string()));
+                }
+                Token::LBrace => {
+                    // Start consuming the expression within braces
+                    self.consume(&Token::LBrace)?;
+                    let expr = self.parse_simple_expr()?;
+
+                    let format = if self.current_token() == &Token::Exclamation {
+                        self.consume(&Token::Exclamation)?;
+                        if let Token::Identifier(ident) = self.current_token().clone() {
+                            self.consume(&Token::Identifier(ident.clone()))?;
+                            match ident.as_str() {
+                                "r" => FormatOption::Repr,
+                                "s" => FormatOption::Str,
+                                "a" => FormatOption::Ascii,
+                                _ => {
+                                    return Err(ParserError::UnexpectedToken(
+                                        self.current_token().clone(),
+                                    ));
+                                }
+                            }
+                        } else {
+                            return Err(ParserError::UnexpectedToken(self.current_token().clone()));
+                        }
+                    } else {
+                        FormatOption::Str
+                    };
+
+                    self.consume(&Token::RBrace)?;
+                    parts.push(FStringPart::Expr(ExprFormat {
+                        expr: Box::new(expr),
+                        format,
+                    }));
+                }
+                _ => {
+                    return Err(ParserError::UnexpectedToken(self.current_token().clone()));
+                }
+            }
+        }
+
+        self.consume(&Token::FStringEnd)?;
+        Ok(Expr::FString(parts))
+    }
+
+    fn parse_set(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_set".to_string());
+        let mut pairs = vec![];
+        let mut set = vec![];
+
+        self.consume(&Token::LBrace)?;
+        while self.current_token() != &Token::RBrace {
+            let key = self.parse_simple_expr()?;
+
+            match self.current_token() {
+                // A Comma or an RBrace indicates the end of an element, which means this element
+                // will not be a key-value (i.e. have a colon). However, only an RBrace indicates
+                // an end to the entire literal.
+                Token::Comma | Token::RBrace => {
+                    match key {
+                        Expr::UnaryOperation {
+                            op: UnaryOp::DictUnpack,
+                            right,
+                        } => {
+                            pairs.push(DictOperation::Unpack(*right));
+                        }
+                        _ => {
+                            set.push(key);
+                        }
+                    };
+                    self.consume_optional(&Token::Comma);
+                    if self.current_token() == &Token::RBrace {
+                        break;
+                    }
+                }
+                Token::For => {
+                    let clauses = self.parse_comprehension_clauses()?;
+                    self.consume(&Token::RBrace)?;
+                    return Ok(Expr::SetComprehension {
+                        body: Box::new(key),
+                        clauses,
+                    });
+                }
+                Token::Colon => {
+                    self.consume(&Token::Colon)?;
+                    let value = self.parse_simple_expr()?;
+
+                    match self.current_token() {
+                        // A Comma or an RBrace indicates the end of an element, which means this
+                        // element _will_ be a key-value (i.e. have a colon). Only an RBrace
+                        // indicates an end to the entire literal.
+                        Token::Comma | Token::RBrace => {
+                            pairs.push(DictOperation::Pair(key, value));
+                            self.consume_optional(&Token::Comma);
+                            if self.current_token() == &Token::RBrace {
+                                break;
+                            }
+                        }
+                        Token::For => {
+                            let clauses = self.parse_comprehension_clauses()?;
+                            self.consume(&Token::RBrace)?;
+                            return Ok(Expr::DictComprehension {
+                                clauses,
+                                key_body: Box::new(key),
+                                value_body: Box::new(value),
+                            });
+                        }
+                        _ => {
+                            return Err(ParserError::UnexpectedToken(self.current_token().clone()))
+                        }
+                    }
+                }
+                _ => return Err(ParserError::UnexpectedToken(self.current_token().clone())),
+            }
+        }
+
+        self.consume(&Token::RBrace)?;
+        if set.is_empty() {
+            Ok(Expr::Dict(pairs))
+        } else if pairs.is_empty() {
+            Ok(Expr::Set(set))
+        } else {
+            // Can the user actually get here?
+            Err(ParserError::syntax_error("invalid dict"))
+        }
+    }
+
+    /// Single elements without a comma will be returned as is, everything else will be wrapped in
+    /// `Expr::Tuple`.
+    ///
+    /// For example:
+    ///
+    /// (4) => int(4)
+    /// (4,) => Expr::Tuple(vec!\[int(4)\])
+    ///
+    fn parse_tuple(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_tuple".to_string());
+        self.consume(&Token::LParen)?;
+
+        let mut args = Vec::new();
+        let mut is_single_element = true;
+        while self.current_token() != &Token::RParen {
+            let expr = self.parse_simple_expr()?;
+            args.push(expr.clone());
+
+            if self.current_token() == &Token::Comma {
+                self.consume(&Token::Comma)?;
+                is_single_element = false;
+            }
+
+            if self.current_token() == &Token::For {
+                // If you saw a For token, we must be in list comprehension.
+                assert_eq!(args.len(), 1);
+                let gen_comp = self.parse_generator_comprehension(&expr)?;
+
+                self.consume(&Token::RParen)?;
+                return Ok(gen_comp);
+            }
+        }
+
+        self.consume(&Token::RParen)?;
+
+        if args.len() == 1 && is_single_element {
+            Ok(args.into_iter().next().unwrap())
+        } else {
+            Ok(Expr::Tuple(args))
+        }
+    }
+
+    fn parse_function_call_args(&mut self) -> ParserResult<CallArgs> {
+        self.consume(&Token::LParen)?;
+
+        let mut args = Vec::new();
+        let mut kwargs = vec![];
+        let mut args_var = None;
+        while self.current_token() != &Token::RParen {
+            if self.current_token() == &Token::Asterisk {
+                self.consume(&Token::Asterisk)?;
+                args_var = Some(Box::new(self.parse_simple_expr()?));
+
+                // If *args is not at the end of the args (only kwargs can come after), we must
+                // allow for a comma. This is similar to how we optionally consume a comma as the
+                // last step of each loop iteration.
+                self.consume_optional(&Token::Comma);
+                continue;
+            }
+
+            // This is to support the formats
+            // - foo(**{'a': 2, 'b': 1})
+            // - foo(**args)
+            if self.current_token() == &Token::DoubleAsterisk {
+                self.consume(&Token::DoubleAsterisk)?;
+                let kwargs_expr = self.parse_simple_expr()?;
+                match kwargs_expr {
+                    Expr::Dict(dict_ops) => {
+                        for op in dict_ops {
+                            match op {
+                                DictOperation::Pair(key, value) => {
+                                    let key_name = key.as_string().ok_or_else(|| {
+                                        ParserError::syntax_error("invalid kwargs key")
+                                    })?;
+                                    let ident = Identifier::new(key_name).expect("Invalid key");
+                                    kwargs.push(KwargsOperation::Pair(ident, value));
+                                }
+                                _ => unimplemented!(),
+                            }
+                        }
+                    }
+                    Expr::Variable(_) | Expr::MemberAccess { .. } => {
+                        kwargs.push(KwargsOperation::Unpacking(kwargs_expr));
+                    }
+                    _ => return Err(ParserError::syntax_error("invalid kwargs")),
+                };
+                self.consume_optional(&Token::Comma);
+                continue;
+            }
+
+            match self.parse_function_call_arg()? {
+                // This is to support the format foo(a=2, b=1)
+                CallArg::Keyword { arg, expr } => {
+                    kwargs.push(KwargsOperation::Pair(arg, expr));
+                }
+                CallArg::Positional(expr) => {
+                    args.push(expr);
+                }
+            }
+
+            self.consume_optional(&Token::Comma);
+        }
+
+        self.consume(&Token::RParen)?;
+
+        Ok(CallArgs {
+            args,
+            kwargs,
+            args_var,
+        })
+    }
+
+    /// An argument in a function call can be either variable `a` or contain an equals such as
+    /// `a = 4`. We originally (and ignorantly) called `parse_statement` but that contains too many
+    /// other cases to be safely used inside function call parsing.
+    fn parse_function_call_arg(&mut self) -> ParserResult<CallArg> {
+        let expr = self.parse_simple_expr()?;
+        match self.current_token() {
+            Token::Assign => {
+                self.consume(&Token::Assign)?;
+                let arg = expr
+                    .as_variable()
+                    .ok_or_else(|| ParserError::syntax_error("invalid assign key"))?;
+                Ok(CallArg::Keyword {
+                    arg: arg.clone(),
+                    expr: self.parse_simple_expr()?,
+                })
+            }
+            Token::For => Ok(CallArg::Positional(
+                self.parse_generator_comprehension(&expr)?,
+            )),
+            _ => Ok(CallArg::Positional(expr)),
+        }
+    }
+
+    fn parse_generator_comprehension(&mut self, body: &Expr) -> ParserResult<Expr> {
+        let clauses = self.parse_comprehension_clauses()?;
+        Ok(Expr::GeneratorComprehension {
+            body: Box::new(body.clone()),
+            clauses,
+        })
+    }
+
+    fn parse_comprehension_clauses(&mut self) -> ParserResult<Vec<ForClause>> {
+        let mut clauses = vec![];
+        while self.current_token() == &Token::For {
+            clauses.push(self.parse_comprehension_clause()?);
+        }
+        Ok(clauses)
+    }
+
+    fn parse_comprehension_clause(&mut self) -> ParserResult<ForClause> {
+        self.consume(&Token::For)?;
+        let index = self.parse_loop_index()?;
+        self.consume(&Token::In)?;
+
+        // We do not use `parse_expr` here because it can think that an expression of the
+        // form `a if True` is the start of a ternary operation and expect an `else` token
+        // next. By calling `parse_binary_expr`, we enter the parse tree below where
+        // ternary operations are handled.
+        let iterable = self.parse_binary_expr()?;
+
+        let condition = if self.current_token() == &Token::If {
+            self.consume(&Token::If)?;
+            Some(self.parse_simple_expr()?)
+        } else {
+            None
+        };
+
+        Ok(ForClause {
+            index,
+            iterable,
+            condition,
+        })
+    }
+
+    fn parse_type_node(&mut self) -> ParserResult<TypeNode> {
+        let mut nodes = vec![];
+
+        loop {
+            let node = match self.current_token() {
+                Token::Identifier(ref ident) => {
+                    let i = ident.clone();
+                    match ident.as_str() {
+                        "int" | "str" | "dict" => {
+                            self.consume(&Token::Identifier(i.clone()))?;
+                            TypeNode::Basic(i.clone())
+                        }
+                        "list" => {
+                            self.consume(&Token::Identifier(i.clone()))?;
+
+                            if self.current_token() == &Token::LBracket {
+                                self.consume(&Token::LBracket)?;
+                                let parameters = self.parse_type_node()?;
+                                self.consume(&Token::RBracket)?;
+
+                                TypeNode::Generic {
+                                    base_type: i.clone(),
+                                    parameters: vec![parameters],
+                                }
+                            } else {
+                                TypeNode::Basic(i.clone())
+                            }
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                Token::Ellipsis => {
+                    self.consume(&Token::Ellipsis)?;
+                    // this is from _collections_abc.py: EllipsisType = type(...)
+                    TypeNode::Ellipsis
+                }
+                _ => unimplemented!(),
+            };
+
+            nodes.push(node);
+
+            if self.current_token() != &Token::BitwiseOr {
+                break;
+            }
+            self.consume(&Token::BitwiseOr)?;
+        }
+
+        if nodes.len() == 1 {
+            Ok(nodes[0].clone())
+        } else {
+            Ok(TypeNode::Union(nodes))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::parser::test_utils::*;
+
+    fn ident(input: &str) -> Identifier {
+        Identifier::new(input).expect("Invalid identifier")
+    }
+
+    #[test]
+    fn expression() {
+        let input = "2 + 3 * (4 - 1)";
+        let expected_ast = bin_op!(
+            int!(2),
+            Add,
+            bin_op!(int!(3), Mul, bin_op!(int!(4), Sub, int!(1)))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 // 3";
+        let expected_ast = bin_op!(int!(2), IntegerDiv, int!(3));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn string_literal() {
+        let input = "\"Hello\"";
+        let expected_ast = str!("Hello");
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "\"\".join([])";
+        let expected_ast = method_call!(str!(""), "join", call_args![list![]]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn function_call() {
+        let input = "print(\"Hello, World!\")";
+        let expected_ast = func_call!("print", call_args![str!("Hello, World!")]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a(*self.args, **self.kwargs)";
+        let expected_ast = func_call!(
+            "a",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![KwargsOperation::Unpacking(member_access!(
+                    var!("self"),
+                    "kwargs"
+                ))],
+                args_var: Some(Box::new(member_access!(var!("self"), "args"))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn function_call_callee() {
+        let input = "mypackage.myothermodule.add('1', '1')";
+        let expected_ast = func_call_callee!(
+            member_access!(member_access!(var!("mypackage"), "myothermodule"), "add"),
+            call_args![str!("1"), str!("1")]
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "cls._abc_registry.add(subclass)";
+        let expected_ast = func_call_callee!(
+            member_access!(member_access!(var!("cls"), "_abc_registry"), "add"),
+            call_args![var!("subclass")]
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_decorator(get_val_undecorated)()";
+        let expected_ast = func_call_callee!(
+            func_call!("test_decorator", call_args![var!("get_val_undecorated")]),
+            call_args![]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn function_call_args_and_kwargs() {
+        let input = "test_kwargs(a=1, b=2)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Pair(ident("a"), int!(1)),
+                    KwargsOperation::Pair(ident("b"), int!(2)),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**{'a':1, 'b':2})";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Pair(ident("a"), int!(1)),
+                    KwargsOperation::Pair(ident("b"), int!(2)),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**{'a':1, 'b':2}, **{'c': 3})";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Pair(ident("a"), int!(1)),
+                    KwargsOperation::Pair(ident("b"), int!(2)),
+                    KwargsOperation::Pair(ident("c"), int!(3)),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**first, **second)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![
+                    KwargsOperation::Unpacking(var!("first")),
+                    KwargsOperation::Unpacking(var!("second")),
+                ],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(**kwargs)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![KwargsOperation::Unpacking(var!("kwargs"))],
+                args_var: None,
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(*args)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![],
+                args_var: Some(Box::new(var!("args"))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "test_kwargs(*args, **kwargs)";
+        let expected_ast = func_call!(
+            "test_kwargs",
+            CallArgs {
+                args: vec![],
+                kwargs: vec![KwargsOperation::Unpacking(var!("kwargs"))],
+                args_var: Some(Box::new(var!("args"))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+deprecated("collections.abc.ByteString",
+)
+"#;
+        let expected_ast = func_call!("deprecated", call_args![str!("collections.abc.ByteString")]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "foo(a, *b[1:])";
+        let expected_ast = func_call!(
+            "foo",
+            CallArgs {
+                args: vec![var!("a")],
+                kwargs: vec![],
+                args_var: Some(Box::new(slice_op!(
+                    var!("b"),
+                    slice!(Some(int!(1)), None, None)
+                ))),
+            }
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn lambda() {
+        let input = "lambda: 4";
+        let expected_ast = lambda!(params![], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda index: 4";
+        let expected_ast = lambda!(params![param!("index")], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda index, val: 4";
+        let expected_ast = lambda!(params![param!("index"), param!("val")], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda: (yield)";
+        let expected_ast = lambda!(params![], yield_expr!());
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(lambda: (yield))()";
+        let expected_ast = func_call_callee!(lambda!(params![], yield_expr!()), call_args![]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn true_false_none() {
+        let input = "True";
+        let expected_ast = bool!(true);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "False";
+        let expected_ast = bool!(false);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "None";
+        let expected_ast = none!();
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn boolean_expressions() {
+        let input = "x and y";
+        let expected_ast = logic_op!(var!("x"), And, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x or y";
+        let expected_ast = logic_op!(var!("x"), Or, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x or not y";
+        let expected_ast = logic_op!(var!("x"), Or, unary_op!(Not, var!("y")));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "not (x or y)";
+        let expected_ast = unary_op!(Not, logic_op!(var!("x"), Or, var!("y")));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn more_operators() {
+        let input = "~a";
+        let expected_ast = unary_op!(BitwiseNot, var!("a"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(*l,)";
+        let expected_ast = tuple![unary_op!(Unpack, var!("l"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a % b";
+        let expected_ast = bin_op!(var!("a"), Mod, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a @ b";
+        let expected_ast = bin_op!(var!("a"), MatMul, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn comparison_operators() {
+        let input = "x == y";
+        let expected_ast = cmp_op!(var!("x"), Equals, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x != y";
+        let expected_ast = cmp_op!(var!("x"), NotEquals, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x < y";
+        let expected_ast = cmp_op!(var!("x"), LessThan, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x > y";
+        let expected_ast = cmp_op!(var!("x"), GreaterThan, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x >= y";
+        let expected_ast = cmp_op!(var!("x"), GreaterThanOrEqual, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x <= y";
+        let expected_ast = cmp_op!(var!("x"), LessThanOrEqual, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x in y";
+        let expected_ast = cmp_op!(var!("x"), In, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x not in y";
+        let expected_ast = cmp_op!(var!("x"), NotIn, var!("y"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x is None";
+        let expected_ast = cmp_op!(var!("x"), Is, none!());
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "x is not None";
+        let expected_ast = cmp_op!(var!("x"), IsNot, none!());
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn class_instantiation() {
+        let input = "Foo()";
+        let expected_ast = func_call!("Foo", call_args![]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn method_invocation() {
+        let input = "foo.bar()";
+        let expected_ast = method_call!(var!("foo"), "bar");
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"Response.text().to_bytes()"#;
+        let expected_ast = method_call!(method_call!(var!("Response"), "text"), "to_bytes");
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn floating_point() {
+        let input = "3.84";
+        let expected_ast = float!(3.84);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2.5e-3";
+        let expected_ast = float!(2.5e-3);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn negative_numbers() {
+        let input = "-3.84";
+        let expected_ast = float!(-3.84);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-3";
+        let expected_ast = int!(-3);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 - 3";
+        let expected_ast = bin_op!(int!(2), Sub, int!(3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-2e-3";
+        let expected_ast = float!(-2e-3);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 + -3";
+        let expected_ast = bin_op!(int!(2), Add, int!(-3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-(3)";
+        let expected_ast = unary_op!(Minus, int!(3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "+(3)";
+        let expected_ast = unary_op!(Plus, int!(3));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "-(2 + 3)";
+        let expected_ast = unary_op!(Minus, bin_op!(int!(2), Add, int!(3)));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn lists() {
+        let input = "[1,2,3]";
+        let expected_ast = list![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[1, 2, 3]";
+        let expected_ast = list![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+[1,
+    2,
+    3
+]"#;
+        let expected_ast = list![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "list([1, 2, 3])";
+        let expected_ast = func_call!("list", call_args![list![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn sets() {
+        let input = "{1,2,3}";
+        let expected_ast = set![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{1, 2, 3}";
+        let expected_ast = set![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "set({1, 2, 3})";
+        let expected_ast = func_call!("set", call_args![set![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+{
+    1,
+    2,
+    3
+}"#;
+        let expected_ast = set![int!(1), int!(2), int!(3),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+{
+    1,
+    2,
+    3,
+}"#;
+        let expected_ast = set![int!(1), int!(2), int!(3),];
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn tuples() {
+        let input = "(1,2,3)";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(1, 2, 3)";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1, 2, 3";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1,";
+        let expected_ast = tuple![int!(1)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1, 2, 3";
+        let expected_ast = tuple![int!(1), int!(2), int!(3)];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "tuple((1, 2, 3))";
+        let expected_ast = func_call!("tuple", call_args![tuple![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+tuple((1,
+       2,
+       3))
+"#;
+        let expected_ast = func_call!("tuple", call_args![tuple![int!(1), int!(2), int!(3)]]);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn dictionaries() {
+        let input = r#"{ "b": 4, 'c': 5 }"#;
+        let expected_ast = dict![
+            dict_pair!(str!("b"), int!(4)),
+            dict_pair!(str!("c"), int!(5)),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"
+{
+    '__name__': 4,
+}
+"#;
+        let expected_ast = dict![dict_pair!(str!("__name__"), int!(4))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"{ **first, **second }"#;
+        let expected_ast = dict![dict_unpack!(var!("first")), dict_unpack!(var!("second")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"{ **first, **second, }"#;
+        let expected_ast = dict![dict_unpack!(var!("first")), dict_unpack!(var!("second")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ 2, **second }";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+
+        let input = "{ 2, **second, }";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+    }
+
+    #[test]
+    fn unterminated_string_literal() {
+        let input = r#""hello"#;
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("unterminated string literal".to_string())
+        );
+    }
+
+    #[test]
+    fn dict_comprehension() {
+        let input = "{ key: val * 2 for key, val in d }";
+        let expected_ast = Expr::DictComprehension {
+            clauses: vec![ForClause {
+                index: loop_index!["key", "val"],
+                iterable: var!("d"),
+                condition: None,
+            }],
+            key_body: Box::new(var!("key")),
+            value_body: Box::new(bin_op!(var!("val"), Mul, int!(2))),
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ key: val * 2 for (key, val) in d }";
+        let expected_ast = Expr::DictComprehension {
+            clauses: vec![ForClause {
+                index: loop_index!["key", "val"],
+                iterable: var!("d"),
+                condition: None,
+            }],
+            key_body: Box::new(var!("key")),
+            value_body: Box::new(bin_op!(var!("val"), Mul, int!(2))),
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn index_access() {
+        let input = "a[0]";
+        let expected_ast = index_access!(var!("a"), int!(0));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[0,1][1]";
+        let expected_ast = index_access!(list![int!(0), int!(1)], int!(1));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn more_tokens() {
+        let input = "Ellipsis";
+        let expected_ast = Expr::Ellipsis;
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension() {
+        let input = "[ i * 2 for i in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension_conditional() {
+        let input = "[i*2 for i in a if True]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
+                iterable: var!("a"),
+                condition: Some(bool!(true)),
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension_parentheses() {
+        let input = "[ i * 2 for (i) in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[ i * j for (i, j) in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, var!("j"))),
+            clauses: vec![ForClause {
+                index: loop_index!["i", "j"],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[ i * j for i, j in a ]";
+        let expected_ast = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, var!("j"))),
+            clauses: vec![ForClause {
+                index: loop_index!["i", "j"],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn generator_comprehension() {
+        let input = "(i * 2 for i in b)";
+        let expected_ast = Expr::GeneratorComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
+                iterable: var!("b"),
+                condition: None,
+            }],
+        };
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "foo(i * 2 for i in b)";
+        let expected_ast = func_call!(
+            "foo",
+            call_args![Expr::GeneratorComprehension {
+                body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+                clauses: vec![ForClause {
+                    index: loop_index!["i"],
+                    iterable: var!("b"),
+                    condition: None,
+                }],
+            }]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn slices() {
+        let input = "a[1:1:1]";
+        let expected_ast = slice_op!(
+            var!("a"),
+            slice!(Some(int!(1)), Some(int!(1)), Some(int!(1)))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[2:5]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), Some(int!(5)), None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[2::5]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), None, Some(int!(5))));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[2::]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(2)), None, None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[:5]";
+        let expected_ast = slice_op!(var!("a"), slice!(None, Some(int!(5)), None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[3:]";
+        let expected_ast = slice_op!(var!("a"), slice!(Some(int!(3)), None, None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[::2]";
+        let expected_ast = slice_op!(var!("a"), slice!(None, None, Some(int!(2))));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a[:]";
+        let expected_ast = slice_op!(var!("a"), slice!(None, None, None));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "new_bases[i+shift:shift+1]";
+        let expected_ast = slice_op!(
+            var!("new_bases"),
+            slice!(
+                Some(bin_op!(var!("i"), Add, var!("shift"))),
+                Some(bin_op!(var!("shift"), Add, int!(1))),
+                None
+            )
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn binary_literal() {
+        let input = "0b0010";
+        let expected_ast = int!(2);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn octal_literal() {
+        let input = "0o0010";
+        let expected_ast = int!(8);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn hex_literal() {
+        let input = "0x0010";
+        let expected_ast = int!(16);
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn f_strings() {
+        let input = r#"f"""#;
+        let expected_ast = f_str_list![];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello {name}.""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Hello "),
+            f_str_expr!(var!("name")),
+            f_str_str!("."),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"{first}{last}""#;
+        let expected_ast = f_str_list![f_str_expr!(var!("first")), f_str_expr!(var!("last")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello""#;
+        let expected_ast = f_str_list![f_str_str!("Hello")];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello {name} goodbye {other}""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Hello "),
+            f_str_expr!(var!("name")),
+            f_str_str!(" goodbye "),
+            f_str_expr!(var!("other")),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Age: {num + 1}""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Age: "),
+            f_str_expr!(bin_op!(var!("num"), Add, int!(1))),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"environ({{{formatted_items}}})""#;
+        let expected_ast = f_str_list![
+            f_str_str!("environ({"),
+            f_str_expr!(var!("formatted_items")),
+            f_str_str!("})"),
+        ];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = r#"f"Hello {name!r} goodbye {other}""#;
+        let expected_ast = f_str_list![
+            f_str_str!("Hello "),
+            f_str_expr!(var!("name"), Repr),
+            f_str_str!(" goodbye "),
+            f_str_expr!(var!("other")),
+        ];
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn binary_operators() {
+        let input = "a & b";
+        let expected_ast = bin_op!(var!("a"), BitwiseAnd, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a | b";
+        let expected_ast = bin_op!(var!("a"), BitwiseOr, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a ^ b";
+        let expected_ast = bin_op!(var!("a"), BitwiseXor, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a << b";
+        let expected_ast = bin_op!(var!("a"), LeftShift, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a >> b";
+        let expected_ast = bin_op!(var!("a"), RightShift, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a ** b";
+        let expected_ast = bin_op!(var!("a"), Expo, var!("b"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "2 * 3 << 2 + 4 & 205";
+        let expected_ast = bin_op!(
+            bin_op!(
+                bin_op!(int!(2), Mul, int!(3)),
+                LeftShift,
+                bin_op!(int!(2), Add, int!(4))
+            ),
+            BitwiseAnd,
+            int!(205)
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn operator_chaining() {
+        let input = "a == b == c";
+        let expected_ast = cmp_chain!(var!("a"), [(Equals, var!("b")), (Equals, var!("c")),]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "a == b < c > d";
+        let expected_ast = cmp_chain!(
+            var!("a"),
+            [
+                (Equals, var!("b")),
+                (LessThan, var!("c")),
+                (GreaterThan, var!("d")),
+            ]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn type_alias() {
+        let input = "list[int]";
+        let expected_ast = Expr::TypeNode(TypeNode::Generic {
+            base_type: ident("list"),
+            parameters: vec![TypeNode::Basic(ident("int"))],
+        });
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "int | str";
+        let expected_ast = Expr::TypeNode(TypeNode::Union(vec![
+            TypeNode::Basic(ident("int")),
+            TypeNode::Basic(ident("str")),
+        ]));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn byte_string() {
+        let input = "b'hello'";
+        let expected_ast = Expr::BytesLiteral("hello".into());
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn yield_and_yield_from() {
+        let input = "yield n";
+        let expected_ast = yield_expr!(var!("n"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "yield from a";
+        let expected_ast = yield_from!(var!("a"));
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn ternary_operation() {
+        let input = "4 if True else 5";
+        let expected_ast = ternary_op!(bool!(true), int!(4), int!(5));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "4 + x if b == 6 else 5 << 2";
+        let expected_ast = ternary_op!(
+            cmp_op!(var!("b"), Equals, int!(6)),
+            bin_op!(int!(4), Add, var!("x")),
+            bin_op!(int!(5), LeftShift, int!(2))
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+}
