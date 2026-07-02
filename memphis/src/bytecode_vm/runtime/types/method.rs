@@ -1,4 +1,4 @@
-use crate::bytecode_vm::runtime::{types::FunctionObject, Reference};
+use crate::bytecode_vm::runtime::{Reference, types::FunctionObject};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Method {

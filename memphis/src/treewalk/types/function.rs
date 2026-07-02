@@ -1,15 +1,15 @@
 use crate::{
-    core::{log, Container, LogLevel},
+    core::{Container, LogLevel, log},
     domain::{DebugStackFrame, Dunder, FunctionType, ToDebugStackFrame, Type},
     parser::types::Ast,
     treewalk::{
+        DomainResult, Scope, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkState,
+        TreewalkValue,
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
         types::{Cell, Class, Dict, Module, Str, Tuple},
-        utils::{bind_args, Args, EnvironmentFrame},
-        DomainResult, Scope, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkState,
-        TreewalkValue,
+        utils::{Args, EnvironmentFrame, bind_args},
     },
 };
 

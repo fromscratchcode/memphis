@@ -2,8 +2,8 @@ use crate::{
     core::Container,
     domain::{ExceptionKind, Type},
     treewalk::{
-        macros::*, protocols::NonDataDescriptor, types::Class, TreewalkInterpreter, TreewalkResult,
-        TreewalkValue,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue, macros::*,
+        protocols::NonDataDescriptor, types::Class,
     },
 };
 

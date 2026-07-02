@@ -1,6 +1,6 @@
 use crate::{
-    domain::{MemphisValue, RaisedMemphisError, Text},
     Engine, MemphisContext,
+    domain::{MemphisValue, RaisedMemphisError, Text},
 };
 
 pub struct CrosscheckSession {

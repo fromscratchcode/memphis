@@ -6,7 +6,7 @@ use std::{
 use crate::{
     core::Container,
     domain::FunctionType,
-    treewalk::{types::Class, utils::Args, TreewalkInterpreter, TreewalkResult, TreewalkValue},
+    treewalk::{TreewalkInterpreter, TreewalkResult, TreewalkValue, types::Class, utils::Args},
 };
 
 pub trait TryEvalFrom: Sized {

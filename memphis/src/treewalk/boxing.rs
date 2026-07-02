@@ -1,6 +1,7 @@
 use crate::{
     domain::Dunder,
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::{MemberRead, MemberWrite},
         type_system::{
             CloneableCallable, CloneableDataDescriptor, CloneableIterable,
@@ -8,7 +9,6 @@ use crate::{
         },
         types::Exception,
         utils::BuiltinObject,
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 
@@ -101,7 +101,7 @@ impl TreewalkValue {
                 return Err(Exception::type_error(format!(
                     "'{}' object is not an iterator",
                     self.get_type()
-                )))
+                )));
             }
         };
 

@@ -1,14 +1,14 @@
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::count,
         macros::*,
         protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableIterable,
         types::{Exception, Tuple},
-        utils::{check_args, Args},
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

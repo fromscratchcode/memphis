@@ -1,13 +1,13 @@
 use crate::{
     bytecode_vm::{
+        CompilerError, VmContext,
         compiler::{Bytecode, CodeObject, Compiler, Constant, Opcode},
         indices::Index,
-        CompilerError, VmContext,
     },
     domain::{FunctionType, ModuleName, Text},
     parser::{
         test_utils::*,
-        types::{ast, Statement},
+        types::{Statement, ast},
     },
 };
 

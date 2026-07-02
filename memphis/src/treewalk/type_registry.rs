@@ -4,18 +4,18 @@ use crate::{
     core::Container,
     domain::Type,
     treewalk::{
+        TreewalkValue,
         type_system::{
             CloneableCallable, CloneableNonDataDescriptor, DataDescriptorProvider,
             DescriptorProvider, MethodProvider, Typed,
         },
         types::{
-            iterators::{ReversedIter, ZipIterator},
             BaseException, Bool, ByteArray, Bytes, Class, Classmethod, Complex, Coroutine, Dict,
             Exception, Float, FrozenSet, Function, Int, List, MappingProxy, Memoryview, Object,
             Property, Range, Set, Slice, Staticmethod, StopIteration, Str, Super, Traceback, Tuple,
             TypeClass,
+            iterators::{ReversedIter, ZipIterator},
         },
-        TreewalkValue,
     },
 };
 

@@ -4,11 +4,11 @@ use crate::{
     parser::types::Ast,
     runtime::MemphisState,
     treewalk::{
+        Executor, RaisedException, TreewalkDisruption, TreewalkResult, TreewalkState,
+        TreewalkValue,
         debugger::TreewalkDebugSession,
         pausable::Frame,
         types::{Exception, Module},
-        Executor, RaisedException, TreewalkDisruption, TreewalkResult, TreewalkState,
-        TreewalkValue,
     },
 };
 
@@ -88,12 +88,12 @@ mod tests {
         domain::Type,
         parser::{
             test_utils::stmt_expr,
-            types::{ast, Expr},
+            types::{Expr, ast},
         },
         treewalk::{
             protocols::Callable,
             test_utils::*,
-            types::{function::RuntimeParams, Function},
+            types::{Function, function::RuntimeParams},
         },
     };
 
@@ -970,18 +970,24 @@ j = +(-3)
 
         let call_stack = e.debug_call_stack;
         assert_eq!(call_stack.len(), 3);
-        assert!(call_stack
-            .get(0)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack.py"));
-        assert!(call_stack
-            .get(1)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/other.py"));
-        assert!(call_stack
-            .get(2)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/other.py"));
+        assert!(
+            call_stack
+                .get(0)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack.py")
+        );
+        assert!(
+            call_stack
+                .get(1)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/other.py")
+        );
+        assert!(
+            call_stack
+                .get(2)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/other.py")
+        );
 
         assert_eq!(call_stack.get(0).name(), "<module>");
         assert_eq!(call_stack.get(1).name(), "middle_call");
@@ -1001,20 +1007,26 @@ j = +(-3)
         assert_eq!(call_stack.get(0).line_number(), 7);
         assert_eq!(call_stack.get(1).line_number(), 2);
         assert_eq!(call_stack.get(2).line_number(), 5);
-        assert!(call_stack
-            .get(0)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack_one_file.py"));
+        assert!(
+            call_stack
+                .get(0)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
+        );
         assert!(call_stack.get(0).file_path_str().starts_with("/"));
-        assert!(call_stack
-            .get(1)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack_one_file.py"));
+        assert!(
+            call_stack
+                .get(1)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
+        );
         assert!(call_stack.get(1).file_path_str().starts_with("/"));
-        assert!(call_stack
-            .get(2)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack_one_file.py"));
+        assert!(
+            call_stack
+                .get(2)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
+        );
         assert!(call_stack.get(2).file_path_str().starts_with("/"));
 
         let input = r#"

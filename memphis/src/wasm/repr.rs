@@ -2,8 +2,8 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     bytecode_vm::{
-        compiler::{CodeObject, Constant},
         CompilerError,
+        compiler::{CodeObject, Constant},
     },
     lexer::Token,
 };

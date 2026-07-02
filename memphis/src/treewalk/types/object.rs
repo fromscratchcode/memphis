@@ -1,16 +1,16 @@
 use std::any::Any;
 
 use crate::{
-    core::{log, Container, LogLevel},
+    core::{Container, LogLevel, log},
     domain::{Dunder, Type},
     treewalk::{
+        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::any,
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
         types::{Class, Exception, Str},
-        utils::{args, check_args, Args},
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, args, check_args},
     },
 };
 
@@ -24,10 +24,10 @@ pub struct Object {
 impl PartialEq for Object {
     fn eq(&self, other: &Self) -> bool {
         // If these are both native objects, compare pointer identity
-        if let (Some(a), Some(b)) = (&self.native_payload, &other.native_payload) {
-            if (**a).type_id() == (**b).type_id() {
-                return std::ptr::eq(a.as_ref(), b.as_ref());
-            }
+        if let (Some(a), Some(b)) = (&self.native_payload, &other.native_payload)
+            && (**a).type_id() == (**b).type_id()
+        {
+            return std::ptr::eq(a.as_ref(), b.as_ref());
         }
 
         self.class == other.class && self.scope == other.scope

@@ -1,10 +1,10 @@
 use crate::{
-    core::{log, Container, LogLevel},
+    core::{Container, LogLevel, log},
     domain::Type,
     treewalk::{
+        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::{Callable, MemberRead, MemberWrite},
         utils::Args,
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

@@ -1,13 +1,13 @@
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::{Dunder, Type},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::{Callable, MemberRead},
         result::Raise,
         types::Exception,
         utils::Args,
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

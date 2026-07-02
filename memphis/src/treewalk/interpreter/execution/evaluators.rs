@@ -2,8 +2,8 @@ use crate::{
     domain::Dunder,
     parser::types::{BinOp, CompareOp, LogicalOp, UnaryOp},
     treewalk::{
-        result::Raise, types::Exception, utils::args, TreewalkInterpreter, TreewalkResult,
-        TreewalkValue,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue, result::Raise, types::Exception,
+        utils::args,
     },
 };
 

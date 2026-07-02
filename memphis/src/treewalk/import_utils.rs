@@ -1,7 +1,7 @@
 use crate::{
     core::Container,
     domain::ModuleName,
-    treewalk::{types::Module, TreewalkValue},
+    treewalk::{TreewalkValue, types::Module},
 };
 
 /// Construct a module chain given a `ModuleName` and a leaf `TreewalkValue`.

@@ -2,10 +2,10 @@ use crate::{
     core::Container,
     domain::{Dunder, ExceptionKind, MemphisException, Type},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::NonDataDescriptor,
         types::{Class, Str, Traceback, Tuple},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

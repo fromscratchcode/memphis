@@ -1,4 +1,4 @@
-use crate::bytecode_vm::{runtime::types::Exception, VirtualMachine};
+use crate::bytecode_vm::{VirtualMachine, runtime::types::Exception};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CompilerError {

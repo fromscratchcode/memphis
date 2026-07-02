@@ -1,4 +1,4 @@
-use crate::bytecode_vm::{runtime::Reference, VirtualMachine, VmResult};
+use crate::bytecode_vm::{VirtualMachine, VmResult, runtime::Reference};
 
 pub type BuiltinFn = fn(&mut VirtualMachine, Vec<Reference>) -> VmResult<Reference>;
 

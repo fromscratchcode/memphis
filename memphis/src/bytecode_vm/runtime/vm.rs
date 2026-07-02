@@ -1,18 +1,17 @@
 use crate::{
     bytecode_vm::{
+        DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
         compiler::{CodeObject, Constant, Opcode},
         indices::{ConstantIndex, FreeIndex, LocalIndex, NonlocalIndex},
         result::Raise,
         runtime::{
-            iter_internal, next_internal,
-            types::{Coroutine, Exception, FunctionObject, Generator, Method, Module},
             CallStack, Completion, Frame, FrameExit, HeapObject, NextResult, Reference, StepResult,
-            Suspension, VmExecutor,
+            Suspension, VmExecutor, iter_internal, next_internal,
+            types::{Coroutine, Exception, FunctionObject, Generator, Method, Module},
         },
         utils::HashKey,
-        DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
     },
-    core::{log, log_impure, Container, LogLevel},
+    core::{Container, LogLevel, log, log_impure},
     domain::{Dunder, MemphisValue, ModuleName, ModuleOrigin},
     runtime::MemphisState,
 };

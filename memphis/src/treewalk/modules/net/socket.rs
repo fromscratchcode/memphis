@@ -1,14 +1,14 @@
 use crate::{
-    core::{net::Socket, Container},
+    core::{Container, net::Socket},
     domain::ModuleName,
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::impl_method_provider,
         modules::net::Connection,
         protocols::Callable,
         result::Raise,
         types::{Exception, Object, Str, Tuple},
         utils::Args,
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

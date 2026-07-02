@@ -1,5 +1,5 @@
 use crate::{
-    bytecode_vm::{runtime::Reference, VirtualMachine},
+    bytecode_vm::{VirtualMachine, runtime::Reference},
     domain::{ExceptionKind, MemphisException},
 };
 

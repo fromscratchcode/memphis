@@ -1,11 +1,11 @@
 use crate::{
+    Engine, MemphisContext,
     domain::Text,
     repl::{
+        ReplResult, ReplStep,
         parser::{self, ParseStep},
         types::ReplOutput,
-        ReplResult, ReplStep,
     },
-    Engine, MemphisContext,
 };
 
 pub struct ReplCore {

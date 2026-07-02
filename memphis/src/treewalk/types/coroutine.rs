@@ -5,6 +5,8 @@ use crate::{
     domain::Type,
     parser::types::Statement,
     treewalk::{
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue,
         macros::*,
         pausable::{
             Completion, Frame, FrameExit, Pausable, PausableRunner, PausableStack, PausableState,
@@ -13,9 +15,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::Function,
-        utils::{check_args, Args},
-        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

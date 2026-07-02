@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         types::iterators::SetIter,
-        utils::{check_args, Args, HashKey},
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, HashKey, check_args},
     },
 };
 

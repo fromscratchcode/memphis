@@ -1,6 +1,6 @@
 use crate::{
     parser::types::{Expr, LoopIndex},
-    treewalk::{pausable::Frame, TreewalkValue},
+    treewalk::{TreewalkValue, pausable::Frame},
 };
 
 /// An enumeration of the possible states in which a `Pausable` can exist. This is key to

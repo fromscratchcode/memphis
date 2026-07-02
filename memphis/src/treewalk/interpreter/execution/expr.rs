@@ -6,14 +6,14 @@ use crate::{
         FormatOption, LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
         iterator::for_each_mut,
         result::Raise,
         types::{
-            iterators::GeneratorIter, Dict, Exception, Function, Generator, List, Set, Slice, Str,
-            Tuple,
+            Dict, Exception, Function, Generator, List, Set, Slice, Str, Tuple,
+            iterators::GeneratorIter,
         },
         value::RuntimeCallable,
-        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
     },
 };
 
@@ -364,8 +364,10 @@ impl TreewalkInterpreter {
             return Ok(result);
         }
 
-        let gen = self.evaluate_expr(expr)?;
-        Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(gen)))
+        let result = self.evaluate_expr(expr)?;
+        Err(TreewalkDisruption::Signal(TreewalkSignal::YieldFrom(
+            result,
+        )))
     }
 
     fn evaluate_slice(&self, params: &SliceParams) -> TreewalkResult<Slice> {
@@ -403,10 +405,10 @@ impl TreewalkInterpreter {
                 self.execute_loop_index_assignment(index, i)?;
 
                 // Condition
-                if let Some(condition) = condition {
-                    if !self.evaluate_expr(condition)?.coerce_to_bool() {
-                        return Ok(());
-                    }
+                if let Some(condition) = condition
+                    && !self.evaluate_expr(condition)?.coerce_to_bool()
+                {
+                    return Ok(());
                 }
 
                 // Recurse

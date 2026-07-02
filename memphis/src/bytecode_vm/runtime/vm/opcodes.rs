@@ -1,18 +1,18 @@
 use crate::{
     bytecode_vm::{
+        VirtualMachine, VmValue,
         compiler::Opcode,
         runtime::{
+            BuiltinFunction, Completion, FrameExit, NextResult, StepResult, Suspension,
             import_utils::build_module_chain,
             iter_internal,
             modules::builtins,
             next_internal,
             types::{
-                str_getitem, Coroutine, Dict, Exception, FunctionObject, Generator, List, Method,
-                Object, Tuple,
+                Coroutine, Dict, Exception, FunctionObject, Generator, List, Method, Object, Tuple,
+                str_getitem,
             },
-            BuiltinFunction, Completion, FrameExit, NextResult, StepResult, Suspension,
         },
-        VirtualMachine, VmValue,
     },
     core::Container,
     domain::{Dunder, ExceptionKind, FunctionType, ModuleName},

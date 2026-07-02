@@ -4,14 +4,14 @@ use crate::{
     bytecode_vm::{
         compiler::CodeObject,
         runtime::{
+            BuiltinFunction,
             types::{
                 Class, Coroutine, Dict, Exception, FunctionObject, Generator, List, ListIter,
                 Method, Module, Object, Range, RangeIter, Tuple, TupleIter,
             },
-            BuiltinFunction,
         },
     },
-    core::{floats_equal, Container},
+    core::{Container, floats_equal},
     domain::Type,
 };
 

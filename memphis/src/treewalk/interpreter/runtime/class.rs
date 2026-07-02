@@ -2,10 +2,10 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         result::Raise,
         types::{Class, Dict, Str, Tuple},
         utils::args,
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

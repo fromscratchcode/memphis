@@ -2,8 +2,8 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    repl::{ReplOutput, ReplResult, ReplSession, ReplStep},
     Engine,
+    repl::{ReplOutput, ReplResult, ReplSession, ReplStep},
 };
 
 #[derive(Serialize)]

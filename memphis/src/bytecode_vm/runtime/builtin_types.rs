@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     bytecode_vm::{
-        runtime::{types::Class, Heap, HeapObject, Reference},
         VmValue,
+        runtime::{Heap, HeapObject, Reference, types::Class},
     },
     domain::{Dunder, Type},
 };

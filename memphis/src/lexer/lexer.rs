@@ -1,11 +1,11 @@
 use std::{
     collections::VecDeque,
-    iter::{repeat_n, Peekable},
+    iter::{Peekable, repeat_n},
     str::Chars,
 };
 
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::{Identifier, Text},
     lexer::{MultilineString, Token},
 };

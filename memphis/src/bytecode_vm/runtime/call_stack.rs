@@ -1,6 +1,6 @@
 use crate::{
     bytecode_vm::runtime::Frame,
-    core::{log, Container, LogLevel},
+    core::{Container, LogLevel, log},
     runtime::MemphisState,
 };
 

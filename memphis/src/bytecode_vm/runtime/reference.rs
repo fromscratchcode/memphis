@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::bytecode_vm::{indices::ObjectTableIndex, runtime::Heap, VmValue};
+use crate::bytecode_vm::{VmValue, indices::ObjectTableIndex, runtime::Heap};
 
 pub type Namespace = HashMap<String, Reference>;
 

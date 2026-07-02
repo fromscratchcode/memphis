@@ -1,15 +1,15 @@
 use std::any::Any;
 
 use crate::{
-    core::{log, Container, LogLevel},
+    core::{Container, LogLevel, log},
     domain::FunctionType,
     treewalk::{
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
         result::Raise,
         type_system::CloneableCallable,
-        types::{iterators::GeneratorIter, Coroutine, Exception, Function, Generator},
+        types::{Coroutine, Exception, Function, Generator, iterators::GeneratorIter},
         utils::Args,
         value::RuntimeCallable,
-        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
     },
 };
 

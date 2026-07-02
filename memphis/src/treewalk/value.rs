@@ -5,27 +5,27 @@ use std::{
 };
 
 use crate::{
-    core::{floats_equal, Container},
+    core::{Container, floats_equal},
     domain::{MemphisValue, Type},
     treewalk::{
+        DomainResult, SymbolTable,
         protocols::MemberRead,
         type_system::{
             CloneableCallable, CloneableDataDescriptor, CloneableIterable,
             CloneableNonDataDescriptor,
         },
         types::{
-            iterators::{
-                DictItemsIter, DictKeysIter, DictValuesIter, GeneratorIter, ListIter, RangeIter,
-                ReversedIter, SetIter, StrIter, TupleIter, ZipIterator,
-            },
             ByteArray, Cell, Class, Classmethod, Code, Complex, Coroutine, Dict, DictItems,
             DictKeys, DictValues, Exception, FrozenSet, Function, List, MappingProxy, Method,
             Module, Object, Property, Range, Set, Slice, Staticmethod, Str, Super, Traceback,
             Tuple,
+            iterators::{
+                DictItemsIter, DictKeysIter, DictValuesIter, GeneratorIter, ListIter, RangeIter,
+                ReversedIter, SetIter, StrIter, TupleIter, ZipIterator,
+            },
         },
         typing::TypeExpr,
         utils::HashKey,
-        DomainResult, SymbolTable,
     },
 };
 
@@ -163,7 +163,7 @@ impl TreewalkValue {
         match (self, other) {
             (TreewalkValue::None, TreewalkValue::None) => true,
             (TreewalkValue::None, _) | (_, TreewalkValue::None) => false,
-            (TreewalkValue::Object(ref a), TreewalkValue::Object(ref b)) => a.same_identity(b),
+            (TreewalkValue::Object(a), TreewalkValue::Object(b)) => a.same_identity(b),
             _ => unimplemented!(), // Different variants or not both TreewalkValue::Object
         }
     }
@@ -274,7 +274,7 @@ impl TreewalkValue {
                 return Err(Exception::type_error(format!(
                     "'{}' object is not iterable",
                     self.get_type()
-                )))
+                )));
             }
         };
 

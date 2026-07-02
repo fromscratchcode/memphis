@@ -7,8 +7,8 @@ use crossterm::{
 };
 
 use crate::{
-    io::{CrosstermIO, TerminalIO},
     Engine,
+    io::{CrosstermIO, TerminalIO},
 };
 
 enum ReplControl {

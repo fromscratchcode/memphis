@@ -2,6 +2,8 @@ use crate::{
     core::Container,
     parser::types::{Ast, ConditionalAst, Expr, ForClause, Statement, StatementKind},
     treewalk::{
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkState, TreewalkValue,
         pausable::{
             Completion, Frame, FrameExit, Pausable, PausableRunner, PausableStack, StepResult,
             Suspension,
@@ -10,8 +12,6 @@ use crate::{
         result::Raise,
         type_system::CloneableIterable,
         types::Function,
-        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkState, TreewalkValue,
     },
 };
 

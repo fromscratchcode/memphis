@@ -2,13 +2,13 @@ use std::{collections::VecDeque, time::Instant};
 
 use crate::{
     bytecode_vm::{
-        runtime::{
-            types::{Coroutine, CoroutineState},
-            Completion, FrameExit, Reference, Suspension,
-        },
         VirtualMachine,
+        runtime::{
+            Completion, FrameExit, Reference, Suspension,
+            types::{Coroutine, CoroutineState},
+        },
     },
-    core::{log, log_impure, Container, LogLevel},
+    core::{Container, LogLevel, log, log_impure},
 };
 
 #[derive(Default)]
@@ -62,10 +62,10 @@ impl VmExecutor {
             let step_result = get_vm_mut(vm).resume_coroutine(coroutine.clone());
             self.handle_step_result(coroutine.clone(), step_result);
 
-            if coroutine.same_identity(&root) {
-                if let CoroutineState::Finished(val) = coroutine.borrow().state {
-                    return val;
-                }
+            if coroutine.same_identity(&root)
+                && let CoroutineState::Finished(val) = coroutine.borrow().state
+            {
+                return val;
             }
         }
 
@@ -142,14 +142,14 @@ impl VmExecutor {
         while i < self.sleeping.len() {
             let sleeper = self.sleeping[i].clone();
             let state = { sleeper.borrow().state.clone() };
-            if let CoroutineState::SleepingUntil(when) = state {
-                if now >= when {
-                    self.requeue(sleeper);
-                    self.sleeping.remove(i);
+            if let CoroutineState::SleepingUntil(when) = state
+                && now >= when
+            {
+                self.requeue(sleeper);
+                self.sleeping.remove(i);
 
-                    // don't advance i, because we just shortened the length of the vector
-                    continue;
-                }
+                // don't advance i, because we just shortened the length of the vector
+                continue;
             }
             i += 1;
         }

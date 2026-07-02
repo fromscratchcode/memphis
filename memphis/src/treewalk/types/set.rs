@@ -4,12 +4,12 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
-        utils::{check_args, Args, HashKey},
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, HashKey, check_args},
     },
 };
 

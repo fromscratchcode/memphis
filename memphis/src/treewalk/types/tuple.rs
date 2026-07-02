@@ -1,14 +1,14 @@
 use crate::{
     core::Container,
-    domain::{utils::normalize_index, Dunder, Type},
+    domain::{Dunder, Type, utils::normalize_index},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         types::{Exception, Slice},
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 
@@ -156,7 +156,7 @@ impl Callable for GetItemBuiltin {
                     "tuple indices must be integers or slices, not {}",
                     interpreter.state.type_name(&index)
                 ))
-                .raise(interpreter)
+                .raise(interpreter);
             }
         };
 

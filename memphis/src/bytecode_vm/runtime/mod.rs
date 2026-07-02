@@ -22,7 +22,7 @@ pub use call_stack::CallStack;
 pub use executor::VmExecutor;
 pub use frame::Frame;
 pub use heap::Heap;
-pub use iter_utils::{iter_internal, next_internal, NextResult};
+pub use iter_utils::{NextResult, iter_internal, next_internal};
 pub use reference::{HeapObject, Reference};
 pub use runtime::Runtime;
 pub use step_result::{Completion, FrameExit, StepResult, Suspension};

@@ -1,17 +1,17 @@
 use crate::{
-    core::{log, Container, LogLevel},
-    domain::{resolve_absolute_path, Dunder, FromImportPath, Identifier, Type},
+    core::{Container, LogLevel, log},
+    domain::{Dunder, FromImportPath, Identifier, Type, resolve_absolute_path},
     parser::types::{
         Ast, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex,
         Params, RaiseKind, RegularImport, Statement, StatementKind,
     },
     treewalk::{
-        iterator::{try_for_each_mut, LoopControl},
-        result::Raise,
-        types::{Exception, Function, Tuple},
-        utils::{args, Args},
         DomainResult, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
         TreewalkValue,
+        iterator::{LoopControl, try_for_each_mut},
+        result::Raise,
+        types::{Exception, Function, Tuple},
+        utils::{Args, args},
     },
 };
 
@@ -148,14 +148,14 @@ impl TreewalkInterpreter {
     /// TODO This should be moved to the semantic analysis
     fn validate_nonlocal_context(&self, name: &Identifier) -> TreewalkResult<()> {
         // We could not find the variable `name` in an enclosing context.
-        if let Some(env) = self.state.read_captured_env() {
-            if env.borrow().read(name.as_str()).is_none() {
-                return Exception::syntax_error(format!(
-                    "'{}' not found in nonlocal environment",
-                    name
-                ))
-                .raise(self);
-            }
+        if let Some(env) = self.state.read_captured_env()
+            && env.borrow().read(name.as_str()).is_none()
+        {
+            return Exception::syntax_error(format!(
+                "'{}' not found in nonlocal environment",
+                name
+            ))
+            .raise(self);
         }
 
         // `nonlocal` cannot be used at the module-level (outside of a function,
@@ -329,10 +329,8 @@ impl TreewalkInterpreter {
             Ok(LoopControl::Continue)
         })?;
 
-        if !encountered_break {
-            if let Some(else_block) = else_block {
-                self.execute_ast(else_block)?;
-            }
+        if !encountered_break && let Some(else_block) = else_block {
+            self.execute_ast(else_block)?;
         }
 
         Ok(())
@@ -492,7 +490,7 @@ impl TreewalkInterpreter {
             self.state.set_current_exception(raised_exception.clone());
             match self.execute_ast(&handler.block) {
                 Err(TreewalkDisruption::Signal(TreewalkSignal::Raise)) => {
-                    return Err(TreewalkDisruption::Error(raised_exception))
+                    return Err(TreewalkDisruption::Error(raised_exception));
                 }
                 Err(other) => return Err(other),
                 Ok(_) => {}

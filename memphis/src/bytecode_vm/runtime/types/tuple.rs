@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
-        runtime::{types::Exception, Reference},
         VirtualMachine, VmResult, VmValue,
+        runtime::{Reference, types::Exception},
     },
     domain::utils::normalize_index,
 };

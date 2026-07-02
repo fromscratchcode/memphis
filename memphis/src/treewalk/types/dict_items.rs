@@ -1,4 +1,4 @@
-use crate::treewalk::{macros::*, types::Tuple, TreewalkValue};
+use crate::treewalk::{TreewalkValue, macros::*, types::Tuple};
 
 impl_iterable!(DictItemsIter);
 

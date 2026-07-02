@@ -61,10 +61,10 @@ impl Ast {
     /// This simulates CPython `eval` mode, rather than `exec` mode. We currently assume this WAY
     /// too many places.
     pub fn rewrite_last_expr_to_return(&mut self) {
-        if let Some(stmt) = self.statements.last_mut() {
-            if let StatementKind::Expression(expr) = &stmt.kind {
-                stmt.kind = StatementKind::Return(vec![expr.clone()]);
-            }
+        if let Some(stmt) = self.statements.last_mut()
+            && let StatementKind::Expression(expr) = &stmt.kind
+        {
+            stmt.kind = StatementKind::Return(vec![expr.clone()]);
         }
     }
 }

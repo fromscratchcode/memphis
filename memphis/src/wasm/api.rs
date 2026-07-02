@@ -2,12 +2,12 @@ use console_error_panic_hook::set_once;
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    bytecode_vm::{compiler::CodeObject, CompilerResult, VmContext},
+    Engine, MemphisContext,
+    bytecode_vm::{CompilerResult, VmContext, compiler::CodeObject},
     domain::Text,
     lexer::Lexer,
     parser::Parser,
     wasm::repr::WasmCodeObject,
-    Engine, MemphisContext,
 };
 
 #[wasm_bindgen]

@@ -1,8 +1,8 @@
 use crate::{
     core::Container,
     treewalk::{
-        types::Function, Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
-        TreewalkSignal, TreewalkValue,
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue, types::Function,
     },
 };
 

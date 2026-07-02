@@ -2,9 +2,9 @@ use crate::{
     core::Container,
     domain::Dunder,
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         types::{Class, Method},
         utils::Args,
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

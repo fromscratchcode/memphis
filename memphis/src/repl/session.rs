@@ -1,6 +1,6 @@
 use crate::{
-    repl::{core::ReplCore, ReplStep},
     Engine,
+    repl::{ReplStep, core::ReplCore},
 };
 
 const INDENT_WIDTH: usize = 4;

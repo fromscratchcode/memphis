@@ -1,13 +1,13 @@
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::Identifier,
     lexer::Token,
     parser::{
+        Parser, ParserError, ParserResult,
         types::{
             BinOp, ConditionalAst, ExceptHandler, Expr, FromImportItem, FromImportMode, LoopIndex,
             RaiseKind, RegularImport, Statement, StatementKind,
         },
-        Parser, ParserError, ParserResult,
     },
 };
 
@@ -545,7 +545,7 @@ mod tests {
 
     use crate::parser::{
         test_utils::*,
-        types::{ast, ExceptHandler, Params, StatementKind},
+        types::{ExceptHandler, Params, StatementKind, ast},
     };
 
     fn ident(input: &str) -> Identifier {

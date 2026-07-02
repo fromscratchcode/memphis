@@ -1,12 +1,12 @@
 use crate::{
     domain::{Dunder, Encoding, Type},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::Callable,
         result::Raise,
         types::{Exception, Str},
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

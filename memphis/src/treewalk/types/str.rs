@@ -2,14 +2,14 @@ use std::{ops::Deref, str};
 
 use crate::{
     core::Container,
-    domain::{utils::normalize_index, Dunder, Encoding, Type},
+    domain::{Dunder, Encoding, Type, utils::normalize_index},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::Callable,
         result::Raise,
         types::{Exception, List, Slice},
-        utils::{check_args, Args},
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 
@@ -385,7 +385,7 @@ impl Callable for GetItemBuiltin {
                     "string indices must be integers, not '{}'",
                     interpreter.state.type_name(&index)
                 ))
-                .raise(interpreter)
+                .raise(interpreter);
             }
         };
 

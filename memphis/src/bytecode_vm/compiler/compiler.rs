@@ -1,11 +1,11 @@
 use crate::{
     bytecode_vm::{
+        CompilerResult,
         compiler::{CodeGenFrame, CodeObject, Constant, Opcode},
         find_index,
         indices::{ConstantIndex, FreeIndex, Index, LocalIndex, NonlocalIndex},
-        CompilerResult,
     },
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::{Context, Identifier, ModuleName},
     parser::types::Ast,
 };
@@ -228,7 +228,7 @@ impl Compiler {
 #[cfg(test)]
 mod tests_compiler {
     use crate::{
-        bytecode_vm::{compiler::test_utils::*, CompilerError},
+        bytecode_vm::{CompilerError, compiler::test_utils::*},
         domain::FunctionType,
     };
 

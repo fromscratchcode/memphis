@@ -1,9 +1,9 @@
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::Dunder,
     treewalk::{
-        result::Raise, type_system::CloneableCallable, types::Exception, utils::args,
-        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkValue, result::Raise,
+        type_system::CloneableCallable, types::Exception, utils::args,
     },
 };
 

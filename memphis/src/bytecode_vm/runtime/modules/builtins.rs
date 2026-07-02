@@ -1,13 +1,12 @@
 use crate::{
     bytecode_vm::{
+        Runtime, VirtualMachine, VmResult, VmValue,
         result::Raise,
         runtime::{
-            iter_internal, next_internal,
+            BuiltinFn, NextResult, Reference, iter_internal, next_internal,
             runtime::register_builtin_funcs,
             types::{Class, Exception, List, Module, Range, Tuple},
-            BuiltinFn, NextResult, Reference,
         },
-        Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::Container,
     domain::{Dunder, ModuleName, Type},
@@ -277,7 +276,7 @@ fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
 
 #[cfg(test)]
 mod tests {
-    use crate::bytecode_vm::{runtime::runtime::register_builtin_funcs, Runtime};
+    use crate::bytecode_vm::{Runtime, runtime::runtime::register_builtin_funcs};
 
     use super::*;
 

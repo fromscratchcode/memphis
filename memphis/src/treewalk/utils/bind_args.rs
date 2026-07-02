@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::{
     core::Container,
     treewalk::{
-        types::{function::RuntimeParams, Exception, Tuple},
-        utils::{check_args, Args},
         DomainResult, SymbolTable, TreewalkValue,
+        types::{Exception, Tuple, function::RuntimeParams},
+        utils::{Args, check_args},
     },
 };
 

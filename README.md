@@ -20,7 +20,7 @@ See [SUPPORTED.md](docs/SUPPORTED.md) for details on specific features.
 - Functionality first, readability second, performance third. Don't do anything obviously wasteful, but there are dozens of non-optimal performance decisions in here in the name of a simple implementation.
 
 ## Installation
-Installation requires a 2021 edition of `rustc` (version `1.56.0` or higher).
+Installation requires a Rust toolchain with 2024 edition support.
 ```bash
 git clone https://github.com/fromscratchcode/memphis
 cd memphis

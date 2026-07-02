@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use crate::{
     parser::types::{CallArgs, KwargsOperation, Params},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::for_each_mut,
         protocols::TryEvalFrom,
         result::Raise,
         types::{
-            function::{RuntimeParam, RuntimeParams},
             Exception, Tuple,
+            function::{RuntimeParam, RuntimeParams},
         },
         utils::Args,
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
-        runtime::{types::Module, Reference},
         VirtualMachine, VmValue,
+        runtime::{Reference, types::Module},
     },
     core::Container,
     domain::ModuleName,

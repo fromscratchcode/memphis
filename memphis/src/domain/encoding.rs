@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::treewalk::{types::Exception, DomainResult};
+use crate::treewalk::{DomainResult, types::Exception};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum Encoding {

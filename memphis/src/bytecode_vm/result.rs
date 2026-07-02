@@ -1,5 +1,5 @@
 use crate::bytecode_vm::{
-    runtime::types::Exception, CompilerError, RaisedException, VirtualMachine,
+    CompilerError, RaisedException, VirtualMachine, runtime::types::Exception,
 };
 
 pub type CompilerResult<T> = Result<T, CompilerError>;

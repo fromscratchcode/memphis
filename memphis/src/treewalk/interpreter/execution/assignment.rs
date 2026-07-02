@@ -1,7 +1,7 @@
 use crate::{
     parser::types::{Expr, LoopIndex},
     treewalk::{
-        result::Raise, types::Exception, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue, result::Raise, types::Exception,
     },
 };
 

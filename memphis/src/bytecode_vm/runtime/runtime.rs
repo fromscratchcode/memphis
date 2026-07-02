@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::{
     bytecode_vm::{
+        VmValue,
         runtime::{
-            modules::{asyncio, builtins},
-            types::Module,
             BuiltinFn, BuiltinFunction, BuiltinInstances, BuiltinTypes, Heap, HeapObject,
             Reference,
+            modules::{asyncio, builtins},
+            types::Module,
         },
-        VmValue,
     },
     core::Container,
     domain::ModuleName,

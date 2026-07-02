@@ -2,13 +2,13 @@ use crate::{
     core::Container,
     domain::ModuleName,
     treewalk::{
+        ModuleStore, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue,
         protocols::Callable,
         result::Raise,
         type_system::CloneableCallable,
         types::Module,
-        utils::{check_args, Args},
-        ModuleStore, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

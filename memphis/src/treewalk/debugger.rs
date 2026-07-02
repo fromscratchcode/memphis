@@ -2,12 +2,12 @@ use crate::{
     core::Container,
     parser::types::{Expr, Statement, StatementKind},
     treewalk::{
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue,
         pausable::{Frame, FrameKind},
         result::Raise,
         state::DebugSnapshot,
         types::{Exception, Function},
-        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue,
     },
 };
 
@@ -190,8 +190,8 @@ mod tests {
         domain::Text,
         parser::Parser,
         treewalk::{
-            debugger::TreewalkDebugSession, test_utils::*, TreewalkContext, TreewalkDisruption,
-            TreewalkResult,
+            TreewalkContext, TreewalkDisruption, TreewalkResult, debugger::TreewalkDebugSession,
+            test_utils::*,
         },
     };
 

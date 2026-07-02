@@ -1,8 +1,8 @@
 use crate::{
     core::Container,
     treewalk::{
-        types::{Class, Function},
         RaisedException, TreewalkValue,
+        types::{Class, Function},
     },
 };
 

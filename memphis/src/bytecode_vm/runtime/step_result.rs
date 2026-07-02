@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use crate::{
     bytecode_vm::{
-        runtime::{types::Coroutine, Reference},
         RaisedException,
+        runtime::{Reference, types::Coroutine},
     },
     core::Container,
 };

@@ -2,11 +2,10 @@ use crate::{
     core::Container,
     domain::{Identifier, ModuleName, ResolvedModule},
     treewalk::{
-        import_utils,
+        DomainResult, TreewalkContext, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
+        TreewalkValue, import_utils,
         result::Raise,
         types::{Exception, Module},
-        DomainResult, TreewalkContext, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
-        TreewalkValue,
     },
 };
 

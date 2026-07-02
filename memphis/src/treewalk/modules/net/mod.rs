@@ -1,16 +1,16 @@
 use crate::{
     core::{
-        net::{Connection, Socket},
         Container,
+        net::{Connection, Socket},
     },
     domain::{ModuleName, Type},
     treewalk::{
+        ModuleStore, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
         protocols::Callable,
         result::Raise,
         type_system::{CloneableCallable, MethodProvider},
         types::{Class, Exception, Module, Object},
-        utils::{check_args, Args},
-        ModuleStore, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
+        utils::{Args, check_args},
     },
 };
 

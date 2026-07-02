@@ -1,4 +1,4 @@
-use crate::treewalk::{macros::*, TreewalkValue};
+use crate::treewalk::{TreewalkValue, macros::*};
 
 impl_iterable!(DictValuesIter);
 

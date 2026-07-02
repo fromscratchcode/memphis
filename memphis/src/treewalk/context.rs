@@ -7,8 +7,8 @@ use crate::{
     parser::Parser,
     runtime::MemphisState,
     treewalk::{
-        types::{Exception, Module},
         RaisedException, TreewalkInterpreter, TreewalkState, TreewalkValue,
+        types::{Exception, Module},
     },
 };
 

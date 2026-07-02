@@ -2,12 +2,12 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        DomainResult, Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::{Callable, NonDataDescriptor},
         result::Raise,
         types::{Class, Exception, MappingProxy, Tuple},
         utils::Args,
-        DomainResult, Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

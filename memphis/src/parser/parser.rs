@@ -1,8 +1,8 @@
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::{Identifier, Text},
     lexer::{Lexer, Token},
-    parser::{types::Ast, ParserError, ParserResult, TokenBuffer},
+    parser::{ParserError, ParserResult, TokenBuffer, types::Ast},
 };
 
 mod block;

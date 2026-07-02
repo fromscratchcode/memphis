@@ -1,8 +1,8 @@
 use crate::{
     core::Container,
     treewalk::{
-        types::{Coroutine, Exception},
         RaisedException, TreewalkInterpreter, TreewalkValue,
+        types::{Coroutine, Exception},
     },
 };
 
@@ -17,7 +17,7 @@ impl TreewalkDisruption {
     pub fn as_err(&self) -> &RaisedException {
         match self {
             TreewalkDisruption::Signal(_) => panic!("Expected error!"),
-            TreewalkDisruption::Error(ref e) => e,
+            TreewalkDisruption::Error(e) => e,
         }
     }
 }

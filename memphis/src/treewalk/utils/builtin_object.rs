@@ -1,7 +1,7 @@
 use crate::{
-    core::{log, Container, LogLevel},
+    core::{Container, LogLevel, log},
     treewalk::{
-        protocols::MemberRead, types::Class, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::MemberRead, types::Class,
     },
 };
 

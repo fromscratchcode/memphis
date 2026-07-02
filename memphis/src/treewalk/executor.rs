@@ -3,9 +3,9 @@ use std::mem::take;
 use crate::{
     core::Container,
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         pausable::{Completion, FrameExit, Pausable, Suspension},
         types::Coroutine,
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

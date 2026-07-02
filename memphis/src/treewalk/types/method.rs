@@ -1,8 +1,8 @@
 use crate::{
     core::Container,
     treewalk::{
-        protocols::Callable, type_system::CloneableCallable, utils::Args, TreewalkInterpreter,
-        TreewalkResult, TreewalkValue,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::Callable,
+        type_system::CloneableCallable, utils::Args,
     },
 };
 

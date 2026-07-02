@@ -1,6 +1,6 @@
 use crate::bytecode_vm::{
-    runtime::{BuiltinTypes, Heap, HeapObject, Reference},
     VmValue,
+    runtime::{BuiltinTypes, Heap, HeapObject, Reference},
 };
 
 pub struct BuiltinInstances {

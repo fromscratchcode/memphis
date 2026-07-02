@@ -1,12 +1,12 @@
 use crate::{
     core::net::Connection,
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::impl_method_provider,
         protocols::Callable,
         result::Raise,
         types::Exception,
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

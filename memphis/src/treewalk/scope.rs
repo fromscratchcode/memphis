@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::treewalk::{
-    types::{Dict, Str},
     TreewalkValue,
+    types::{Dict, Str},
 };
 
 /// This is similar to our runtime `Dict` object, but where keys must be valid Python runtime

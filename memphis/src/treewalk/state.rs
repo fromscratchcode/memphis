@@ -2,13 +2,13 @@ use std::{cell::UnsafeCell, collections::HashMap};
 
 use crate::{
     core::Container,
-    domain::{resolve_import_path, FromImportPath, ModuleName, Type},
+    domain::{FromImportPath, ModuleName, Type, resolve_import_path},
     treewalk::{
+        DomainResult, ExecutionContextManager, Executor, ModuleStore, RaisedException, Scope,
+        ScopeManager, TreewalkValue, TypeRegistry,
         modules::builtins,
         types::{Class, Dict, Exception, Function, Module},
         utils::EnvironmentFrame,
-        DomainResult, ExecutionContextManager, Executor, ModuleStore, RaisedException, Scope,
-        ScopeManager, TreewalkValue, TypeRegistry,
     },
 };
 

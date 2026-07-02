@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter, Result};
 use crate::{
     core::floats_equal,
     domain::{
-        utils::{format_bytes, format_comma_separated, format_comma_separated_with},
         MemphisException,
+        utils::{format_bytes, format_comma_separated, format_comma_separated_with},
     },
 };
 

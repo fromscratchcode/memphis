@@ -1,14 +1,14 @@
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::Identifier,
     lexer::Token,
     parser::{
+        Parser, ParserError, ParserResult,
         types::{
             BinOp, CallArg, CallArgs, Callee, CompareOp, DictOperation, Expr, ExprFormat,
             FStringPart, ForClause, FormatOption, KwargsOperation, LogicalOp, SliceParams,
             TypeNode, UnaryOp,
         },
-        Parser, ParserError, ParserResult,
     },
 };
 
@@ -784,7 +784,7 @@ impl Parser<'_> {
                             });
                         }
                         _ => {
-                            return Err(ParserError::UnexpectedToken(self.current_token().clone()))
+                            return Err(ParserError::UnexpectedToken(self.current_token().clone()));
                         }
                     }
                 }
@@ -984,7 +984,7 @@ impl Parser<'_> {
 
         loop {
             let node = match self.current_token() {
-                Token::Identifier(ref ident) => {
+                Token::Identifier(ident) => {
                     let i = ident.clone();
                     match ident.as_str() {
                         "int" | "str" | "dict" => {

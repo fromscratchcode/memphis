@@ -1,8 +1,8 @@
 use crate::{
     domain::Dunder,
     treewalk::{
-        result::Raise, types::Exception, utils::args, TreewalkDisruption, TreewalkInterpreter,
-        TreewalkResult, TreewalkValue,
+        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkValue, result::Raise,
+        types::Exception, utils::args,
     },
 };
 

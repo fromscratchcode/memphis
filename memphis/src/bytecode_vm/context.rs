@@ -2,7 +2,7 @@
 use crate::domain::Source;
 use crate::{
     bytecode_vm::{
-        compiler::CodeObject, Compiler, CompilerError, Runtime, VirtualMachine, VmResult, VmValue,
+        Compiler, CompilerError, Runtime, VirtualMachine, VmResult, VmValue, compiler::CodeObject,
     },
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},

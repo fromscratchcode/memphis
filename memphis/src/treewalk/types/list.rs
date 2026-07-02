@@ -2,16 +2,16 @@ use std::{collections::VecDeque, ops::Add};
 
 use crate::{
     core::Container,
-    domain::{utils::normalize_index, Dunder, Type},
+    domain::{Dunder, Type, utils::normalize_index},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::collect,
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
         types::{Exception, Slice},
-        utils::{check_args, Args},
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 
@@ -276,7 +276,7 @@ impl Callable for GetItemBuiltin {
                     "list indices must be integers or slices, not {}",
                     interpreter.state.type_name(&index)
                 ))
-                .raise(interpreter)
+                .raise(interpreter);
             }
         };
 
@@ -312,7 +312,7 @@ impl Callable for SetItemBuiltin {
                     "list indices must be integers or slices, not {}",
                     interpreter.state.type_name(&index)
                 ))
-                .raise(interpreter)
+                .raise(interpreter);
             }
         }
 

@@ -1,8 +1,8 @@
 use crate::{
     lexer::Token,
     parser::{
-        types::{Param, Params},
         Parser, ParserResult,
+        types::{Param, Params},
     },
 };
 

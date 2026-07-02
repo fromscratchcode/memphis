@@ -1,8 +1,8 @@
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
-        macros::*, protocols::Callable, utils::Args, TreewalkInterpreter, TreewalkResult,
-        TreewalkValue,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue, macros::*, protocols::Callable,
+        utils::Args,
     },
 };
 

@@ -1,13 +1,13 @@
 use std::cmp::Ordering;
 
 use crate::{
-    domain::{utils::wrap_negative, Dunder, Type},
+    domain::{Dunder, Type, utils::wrap_negative},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::Callable,
         result::Raise,
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

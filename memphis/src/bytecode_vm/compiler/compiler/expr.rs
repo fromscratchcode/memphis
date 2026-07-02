@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
-        compiler::{Constant, JumpKind, Opcode},
         Compiler, CompilerError, CompilerResult,
+        compiler::{Constant, JumpKind, Opcode},
     },
     domain::Identifier,
     parser::types::{
@@ -308,7 +308,7 @@ mod tests_bytecode_expr {
 
     use crate::{
         bytecode_vm::{
-            compiler::{test_utils::*, Bytecode},
+            compiler::{Bytecode, test_utils::*},
             indices::Index,
         },
         parser::test_utils::*,

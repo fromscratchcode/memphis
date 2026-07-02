@@ -457,24 +457,30 @@ middle_call()
         let call_stack = e.debug_call_stack;
         assert_eq!(call_stack.len(), 3);
         assert_eq!(call_stack.get(0).name(), "<module>");
-        assert!(call_stack
-            .get(0)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack_one_file.py"));
+        assert!(
+            call_stack
+                .get(0)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
+        );
         assert!(call_stack.get(0).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(0).line_number(), 7);
         assert_eq!(call_stack.get(1).name(), "middle_call");
-        assert!(call_stack
-            .get(1)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack_one_file.py"));
+        assert!(
+            call_stack
+                .get(1)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
+        );
         assert!(call_stack.get(1).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(1).line_number(), 2);
         assert_eq!(call_stack.get(2).name(), "last_call");
-        assert!(call_stack
-            .get(2)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack_one_file.py"));
+        assert!(
+            call_stack
+                .get(2)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
+        );
         assert!(call_stack.get(2).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(2).line_number(), 5);
     }
@@ -487,24 +493,30 @@ middle_call()
         let call_stack = e.debug_call_stack;
         assert_eq!(call_stack.len(), 3);
         assert_eq!(call_stack.get(0).name(), "<module>");
-        assert!(call_stack
-            .get(0)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/call_stack.py"));
+        assert!(
+            call_stack
+                .get(0)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/call_stack.py")
+        );
         assert!(call_stack.get(0).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(0).line_number(), 2);
         assert_eq!(call_stack.get(1).name(), "middle_call");
-        assert!(call_stack
-            .get(1)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/other.py"));
+        assert!(
+            call_stack
+                .get(1)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/other.py")
+        );
         assert!(call_stack.get(1).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(1).line_number(), 2);
         assert_eq!(call_stack.get(2).name(), "last_call");
-        assert!(call_stack
-            .get(2)
-            .file_path_str()
-            .ends_with("src/fixtures/call_stack/other.py"));
+        assert!(
+            call_stack
+                .get(2)
+                .file_path_str()
+                .ends_with("src/fixtures/call_stack/other.py")
+        );
         assert!(call_stack.get(2).file_path_str().starts_with("/"));
         assert_eq!(call_stack.get(2).line_number(), 5);
     }

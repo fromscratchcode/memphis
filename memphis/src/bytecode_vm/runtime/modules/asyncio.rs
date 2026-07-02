@@ -2,13 +2,13 @@ use std::time::Duration;
 
 use crate::{
     bytecode_vm::{
+        Runtime, VirtualMachine, VmResult, VmValue,
         result::Raise,
         runtime::{
+            BuiltinFn, Reference,
             runtime::register_builtin_funcs,
             types::{Coroutine, Exception, Module},
-            BuiltinFn, Reference,
         },
-        Runtime, VirtualMachine, VmResult, VmValue,
     },
     core::Container,
     domain::ModuleName,

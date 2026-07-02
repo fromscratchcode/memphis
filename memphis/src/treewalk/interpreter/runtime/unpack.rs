@@ -1,6 +1,6 @@
 use crate::treewalk::{
-    iterator::collect, result::Raise, types::Exception, TreewalkInterpreter, TreewalkResult,
-    TreewalkValue,
+    TreewalkInterpreter, TreewalkResult, TreewalkValue, iterator::collect, result::Raise,
+    types::Exception,
 };
 
 impl TreewalkInterpreter {

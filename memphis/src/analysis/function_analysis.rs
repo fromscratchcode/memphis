@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    core::{log, LogLevel},
+    core::{LogLevel, log},
     domain::Identifier,
     parser::types::{Ast, Expr, Statement, StatementKind},
 };

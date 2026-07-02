@@ -2,7 +2,7 @@ use crate::{
     core::Container,
     domain::Type,
     treewalk::{
-        macros::*, protocols::NonDataDescriptor, types::Class, TreewalkResult, TreewalkValue,
+        TreewalkResult, TreewalkValue, macros::*, protocols::NonDataDescriptor, types::Class,
     },
 };
 

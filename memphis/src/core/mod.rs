@@ -4,5 +4,5 @@ pub mod net;
 mod utils;
 
 pub use container::Container;
-pub use log::{log, log_impure, LogLevel};
+pub use log::{LogLevel, log, log_impure};
 pub use utils::floats_equal;

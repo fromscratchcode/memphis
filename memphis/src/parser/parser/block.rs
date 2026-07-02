@@ -1,8 +1,8 @@
 use crate::{
     lexer::Token,
     parser::{
-        types::{ast, Ast},
         Parser, ParserResult,
+        types::{Ast, ast},
     },
 };
 
@@ -73,9 +73,9 @@ mod tests {
     use super::*;
 
     use crate::parser::{
-        test_utils::*,
-        types::{ast, ConditionalAst, StatementKind},
         ParserError,
+        test_utils::*,
+        types::{ConditionalAst, StatementKind, ast},
     };
 
     #[test]

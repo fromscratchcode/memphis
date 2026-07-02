@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use crate::{
     core::Container,
     domain::{
-        resolve, DebugCallStack, DebugStackFrame, ModuleName, ModuleOrigin, ResolvedModule, Source,
-        ToDebugStackFrame,
+        DebugCallStack, DebugStackFrame, ModuleName, ModuleOrigin, ResolvedModule, Source,
+        ToDebugStackFrame, resolve,
     },
 };
 
@@ -42,7 +42,7 @@ impl MemphisState {
 
     pub fn init(origin: &ModuleOrigin) -> Self {
         let mut state = MemphisState::new();
-        if let ModuleOrigin::File(ref p) = origin {
+        if let ModuleOrigin::File(p) = origin {
             state.register_root(p);
         }
         state

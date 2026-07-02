@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use crate::{
     domain::{DebugStackFrame, Dunder, ModuleName, ModuleOrigin, ToDebugStackFrame},
     treewalk::{
+        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::MemberRead,
         types::{Dict, Str},
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

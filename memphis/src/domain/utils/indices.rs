@@ -1,9 +1,5 @@
 pub fn wrap_negative(index: i64, len: usize) -> i64 {
-    if index < 0 {
-        len as i64 + index
-    } else {
-        index
-    }
+    if index < 0 { len as i64 + index } else { index }
 }
 
 pub fn normalize_index(index: i64, len: usize) -> Option<usize> {

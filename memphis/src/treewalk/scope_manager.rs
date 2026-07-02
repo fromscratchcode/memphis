@@ -1,7 +1,7 @@
 use crate::{
     core::Container,
     domain::Context,
-    treewalk::{types::Module, utils::EnvironmentFrame, Scope, TreewalkValue},
+    treewalk::{Scope, TreewalkValue, types::Module, utils::EnvironmentFrame},
 };
 
 /// This struct implements Python's scoping rules by storing data to power the
@@ -103,10 +103,10 @@ impl ScopeManager {
         // TODO I'm not sure we should be searching the entire captured environment here. I think
         // only the closure free vars should be available, but I don't yet know of a good way to
         // connect those here.
-        if let Some(env) = self.read_captured_env() {
-            if let Some(value) = env.borrow().read(name) {
-                return Some(value);
-            }
+        if let Some(env) = self.read_captured_env()
+            && let Some(value) = env.borrow().read(name)
+        {
+            return Some(value);
         }
 
         for module in self.module_stack.iter().rev() {

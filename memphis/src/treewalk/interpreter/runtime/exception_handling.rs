@@ -2,10 +2,10 @@ use crate::{
     core::Container,
     domain::Type,
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::for_each_mut,
         result::Raise,
         types::{Class, Exception},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
     },
 };
 

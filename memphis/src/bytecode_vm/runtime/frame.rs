@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     bytecode_vm::{
         compiler::Opcode,
-        runtime::{types::FunctionObject, Reference},
+        runtime::{Reference, types::FunctionObject},
     },
     domain::{DebugStackFrame, ToDebugStackFrame},
 };

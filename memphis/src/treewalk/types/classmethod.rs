@@ -2,13 +2,13 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::{Callable, NonDataDescriptor},
         result::Raise,
         type_system::CloneableCallable,
         types::{Class, Method},
-        utils::{check_args, Args},
-        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

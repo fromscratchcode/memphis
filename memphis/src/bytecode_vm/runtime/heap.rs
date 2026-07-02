@@ -1,8 +1,8 @@
 use crate::{
     bytecode_vm::{
-        indices::Index,
-        runtime::{types::Class, HeapObject, Reference},
         VmValue,
+        indices::Index,
+        runtime::{HeapObject, Reference, types::Class},
     },
     domain::Type,
 };

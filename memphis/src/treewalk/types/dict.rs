@@ -4,14 +4,14 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
+        DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::{collect, for_each_mut},
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
-        types::{iterators::DictKeysIter, DictItems, DictKeys, DictValues, Exception},
-        utils::{check_args, Args, HashKey},
-        DomainResult, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        types::{DictItems, DictKeys, DictValues, Exception, iterators::DictKeysIter},
+        utils::{Args, HashKey, check_args},
     },
 };
 

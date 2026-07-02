@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::bytecode_vm::compiler::{
-    opcode::{SignedOffset, UnsignedOffset},
     CodeObject, ExceptionRange, Opcode,
+    opcode::{SignedOffset, UnsignedOffset},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

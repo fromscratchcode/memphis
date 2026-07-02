@@ -1,9 +1,9 @@
 use crate::{
     bytecode_vm::{
-        compiler::{CodeObject, Constant, JumpKind, Opcode},
         Compiler, CompilerError, CompilerResult,
+        compiler::{CodeObject, Constant, JumpKind, Opcode},
     },
-    domain::{resolve_import_path, FromImportPath, FunctionType, Identifier},
+    domain::{FromImportPath, FunctionType, Identifier, resolve_import_path},
     parser::types::{
         Ast, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex,
         Params, RaiseKind, RegularImport, Statement, StatementKind,
@@ -77,7 +77,7 @@ impl Compiler {
             _ => {
                 return Err(CompilerError::Unsupported(format!(
                     "Statement type: {stmt:?}"
-                )))
+                )));
             }
         };
 
@@ -131,7 +131,7 @@ impl Compiler {
             _ => {
                 return Err(CompilerError::syntax_error(
                     "cannot assign to that expression type here",
-                ))
+                ));
             }
         };
         Ok(())
@@ -562,7 +562,7 @@ mod tests_bytecode_stmt {
         bytecode_vm::{compiler::test_utils::*, indices::Index},
         parser::{
             test_utils::*,
-            types::{ast, ExceptHandler},
+            types::{ExceptHandler, ast},
         },
     };
 

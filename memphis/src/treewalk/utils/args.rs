@@ -1,9 +1,8 @@
 use std::{collections::HashMap, slice::Iter};
 
 use crate::treewalk::{
-    symbol_table_to_runtime_dict,
+    DomainResult, SymbolTable, TreewalkValue, symbol_table_to_runtime_dict,
     types::{Dict, Exception},
-    DomainResult, SymbolTable, TreewalkValue,
 };
 
 /// Represents the fully resolved parameter state for all positional and keyword arguments.

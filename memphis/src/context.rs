@@ -1,11 +1,11 @@
 use crate::{
+    Engine,
     bytecode_vm::VmContext,
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleOrigin, Source, Text},
     interpreter::Interpreter,
     runtime::MemphisState,
     treewalk::TreewalkContext,
-    Engine,
 };
 
 pub struct MemphisContext {

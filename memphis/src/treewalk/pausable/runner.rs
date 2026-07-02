@@ -1,10 +1,10 @@
 use crate::{
     parser::types::{Statement, StatementKind},
     treewalk::{
+        TreewalkInterpreter, TreewalkResult,
         pausable::{Completion, FrameExit},
         protocols::{Iterable, NextResult},
         result::Raise,
-        TreewalkInterpreter, TreewalkResult,
     },
 };
 

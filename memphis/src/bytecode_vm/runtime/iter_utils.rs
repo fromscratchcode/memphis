@@ -1,8 +1,8 @@
 use crate::{
     bytecode_vm::{
-        result::Raise,
-        runtime::{types::Exception, Reference, VirtualMachine},
         VmResult, VmValue,
+        result::Raise,
+        runtime::{Reference, VirtualMachine, types::Exception},
     },
     core::Container,
 };

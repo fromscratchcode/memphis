@@ -4,12 +4,12 @@ use crate::{
     core::Container,
     domain::ModuleName,
     treewalk::{
+        ModuleStore, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::Callable,
         result::Raise,
         type_system::CloneableCallable,
         types::Module,
-        utils::{check_args, Args},
-        ModuleStore, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        utils::{Args, check_args},
     },
 };
 

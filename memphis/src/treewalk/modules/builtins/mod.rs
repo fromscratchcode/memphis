@@ -2,13 +2,13 @@ use crate::{
     core::Container,
     domain::{Dunder, MemphisValue, ModuleName},
     treewalk::{
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
         iterator::{collect, count},
         protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableCallable,
         types::{Exception, List, Module, Str},
-        utils::{args, check_args, Args},
-        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
+        utils::{Args, args, check_args},
     },
 };
 

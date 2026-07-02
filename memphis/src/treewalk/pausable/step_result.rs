@@ -1,6 +1,6 @@
 use crate::{
     core::Container,
-    treewalk::{types::Coroutine, TreewalkValue},
+    treewalk::{TreewalkValue, types::Coroutine},
 };
 
 pub enum StepResult {

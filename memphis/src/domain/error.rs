@@ -188,7 +188,7 @@ impl Display for MemphisException {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::{test_utils::str, ExceptionKind, MemphisException};
+    use crate::domain::{ExceptionKind, MemphisException, test_utils::str};
 
     #[test]
     fn import_error_ux_for_stdlib() {

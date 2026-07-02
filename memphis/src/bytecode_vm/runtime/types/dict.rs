@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::bytecode_vm::{
-    result::Raise,
-    runtime::{types::Exception, Reference},
-    utils::HashKey,
     VirtualMachine, VmResult,
+    result::Raise,
+    runtime::{Reference, types::Exception},
+    utils::HashKey,
 };
 
 #[derive(Clone, Debug, PartialEq)]

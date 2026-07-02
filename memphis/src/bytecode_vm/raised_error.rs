@@ -1,5 +1,5 @@
 use crate::{
-    bytecode_vm::{runtime::types::Exception, VirtualMachine},
+    bytecode_vm::{VirtualMachine, runtime::types::Exception},
     domain::{DebugCallStack, RaisedMemphisError},
 };
 

@@ -63,7 +63,6 @@ pub use method::Method;
 pub use module::Module;
 pub use object::Object;
 pub use property::Property;
-pub use r#type::TypeClass;
 pub use range::Range;
 pub use set::Set;
 pub use slice::Slice;
@@ -73,6 +72,7 @@ pub use str::Str;
 pub use super_type::Super;
 pub use traceback::Traceback;
 pub use tuple::Tuple;
+pub use r#type::TypeClass;
 
 pub mod iterators {
     pub use super::dict_items::DictItemsIter;

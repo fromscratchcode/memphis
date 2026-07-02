@@ -1,7 +1,7 @@
 use crate::treewalk::{
+    TreewalkResult, TreewalkValue,
     protocols::{Iterable, NextResult},
     type_system::CloneableIterable,
-    TreewalkResult, TreewalkValue,
 };
 
 impl Iterable for Box<dyn CloneableIterable> {
