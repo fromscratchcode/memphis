@@ -1,6 +1,6 @@
 use crate::{
     core::Container,
-    domain::{Identifier, ModuleName, ResolvedModule},
+    domain::{Identifier, LoadedModule, ModuleName},
     treewalk::{
         DomainResult, TreewalkContext, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
         TreewalkValue, import_utils,
@@ -45,11 +45,11 @@ impl TreewalkInterpreter {
         Ok(())
     }
 
-    fn prepare_imported_module(&self, resolved: &ResolvedModule) -> Container<Module> {
+    fn prepare_imported_module(&self, loaded: &LoadedModule) -> Container<Module> {
         let module = Container::new(Module::new_file_backed(
-            resolved.name.clone(),
-            resolved.package.clone(),
-            &resolved.path,
+            loaded.name.clone(),
+            loaded.package.clone(),
+            loaded.source.path().clone(),
         ));
 
         // Before we parse and evaluate this module, store an empty module as a placeholder. This
@@ -78,17 +78,17 @@ impl TreewalkInterpreter {
     }
 
     fn import_module(&self, module_name: &ModuleName) -> TreewalkResult<Container<Module>> {
-        let (resolved, source) = self
+        let loaded = self
             .memphis_state
             .load_source(module_name)
             .map_err(|_| Exception::import_error(module_name))
             .raise(self)?;
 
-        let module = self.prepare_imported_module(&resolved);
+        let module = self.prepare_imported_module(&loaded);
         self.enter_imported_module(module);
 
         TreewalkContext::from_state(self.memphis_state.clone(), self.state.clone())
-            .eval_inner(source.text().clone())
+            .eval_inner(loaded.source.text().clone())
             .map_err(TreewalkDisruption::Error)?;
 
         let module = self.exit_imported_module().raise(self)?;

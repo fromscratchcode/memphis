@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::domain::Source;
+use crate::domain::ScriptPath;
 use crate::{
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
@@ -85,8 +85,8 @@ impl TreewalkContext {
     }
 
     #[cfg(test)]
-    pub fn script(source: Source) -> Self {
-        let origin = ModuleOrigin::File(source.path().to_path_buf());
+    pub fn script(path: ScriptPath) -> Self {
+        let origin = ModuleOrigin::File(path);
         let state = Container::new(MemphisState::init(&origin));
         Self::new(state, origin)
     }

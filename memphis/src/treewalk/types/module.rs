@@ -1,7 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::{
-    domain::{DebugStackFrame, Dunder, ModuleName, ModuleOrigin, ToDebugStackFrame},
+    domain::{DebugStackFrame, Dunder, ModuleName, ModuleOrigin, ScriptPath, ToDebugStackFrame},
     treewalk::{
         Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::MemberRead,
@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Module {
     name: ModuleName,
     package: Option<ModuleName>,
@@ -29,8 +29,12 @@ impl Module {
         }
     }
 
-    pub fn new_file_backed(name: ModuleName, package: Option<ModuleName>, path: &Path) -> Self {
-        Self::new(name, package, ModuleOrigin::File(path.to_path_buf()))
+    pub fn new_file_backed(
+        name: ModuleName,
+        package: Option<ModuleName>,
+        path: ScriptPath,
+    ) -> Self {
+        Self::new(name, package, ModuleOrigin::File(path))
     }
 
     pub fn new_builtin(name: ModuleName) -> Self {

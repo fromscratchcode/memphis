@@ -2,7 +2,7 @@ use crate::{
     Engine,
     bytecode_vm::VmContext,
     core::Container,
-    domain::{MemphisResult, MemphisValue, ModuleOrigin, Source, Text},
+    domain::{MemphisResult, MemphisValue, ModuleOrigin, ScriptPath, Text},
     interpreter::Interpreter,
     runtime::MemphisState,
     treewalk::TreewalkContext,
@@ -19,8 +19,8 @@ impl MemphisContext {
         Self::new(engine, ModuleOrigin::Stdin)
     }
 
-    pub fn script(engine: Engine, source: Source) -> Self {
-        Self::new(engine, ModuleOrigin::File(source.path().to_path_buf()))
+    pub fn script(engine: Engine, path: ScriptPath) -> Self {
+        Self::new(engine, ModuleOrigin::File(path))
     }
 
     pub fn eval(&mut self, text: Text) -> MemphisResult<MemphisValue> {

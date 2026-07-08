@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, Clone)]
+use crate::domain::ScriptPath;
+
+#[derive(Debug, Clone)]
 pub enum ModuleOrigin {
-    File(PathBuf),
+    File(ScriptPath),
     Stdin,
     Builtin,
     Synthetic,
@@ -11,7 +13,7 @@ pub enum ModuleOrigin {
 impl ModuleOrigin {
     pub fn path(&self) -> PathBuf {
         match self {
-            ModuleOrigin::File(p) => p.to_path_buf(),
+            ModuleOrigin::File(p) => p.as_path().to_path_buf(),
             ModuleOrigin::Stdin => PathBuf::from("<stdin>"),
             ModuleOrigin::Builtin => PathBuf::from("<builtin>"),
             ModuleOrigin::Synthetic => PathBuf::from("<synthetic>"),

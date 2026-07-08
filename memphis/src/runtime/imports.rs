@@ -1,4 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+use crate::domain::ScriptPath;
 
 /// A store of directories searched during each import.
 pub struct ImportResolver {
@@ -14,8 +16,9 @@ impl ImportResolver {
     }
 
     /// Subsequent absolute imports will use the provided [`PathBuf`] to search for modules.
-    pub fn register_root(&mut self, path: &Path) {
+    pub fn register_root(&mut self, path: &ScriptPath) {
         let path = path
+            .as_path()
             .parent()
             .map_or_else(|| PathBuf::from("./"), |parent| parent.to_path_buf());
 

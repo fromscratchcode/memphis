@@ -7,7 +7,7 @@ use crate::{
         protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableCallable,
-        types::{Exception, List, Module, Str},
+        types::{Class, Exception, List, Module, Str},
         utils::{Args, args, check_args},
     },
 };
@@ -216,9 +216,9 @@ impl Callable for IsinstanceBuiltin {
         };
 
         let isinstance = if args.get_arg(0).as_class().is_ok() {
-            has_overlap(&reference_class, &instance_class.borrow().metaclass().mro())
+            has_class_overlap(&reference_class, &instance_class.borrow().metaclass().mro())
         } else {
-            has_overlap(&reference_class, &instance_class.mro())
+            has_class_overlap(&reference_class, &instance_class.mro())
         };
 
         Ok(TreewalkValue::Bool(isinstance))
@@ -334,6 +334,7 @@ impl Callable for SortedBuiltin {
     }
 }
 
-fn has_overlap<T: PartialEq>(vec1: &[T], vec2: &[T]) -> bool {
-    vec1.iter().any(|item| vec2.contains(item))
+fn has_class_overlap(left: &[Container<Class>], right: &[Container<Class>]) -> bool {
+    left.iter()
+        .any(|a| right.iter().any(|b| a.same_identity(b)))
 }

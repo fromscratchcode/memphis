@@ -114,7 +114,6 @@ impl PartialEq for TreewalkValue {
             (TreewalkValue::DictValues(a), TreewalkValue::DictValues(b)) => a == b,
             (TreewalkValue::Range(a), TreewalkValue::Range(b)) => a == b,
             (TreewalkValue::Tuple(a), TreewalkValue::Tuple(b)) => a == b,
-            (TreewalkValue::Function(a), TreewalkValue::Function(b)) => a == b,
             (TreewalkValue::Class(a), TreewalkValue::Class(b)) => a == b,
             (TreewalkValue::Object(a), TreewalkValue::Object(b)) => a.same_identity(b),
             (TreewalkValue::Exception(a), TreewalkValue::Exception(b)) => a == b,

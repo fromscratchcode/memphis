@@ -1,10 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::{
     core::Container,
     domain::{
-        DebugCallStack, DebugStackFrame, ModuleName, ModuleOrigin, ResolvedModule, Source,
-        ToDebugStackFrame, resolve,
+        DebugCallStack, DebugStackFrame, LoadedModule, ModuleName, ModuleOrigin, ResolvedModule,
+        ScriptPath, ToDebugStackFrame, resolve,
     },
 };
 
@@ -48,7 +48,7 @@ impl MemphisState {
         state
     }
 
-    fn register_root(&mut self, path: &Path) {
+    fn register_root(&mut self, path: &ScriptPath) {
         self.import_resolver.register_root(path);
     }
 }
@@ -81,15 +81,12 @@ impl Container<MemphisState> {
         self.borrow_mut().debug_call_stack.pop_stack_frame()
     }
 
-    pub fn load_source(
-        &self,
-        module_name: &ModuleName,
-    ) -> Result<(ResolvedModule, Source), ImportError> {
+    pub fn load_source(&self, module_name: &ModuleName) -> Result<LoadedModule, ImportError> {
         let resolved = self.resolve_module(module_name)?;
-        let source = Source::from_path(&resolved.path)
+        let loaded = resolved
+            .load()
             .map_err(|_| ImportError::new(&format!("No module named {}", module_name)))?;
-
-        Ok((resolved, source))
+        Ok(loaded)
     }
 
     fn resolve_module(&self, module_name: &ModuleName) -> Result<ResolvedModule, ImportError> {

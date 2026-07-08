@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::domain::{Dunder, FromImportPath, ModuleName, ModulePath, ResolvedModule};
+use crate::domain::{Dunder, FromImportPath, ModuleName, ModulePath, ResolvedModule, ScriptPath};
 
 pub enum ImportResolutionError {
     NoParentPackage,
@@ -53,9 +53,9 @@ pub fn resolve(requested: &ModuleName, search_paths: &[PathBuf]) -> Option<Resol
 
         for path in candidates {
             if path.exists() {
-                let path = path.canonicalize().ok()?;
+                let path = ScriptPath::new(path).ok()?;
 
-                let package = if path.ends_with(Dunder::Init.py_file()) {
+                let package = if path.as_path().ends_with(Dunder::Init.py_file()) {
                     // package
                     Some(requested.clone())
                 } else {

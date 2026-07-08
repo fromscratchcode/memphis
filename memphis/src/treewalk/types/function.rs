@@ -63,12 +63,6 @@ impl_descriptor_provider!(
     ]
 );
 
-impl PartialEq for Function {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.module == other.module
-    }
-}
-
 impl ToDebugStackFrame for Function {
     fn to_stack_frame(&self) -> DebugStackFrame {
         DebugStackFrame::new(

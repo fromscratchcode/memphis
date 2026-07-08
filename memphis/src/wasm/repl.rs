@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -68,7 +70,7 @@ impl WasmRepl {
     #[wasm_bindgen(constructor)]
     pub fn new(engine_str: &str) -> WasmRepl {
         // We guard this using TypeScript
-        let engine = Engine::try_from(engine_str).expect("Invalid engine.");
+        let engine = Engine::from_str(engine_str).expect("Invalid engine.");
 
         WasmRepl {
             session: ReplSession::new(engine),

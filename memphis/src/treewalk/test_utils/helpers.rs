@@ -20,7 +20,7 @@ fn resolve_workspace_path(path: &str) -> PathBuf {
 fn init_path(path: &str) -> (TreewalkContext, Text) {
     let source = Source::from_path(resolve_workspace_path(path)).expect("Failed to create Source");
     (
-        TreewalkContext::script(source.clone()),
+        TreewalkContext::script(source.path().clone()),
         source.text().clone(),
     )
 }

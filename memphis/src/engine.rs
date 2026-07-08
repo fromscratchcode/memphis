@@ -1,44 +1,26 @@
-use std::{
-    env,
-    fmt::{Display, Formatter, Result},
-};
+use std::fmt::{Display, Formatter};
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub enum Engine {
+    #[default]
     Treewalk,
     BytecodeVm,
 }
 
-impl Engine {
-    /// I could see the default becoming [`Engine::BytecodeVm`] in the future once it supports more.
-    pub const DEFAULT_ENGINE: Engine = Engine::Treewalk;
+impl std::str::FromStr for Engine {
+    type Err = String;
 
-    pub fn from_env() -> Self {
-        if let Ok(mode) = env::var("MEMPHIS_ENGINE") {
-            match Engine::try_from(mode.to_lowercase().as_str()) {
-                Ok(e) => e,
-                Err(_) => panic!("Unsupported engine: {mode}"),
-            }
-        } else {
-            Self::DEFAULT_ENGINE
-        }
-    }
-}
-
-impl TryFrom<&str> for Engine {
-    type Error = ();
-
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        match value {
-            "bytecode_vm" => Ok(Engine::BytecodeVm),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
             "treewalk" => Ok(Engine::Treewalk),
-            _ => Err(()),
+            "bytecode_vm" => Ok(Engine::BytecodeVm),
+            _ => Err(format!("Unknown engine: {}", s)),
         }
     }
 }
 
 impl Display for Engine {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Engine::Treewalk => write!(f, "treewalk"),
             Engine::BytecodeVm => write!(f, "bytecode_vm"),

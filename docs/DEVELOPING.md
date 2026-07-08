@@ -15,7 +15,7 @@ cargo run
 To compare runtime, we can build in release mode and use the different engines.
 ```bash
 cargo install --path memphis-cli
-hyperfine "memphis examples/loop_perf.py" "MEMPHIS_ENGINE=bytecode_vm memphis examples/loop_perf.py" --warmup 5
+hyperfine "memphis examples/loop_perf.py" "memphis --engine bytecode_vm examples/loop_perf.py" --warmup 5
 ```
 ### Flamegraph
 This is a cool way to visualize why a bytecode VM is more performant than a treewalk interpreter.
@@ -24,7 +24,7 @@ cargo install flamegraph
 cargo build --all-features
 # we require debug symbols to produce a flamegraph, hence invoking the binary from `target/debug`.
 sudo flamegraph -v -o tw.svg -- target/debug/memphis examples/loop_perf.py
-sudo flamegraph -v -o vm.svg -- MEMPHIS_ENGINE=bytecode_vm target/debug/memphis examples/loop_perf.py
+sudo flamegraph -v -o vm.svg -- target/debug/memphis --engine bytecode_vm examples/loop_perf.py
 ```
 
 ## WebAssembly
@@ -35,5 +35,5 @@ cargo install wasm-pack
 
 # wasm-pack also downloads the wasm32-unknown-unknown target via rustup for us.
 # We must specify a feature flag because our wasm_bindgen interface is behind the wasm feature flag.
-wasm-pack build --target web -- --features wasm
+wasm-pack build memphis --target web -- --features wasm
 ```

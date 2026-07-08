@@ -115,7 +115,7 @@ impl VirtualMachine {
     }
 
     fn import_from_source(&mut self, module_name: &ModuleName) -> VmResult<Reference> {
-        let (resolved, source) = self
+        let loaded = self
             .state
             .load_source(module_name)
             .map_err(|_| {
@@ -130,14 +130,14 @@ impl VirtualMachine {
             .alloc_module(Module::new(module_name.clone()));
 
         let mut context = VmContext::from_state(
-            resolved.name.clone(),
-            resolved.package.clone(),
-            ModuleOrigin::File(source.path().to_path_buf()),
+            loaded.name.clone(),
+            loaded.package.clone(),
+            ModuleOrigin::File(loaded.source.path().clone()),
             self.state.clone(),
             self.runtime.clone(),
         );
 
-        context.eval_inner(source.text().clone())?;
+        context.eval_inner(loaded.source.text().clone())?;
 
         Ok(module_ref)
     }

@@ -19,7 +19,10 @@ fn resolve_workspace_path(path: &str) -> PathBuf {
 
 fn init_path(path: &str) -> (VmContext, Text) {
     let source = Source::from_path(resolve_workspace_path(path)).expect("Failed to create Source");
-    (VmContext::script(source.clone()), source.text().clone())
+    (
+        VmContext::script(source.path().clone()),
+        source.text().clone(),
+    )
 }
 
 pub fn eval(text: &str) -> MemphisValue {

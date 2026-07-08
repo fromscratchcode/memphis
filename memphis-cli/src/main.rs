@@ -1,21 +1,27 @@
-use std::{env, process};
+use clap::Parser;
+use std::path::PathBuf;
 
 use memphis::Engine;
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(long)]
+    engine: Option<Engine>,
+
+    #[arg(value_name = "SCRIPT")]
+    script: Option<PathBuf>,
+}
 
 mod cli;
 mod io;
 mod terminal;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let engine = Engine::from_env();
+    let cli = Cli::parse();
+    let engine = cli.engine.unwrap_or(Engine::default());
 
-    match args.len() {
-        1 => cli::repl(engine),
-        2 => cli::script(&args[1], engine),
-        _ => {
-            eprintln!("Usage: memphis [<filename>]");
-            process::exit(1);
-        }
+    match cli.script {
+        None => cli::repl(engine),
+        Some(path) => cli::script(path, engine),
     }
 }

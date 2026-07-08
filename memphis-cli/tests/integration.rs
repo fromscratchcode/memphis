@@ -1,6 +1,6 @@
 #[cfg(test)]
 // These tests exist to test that the memphis binary works properly in script mode and correctly
-// responds to the MEMPHIS_ENGINE environment variable. For semantic tests, look in the specific
+// responds to the engine cli flag. For semantic tests, look in the specific
 // engine or in crosscheck, which do not boot another process.
 mod integration_tests {
     use std::{
@@ -19,7 +19,7 @@ mod integration_tests {
         let mut command = Command::new(binary);
 
         if let Some(engine_name) = engine {
-            command.env("MEMPHIS_ENGINE", engine_name);
+            command.arg("--engine").arg(engine_name);
         }
 
         let output = command
@@ -45,11 +45,20 @@ mod integration_tests {
     }
 
     #[test]
-    fn run_treewalk_script() {
+    fn run_treewalk_script_default() {
         test_script(
             "fixtures/test.py",
             include_str!("../../fixtures/test.stdout"),
             None,
+        );
+    }
+
+    #[test]
+    fn run_treewalk_script_explicit() {
+        test_script(
+            "fixtures/test.py",
+            include_str!("../../fixtures/test.stdout"),
+            Some("treewalk"),
         );
     }
 

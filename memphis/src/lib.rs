@@ -16,6 +16,6 @@ mod treewalk;
 mod wasm;
 
 pub use context::MemphisContext;
-pub use domain::Source;
+pub use domain::{ScriptPath, Source};
 pub use engine::Engine;
 pub use repl::{ReplResult, ReplSession, ReplStep};
