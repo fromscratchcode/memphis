@@ -1,0 +1,25 @@
+{
+  "name": "@fromscratchcode/memphis-js",
+  "version": "0.1.0",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "./scripts/prepack.sh"
+  },
+  "type": "module",
+  "description": "JavaScript interface for running the Memphis Python interpreter in WebAssembly.",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "pkg"
+  ]
+}

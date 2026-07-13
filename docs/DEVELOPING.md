@@ -35,5 +35,5 @@ cargo install wasm-pack
 
 # wasm-pack also downloads the wasm32-unknown-unknown target via rustup for us.
 # We must specify a feature flag because our wasm_bindgen interface is behind the wasm feature flag.
-wasm-pack build memphis --target web -- --features wasm
+wasm-pack build memphis --target web --out-dir ../memphis-js/pkg -- --features wasm
 ```
