@@ -4,7 +4,7 @@ use crate::{
 };
 use std::path::{Path, PathBuf};
 
-fn init() -> TreewalkContext {
+pub fn init() -> TreewalkContext {
     TreewalkContext::stdin()
 }
 

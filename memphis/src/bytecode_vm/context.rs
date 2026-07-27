@@ -82,6 +82,15 @@ impl VmContext {
         self.vm.state.borrow_mut().io.take_output()
     }
 
+    #[cfg(test)]
+    pub fn set_input<I, S>(&mut self, lines: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.vm.state.borrow_mut().io.set_input(lines);
+    }
+
     #[cfg(any(test, feature = "wasm"))]
     pub fn stdin() -> Self {
         // We don't need to initialize the ModuleOrigin here because there's no filepath to record.

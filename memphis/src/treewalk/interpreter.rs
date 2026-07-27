@@ -85,7 +85,7 @@ mod tests {
     use super::*;
 
     use crate::{
-        domain::Type,
+        domain::{Text, Type},
         parser::{
             test_utils::stmt_expr,
             types::{Expr, ast},
@@ -5341,5 +5341,83 @@ b = 2; c = 3
 
         let output = run_script("fixtures/builtins.py");
         assert_eq!(output, include_str!("../../../fixtures/builtins.stdout"));
+    }
+
+    #[test]
+    fn stdin() {
+        let mut context = init();
+        context.set_input(["Name"]);
+
+        let result = context
+            .eval_inner(Text::new("input()"))
+            .expect("Eval failed");
+
+        assert_eq!(result, str!("Name"));
+
+        let mut context = init();
+        context.set_input(["  Name  "]);
+
+        let result = context
+            .eval_inner(Text::new("input()"))
+            .expect("Eval failed");
+
+        assert_eq!(result, str!("  Name  "));
+
+        let mut context = init();
+        context.set_input(["  Name  \r\n"]);
+
+        let result = context
+            .eval_inner(Text::new("input()"))
+            .expect("Eval failed");
+
+        assert_eq!(result, str!("  Name  "));
+
+        let mut context = init();
+        context.set_input(["\n"]);
+
+        let result = context
+            .eval_inner(Text::new("input()"))
+            .expect("Eval failed");
+
+        assert_eq!(result, str!(""));
+    }
+
+    #[test]
+    fn stdin_eoferror() {
+        let mut context = init();
+        context.set_input(["Name"]);
+
+        let first = context
+            .eval_inner(Text::new("input()"))
+            .expect("Eval failed");
+        assert_eq!(first, str!("Name"));
+
+        let result = context.eval_inner(Text::new("input()")).unwrap_err();
+        assert_eof_error!(result.exception, "EOF when reading a line");
+    }
+
+    #[test]
+    fn stdin_with_prompt() {
+        let input = r#"
+name = input("Enter your name: ")
+print(f"Hello {name}.")
+"#;
+        let mut context = init();
+        context.set_input(["John"]);
+        context.enable_capture();
+
+        let _ = context.eval_inner(Text::new(input)).expect("Eval failed");
+
+        assert_eq!(
+            context.take_output().unwrap(),
+            "Enter your name: Hello John.\n"
+        );
+    }
+
+    #[test]
+    fn stdin_with_extra_arg() {
+        let input = r#"input("one", "two")"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "Found 2 args");
     }
 }

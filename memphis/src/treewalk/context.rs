@@ -78,6 +78,19 @@ impl TreewalkContext {
     }
 
     #[cfg(test)]
+    pub fn set_input<I, S>(&mut self, lines: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.interpreter
+            .memphis_state
+            .borrow_mut()
+            .io
+            .set_input(lines);
+    }
+
+    #[cfg(test)]
     pub fn stdin() -> Self {
         // We don't need to initialize the ModuleOrigin here because there's no filepath to record.
         let state = Container::new(MemphisState::new());

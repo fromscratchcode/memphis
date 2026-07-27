@@ -4,7 +4,7 @@ use crate::{
 };
 use std::path::{Path, PathBuf};
 
-fn init() -> VmContext {
+pub fn init() -> VmContext {
     VmContext::stdin()
 }
 

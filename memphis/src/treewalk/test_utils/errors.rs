@@ -571,10 +571,52 @@ macro_rules! assert_lookup_error {
     }};
 }
 
+macro_rules! assert_eof_error {
+    ($exc:expr) => {{
+        match &$exc {
+            $crate::treewalk::types::Exception {
+                kind: $crate::domain::ExceptionKind::EOFError,
+                payload,
+            } => {
+                assert!(
+                    payload.is_empty(),
+                    "Expected EOFError with no message, got payload: {:?}",
+                    payload
+                );
+            }
+            _ => panic!("Expected EOFError, got: {:?}", &$exc),
+        }
+    }};
+    ($exc:expr, $expected_message:expr) => {{
+        match &$exc {
+            $crate::treewalk::types::Exception {
+                kind: $crate::domain::ExceptionKind::EOFError,
+                payload,
+            } => {
+                assert_eq!(
+                    payload.len(),
+                    1,
+                    "Expected EOFError with one argument, got payload: {:?}",
+                    payload
+                );
+
+                match &payload[0] {
+                    $crate::treewalk::TreewalkValue::Str(s) => {
+                        assert_eq!(s.as_str(), $expected_message, "Unexpected EOFError message");
+                    }
+                    other => panic!("Expected EOFError message to be a string, got: {:?}", other),
+                }
+            }
+            _ => panic!("Expected EOFError, got: {:?}", &$exc),
+        }
+    }};
+}
+
 pub(crate) use assert_assertion_error;
 pub(crate) use assert_attribute_error;
 pub(crate) use assert_base_exception;
 pub(crate) use assert_div_by_zero_error;
+pub(crate) use assert_eof_error;
 pub(crate) use assert_exception;
 #[allow(unused_imports)]
 pub(crate) use assert_index_error;

@@ -10,9 +10,10 @@ use crate::{
     },
     core::Container,
     domain::{Dunder, ModuleName, Type},
+    runtime::IoError,
 };
 
-static BUILTINS: [(&str, BuiltinFn); 10] = [
+static BUILTINS: [(&str, BuiltinFn); 11] = [
     ("type", type_fn),
     ("bool", bool),
     ("int", int),
@@ -23,6 +24,7 @@ static BUILTINS: [(&str, BuiltinFn); 10] = [
     ("print", print),
     ("iter", iter),
     ("next", next),
+    ("input", input),
 ];
 
 fn register_builtin_types(runtime: &Runtime, module: &mut Module) {
@@ -270,8 +272,32 @@ fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         .map(|arg| vm.normalize_vm_ref(*arg).to_string())
         .collect::<Vec<_>>()
         .join(" ");
-    vm.state.borrow_mut().io.print_line(&value);
+    vm.state.borrow_mut().io.println(&value);
     Ok(vm.none())
+}
+
+fn input(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
+    if args.len() >= 2 {
+        let msg = vm.intern_string("input expected 0 or 1 positional arguments");
+        return Exception::type_error(msg).raise(vm);
+    }
+
+    if let Some(prompt) = args.first() {
+        let s = vm.normalize_vm_ref(*prompt).to_string();
+        vm.state.borrow_mut().io.print(&s);
+    }
+
+    let input = vm.state.borrow_mut().io.input();
+    match input {
+        Err(IoError::Eof) => {
+            let msg = vm.intern_string("EOF when reading a line");
+            Exception::eof_error(msg).raise(vm)
+        }
+        Ok(input) => {
+            let val = vm.intern_string(&input);
+            Ok(val)
+        }
+    }
 }
 
 #[cfg(test)]

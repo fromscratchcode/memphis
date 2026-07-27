@@ -114,6 +114,10 @@ impl Exception {
         Self::new_from_str(ExceptionKind::DivisionByZero, msg.into())
     }
 
+    pub fn eof_error(msg: impl Into<String>) -> Self {
+        Self::new_from_str(ExceptionKind::EOFError, msg)
+    }
+
     pub fn lookup_error(msg: impl Into<String>) -> Self {
         Self::new_from_str(ExceptionKind::LookupError, msg)
     }

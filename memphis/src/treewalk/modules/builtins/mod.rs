@@ -1,6 +1,7 @@
 use crate::{
     core::Container,
     domain::{Dunder, MemphisValue, ModuleName},
+    runtime::IoError,
     treewalk::{
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
         iterator::{collect, count},
@@ -27,6 +28,7 @@ fn builtins() -> Vec<Box<dyn CloneableCallable>> {
         Box::new(LenBuiltin),
         Box::new(NextBuiltin),
         Box::new(PrintBuiltin),
+        Box::new(InputBuiltin),
     ]
 }
 
@@ -75,6 +77,8 @@ pub struct LenBuiltin;
 pub struct NextBuiltin;
 #[derive(Clone)]
 pub struct PrintBuiltin;
+#[derive(Clone)]
+pub struct InputBuiltin;
 
 impl Callable for CallableBuiltin {
     fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
@@ -269,12 +273,33 @@ impl Callable for PrintBuiltin {
             })
             .collect::<Vec<_>>()
             .join(" ");
-        interpreter.memphis_state.borrow_mut().io.print_line(&value);
+        interpreter.memphis_state.borrow_mut().io.println(&value);
         Ok(TreewalkValue::None)
     }
 
     fn name(&self) -> String {
         "print".into()
+    }
+}
+
+impl Callable for InputBuiltin {
+    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+        check_args(&args, |len| [0, 1].contains(&len)).raise(interpreter)?;
+
+        if let Some(prompt) = args.get_arg_optional(0) {
+            let mv = MemphisValue::from(prompt).to_string();
+            interpreter.memphis_state.borrow_mut().io.print(&mv);
+        }
+
+        let input = interpreter.memphis_state.borrow_mut().io.input();
+        match input {
+            Err(IoError::Eof) => Exception::eof_error("EOF when reading a line").raise(interpreter),
+            Ok(input) => Ok(TreewalkValue::Str(Str::new(&input))),
+        }
+    }
+
+    fn name(&self) -> String {
+        "input".into()
     }
 }
 

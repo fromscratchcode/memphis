@@ -1,6 +1,10 @@
 #[cfg(test)]
 mod tests_vm_interpreter {
-    use crate::{bytecode_vm::test_utils::*, domain::test_utils::*};
+    use crate::{
+        bytecode_vm::test_utils::*,
+        domain::{Text, test_utils::*},
+        interpreter::Interpreter as _,
+    };
 
     #[test]
     fn expression() {
@@ -702,5 +706,65 @@ b, c
             output,
             include_str!("../../../fixtures/async/simple.stdout")
         );
+    }
+
+    #[test]
+    fn stdin() {
+        let mut context = init();
+        context.set_input(["Name"]);
+        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        assert_eq!(result, str!("Name"));
+
+        let mut context = init();
+        context.set_input(["  Name  "]);
+        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        assert_eq!(result, str!("  Name  "));
+
+        let mut context = init();
+        context.set_input(["  Name  \r\n"]);
+        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        assert_eq!(result, str!("  Name  "));
+
+        let mut context = init();
+        context.set_input(["\n"]);
+        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        assert_eq!(result, str!(""));
+    }
+
+    #[test]
+    fn stdin_eoferror() {
+        let mut context = init();
+        context.set_input(["Name"]);
+
+        let first = context.eval(Text::new("input()")).expect("Eval failed");
+        assert_eq!(first, str!("Name"));
+
+        let result = context.eval(Text::new("input()")).unwrap_err();
+        assert_eof_error!(result.exception, "EOF when reading a line");
+    }
+
+    #[test]
+    fn stdin_with_prompt() {
+        let input = r#"
+name = input("Enter your name: ")
+print(f"Hello {name}.")
+"#;
+        let mut context = init();
+        context.set_input(["John"]);
+        context.enable_capture();
+
+        let _ = context.eval(Text::new(input)).expect("Eval failed");
+
+        assert_eq!(
+            context.take_output().unwrap(),
+            "Enter your name: Hello John.\n"
+        );
+    }
+
+    #[test]
+    fn stdin_with_extra_arg() {
+        let input = r#"input("one", "two")"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "input expected 0 or 1 positional arguments");
     }
 }

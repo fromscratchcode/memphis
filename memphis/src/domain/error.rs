@@ -20,6 +20,7 @@ pub enum ExceptionKind {
     StopIteration,
     AssertionError,
     SyntaxError,
+    EOFError,
 }
 
 impl ExceptionKind {
@@ -41,6 +42,7 @@ impl ExceptionKind {
             Self::AttributeError => Type::AttributeError,
             Self::AssertionError => Type::AssertionError,
             Self::SyntaxError => Type::SyntaxError,
+            Self::EOFError => Type::EOFError,
         }
     }
 
@@ -62,6 +64,7 @@ impl ExceptionKind {
             Type::AttributeError => Self::AttributeError,
             Type::AssertionError => Self::AssertionError,
             Type::SyntaxError => Self::SyntaxError,
+            Type::EOFError => Self::EOFError,
             _ => panic!("Not an error kind"),
         }
     }

@@ -75,11 +75,12 @@ pub enum Type {
     AssertionError,
     SyntaxError,
     IOError,
+    EOFError,
 }
 
 impl Type {
     /// A list of all the variants of [`Type`] which should have a type class created.
-    const ALL: [Type; 69] = [
+    const ALL: [Type; 70] = [
         Type::Type,
         Type::Object,
         Type::Super,
@@ -149,6 +150,7 @@ impl Type {
         Type::SyntaxError,
         Type::IOError,
         Type::IndexError,
+        Type::EOFError,
     ];
 
     pub fn all() -> &'static [Type] {
@@ -228,6 +230,7 @@ impl Type {
             Type::AssertionError => "AssertionError",
             Type::SyntaxError => "SyntaxError",
             Type::IOError => "IOError",
+            Type::EOFError => "EOFError",
         }
     }
 
@@ -280,6 +283,7 @@ impl Type {
                 | Type::AssertionError
                 | Type::SyntaxError
                 | Type::IOError
+                | Type::EOFError
         )
     }
 }
@@ -302,7 +306,7 @@ impl From<&Type> for &str {
     }
 }
 
-static TYPE_PARENTS: [(Type, &[Type]); 15] = [
+static TYPE_PARENTS: [(Type, &[Type]); 16] = [
     (Type::Exception, &[Type::BaseException]),
     (Type::TypeError, &[Type::Exception]),
     (Type::StopIteration, &[Type::Exception]),
@@ -318,4 +322,5 @@ static TYPE_PARENTS: [(Type, &[Type]); 15] = [
     (Type::AssertionError, &[Type::Exception]),
     (Type::SyntaxError, &[Type::Exception]),
     (Type::IOError, &[Type::Exception]),
+    (Type::EOFError, &[Type::Exception]),
 ];

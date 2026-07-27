@@ -78,6 +78,7 @@ pub struct BuiltinTypes {
     pub assertionerror: Reference,
     pub syntaxerror: Reference,
     pub ioerror: Reference,
+    pub eoferror: Reference,
 }
 
 impl BuiltinTypes {
@@ -152,6 +153,7 @@ impl BuiltinTypes {
             valueerror: type_map.remove(&Type::ValueError).unwrap(),
             nameerror: type_map.remove(&Type::NameError).unwrap(),
             syntaxerror: type_map.remove(&Type::SyntaxError).unwrap(),
+            eoferror: type_map.remove(&Type::EOFError).unwrap(),
         }
     }
 
@@ -272,6 +274,7 @@ impl BuiltinTypes {
             Type::AssertionError => self.assertionerror,
             Type::SyntaxError => self.syntaxerror,
             Type::IOError => self.ioerror,
+            Type::EOFError => self.eoferror,
         }
     }
 }

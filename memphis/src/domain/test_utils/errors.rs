@@ -396,7 +396,49 @@ macro_rules! assert_runtime_error {
     }};
 }
 
+macro_rules! assert_eof_error {
+    ($exc:expr) => {{
+        match &$exc {
+            $crate::domain::MemphisException {
+                kind: $crate::domain::ExceptionKind::EOFError,
+                payload,
+            } => {
+                assert!(
+                    payload.is_empty(),
+                    "Expected EOFError with no message, got payload: {:?}",
+                    payload
+                );
+            }
+            _ => panic!("Expected EOFError, got: {:?}", &$exc),
+        }
+    }};
+    ($exc:expr, $expected_message:expr) => {{
+        match &$exc {
+            $crate::domain::MemphisException {
+                kind: $crate::domain::ExceptionKind::EOFError,
+                payload,
+            } => {
+                assert_eq!(
+                    payload.len(),
+                    1,
+                    "Expected EOFError with one argument, got payload: {:?}",
+                    payload
+                );
+
+                match &payload[0] {
+                    $crate::domain::MemphisValue::Str(s) => {
+                        assert_eq!(s.as_str(), $expected_message, "Unexpected EOFError message");
+                    }
+                    other => panic!("Expected EOFError message to be a string, got: {:?}", other),
+                }
+            }
+            _ => panic!("Expected EOFError, got: {:?}", &$exc),
+        }
+    }};
+}
+
 pub(crate) use assert_div_by_zero_error;
+pub(crate) use assert_eof_error;
 pub(crate) use assert_import_error;
 pub(crate) use assert_index_error;
 pub(crate) use assert_key_error;
