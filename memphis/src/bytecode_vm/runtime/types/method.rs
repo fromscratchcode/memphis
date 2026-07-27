@@ -12,6 +12,6 @@ impl Method {
     }
 
     pub fn name(&self) -> String {
-        format!("{} of {:?}", self.function.name(), &self.receiver)
+        format!("{} of {:?}", self.function.name(), self.receiver)
     }
 }
