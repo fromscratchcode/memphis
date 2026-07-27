@@ -163,7 +163,10 @@ impl TreewalkValue {
             (TreewalkValue::None, TreewalkValue::None) => true,
             (TreewalkValue::None, _) | (_, TreewalkValue::None) => false,
             (TreewalkValue::Object(a), TreewalkValue::Object(b)) => a.same_identity(b),
-            _ => unimplemented!(), // Different variants or not both TreewalkValue::Object
+            (TreewalkValue::Class(a), TreewalkValue::Class(b)) => a.same_identity(b),
+            // Different variants or not both TreewalkValue::Object
+            // TODO this is incomplete
+            _ => false,
         }
     }
 

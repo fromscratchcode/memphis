@@ -3088,6 +3088,38 @@ raise MyError()
     }
 
     #[test]
+    fn raise_class_versus_instance() {
+        let input = r#"
+try:
+    raise Exception
+except Exception as e:
+    a = e is Exception
+    b = type(e) is Exception
+
+a, b
+"#;
+        assert_eval_eq!(input, tuple![bool!(false), bool!(true)]);
+    }
+
+    #[test]
+    #[ignore]
+    fn raise_class_versus_instance_user_defined() {
+        let input = r#"
+class Klass(Exception):
+    pass
+
+try:
+    raise Klass
+except Klass as e:
+    a = e is Klass
+    b = type(e) is Klass
+
+a, b
+"#;
+        assert_eval_eq!(input, tuple![bool!(false), bool!(true)]);
+    }
+
+    #[test]
     fn context_manager() {
         let input = r#"
 class MyContextManager:
