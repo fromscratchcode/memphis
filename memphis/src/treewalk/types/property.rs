@@ -8,7 +8,7 @@ use crate::{
         result::Raise,
         type_system::CloneableCallable,
         types::Class,
-        utils::{Args, args, check_args},
+        utils::{BoundArgs, Signature, args},
     },
 };
 
@@ -28,10 +28,16 @@ impl Property {
 pub struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        // The first arg is the class itself, the second arg is the function
-        check_args(&args, |len| len == 2).raise(interpreter)?;
-        let function = args.get_arg(1).as_callable().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls", "func"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let function = args.get("func").clone().as_callable().raise(interpreter)?;
         Ok(TreewalkValue::Property(Property::new(function)))
     }
 

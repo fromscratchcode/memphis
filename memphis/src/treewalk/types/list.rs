@@ -10,8 +10,8 @@ use crate::{
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
-        types::{Exception, Slice},
-        utils::{Args, check_args},
+        types::{Exception, Slice, Tuple},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -174,15 +174,20 @@ struct SetItemBuiltin;
 struct DelItemBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("iterable", TreewalkValue::Tuple(Tuple::default()))
+                .positional_only(),
+        ])
+    }
 
-        let list = match args.len() {
-            1 => List::default(),
-            2 => List::try_eval_from(args.get_arg(1), interpreter)?,
-            _ => unreachable!(),
-        };
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let list = List::try_eval_from(args.get("iterable").clone(), interpreter)?;
         Ok(TreewalkValue::List(Container::new(list)))
     }
 
@@ -192,18 +197,19 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for AddBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "value"])
+    }
 
-        let left_list = args
-            .get_self()
-            .raise(interpreter)?
-            .as_list()
-            .raise(interpreter)?;
-        let right_list = args.get_arg(0).as_list().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let left_list = args.get("self").as_list().raise(interpreter)?;
+        let right_list = args.get("value").as_list().raise(interpreter)?;
         let l = left_list.borrow().clone();
         let r = right_list.borrow().clone();
-
         Ok(TreewalkValue::List(Container::new(l + r)))
     }
 
@@ -213,16 +219,17 @@ impl Callable for AddBuiltin {
 }
 
 impl Callable for AppendBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "object"])
+    }
 
-        let list = args
-            .get_self()
-            .raise(interpreter)?
-            .as_list()
-            .raise(interpreter)?;
-        list.borrow_mut().append(args.get_arg(0).clone());
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let list = args.get("self").as_list().raise(interpreter)?;
+        list.borrow_mut().append(args.get("object").clone());
         Ok(TreewalkValue::None)
     }
 
@@ -232,17 +239,18 @@ impl Callable for AppendBuiltin {
 }
 
 impl Callable for ExtendBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "iterable"])
+    }
 
-        let list = args
-            .get_self()
-            .raise(interpreter)?
-            .as_list()
-            .raise(interpreter)?;
-        let iter = args.get_arg(0).as_iterator().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let list = args.get("self").as_list().raise(interpreter)?;
+        let iter = args.get("iterable").as_iterator().raise(interpreter)?;
         list.borrow_mut().extend(iter)?;
-
         Ok(TreewalkValue::None)
     }
 
@@ -252,29 +260,31 @@ impl Callable for ExtendBuiltin {
 }
 
 impl Callable for GetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "index"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_list()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_list().raise(interpreter)?;
+        let index = args.get("index");
 
         let value = match index {
             TreewalkValue::Int(i) => object
                 .borrow()
-                .get_normalized(i)
+                .get_normalized(*i)
                 .ok_or_else(|| Exception::index_error("list index out of range"))
                 .raise(interpreter)?,
             TreewalkValue::Slice(s) => {
-                TreewalkValue::List(Container::new(object.borrow().slice(&s)))
+                TreewalkValue::List(Container::new(object.borrow().slice(s)))
             }
             _ => {
                 return Exception::type_error(format!(
                     "list indices must be integers or slices, not {}",
-                    interpreter.state.type_name(&index)
+                    interpreter.state.type_name(index)
                 ))
                 .raise(interpreter);
             }
@@ -289,28 +299,30 @@ impl Callable for GetItemBuiltin {
 }
 
 impl Callable for SetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 2).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "key", "value"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_list()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
-        let value = args.get_arg(1);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_list().raise(interpreter)?;
+        let index = args.get("key");
+        let value = args.get("value");
 
         match index {
             TreewalkValue::Int(i) => {
-                let i = normalize_index(i, object.borrow().len())
+                let i = normalize_index(*i, object.borrow().len())
                     .ok_or_else(|| Exception::index_error("list assignment index out of range"))
                     .raise(interpreter)?;
-                object.borrow_mut().set(i, value);
+                object.borrow_mut().set(i, value.clone());
             }
             _ => {
                 return Exception::type_error(format!(
                     "list indices must be integers or slices, not {}",
-                    interpreter.state.type_name(&index)
+                    interpreter.state.type_name(index)
                 ))
                 .raise(interpreter);
             }
@@ -325,15 +337,17 @@ impl Callable for SetItemBuiltin {
 }
 
 impl Callable for DelItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "key"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_list()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_list().raise(interpreter)?;
+        let index = args.get("key");
 
         // TODO what if this is a slice
         let i = index.as_int().raise(interpreter)?;

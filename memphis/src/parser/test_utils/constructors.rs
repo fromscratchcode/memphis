@@ -320,7 +320,7 @@ macro_rules! param {
 
 macro_rules! params {
     ($($expr:expr),* $(,)?) => {
-        $crate::parser::types::Params {
+        $crate::parser::types::AstParams {
             positional: vec![$($expr),*],
             args_var: None,
             kwargs_var: None,
@@ -330,8 +330,8 @@ macro_rules! params {
 
 macro_rules! call_args {
     ($($positional:expr),* $(,)?) => {
-        $crate::parser::types::CallArgs {
-            args: vec![$($positional),*],
+        $crate::parser::types::AstInvokeArgs {
+            positional: vec![$($positional),*],
             kwargs: vec![],
             args_var: None,
         }

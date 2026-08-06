@@ -21,7 +21,7 @@ impl Exception {
     }
 
     fn new_from_str(kind: ExceptionKind, msg: impl Into<String>) -> Self {
-        Self::new(kind, vec![TreewalkValue::Str(Str::new(&msg.into()))])
+        Self::new(kind, vec![TreewalkValue::Str(Str::new(msg.into()))])
     }
 
     fn new_empty(kind: ExceptionKind) -> Self {
@@ -100,8 +100,8 @@ impl Exception {
         Self::new(
             ExceptionKind::AttributeError,
             vec![
-                TreewalkValue::Str(Str::new(&object_type.into())),
-                TreewalkValue::Str(Str::new(&attr.into())),
+                TreewalkValue::Str(Str::new(object_type.into())),
+                TreewalkValue::Str(Str::new(attr.into())),
             ],
         )
     }

@@ -1,8 +1,10 @@
 use crate::{
     core::Container,
     treewalk::{
-        TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::Callable,
-        type_system::CloneableCallable, utils::Args,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        protocols::Callable,
+        type_system::CloneableCallable,
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -27,7 +29,15 @@ impl Method {
 }
 
 impl Callable for Container<Method> {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+    fn signature(&self) -> Signature {
+        self.borrow().function.signature()
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         interpreter
             .state
             .push_receiver(self.borrow().receiver.clone());

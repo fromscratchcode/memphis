@@ -1,8 +1,10 @@
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
-        TreewalkInterpreter, TreewalkResult, TreewalkValue, macros::*, protocols::Callable,
-        result::Raise, types::Exception, utils::Args,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        macros::*,
+        protocols::Callable,
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -15,16 +17,19 @@ impl_method_provider!(Bool, [NewBuiltin]);
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        if args.len() == 1 {
-            Ok(TreewalkValue::Bool(false))
-        } else if args.len() == 2 {
-            let input = args.get_arg(1).coerce_to_bool();
-            Ok(TreewalkValue::Bool(input))
-        } else {
-            Exception::type_error(format!("Expected 1 found {} args", args.len()))
-                .raise(interpreter)
-        }
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("value", TreewalkValue::Bool(false)),
+        ])
+    }
+    fn call(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let input = args.get("value").coerce_to_bool();
+        Ok(TreewalkValue::Bool(input))
     }
 
     fn name(&self) -> String {

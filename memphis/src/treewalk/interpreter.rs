@@ -90,11 +90,7 @@ mod tests {
             test_utils::stmt_expr,
             types::{Expr, ast},
         },
-        treewalk::{
-            protocols::Callable,
-            test_utils::*,
-            types::{Function, function::RuntimeParams},
-        },
+        treewalk::{protocols::Callable, test_utils::*, types::Function, utils::Signature},
     };
 
     #[test]
@@ -932,7 +928,7 @@ add(2.1, 3)
 float(1, 1)
 "#;
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 3 args");
+        assert_type_error!(e.exception, "Expected 2, found 3 args");
     }
 
     #[test]
@@ -1111,7 +1107,7 @@ t.extend([3,4])
 
         let input = "list([1,2,3], [1,2])";
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 3 args");
+        assert_type_error!(e.exception, "Expected 2, found 3 args");
     }
 
     #[test]
@@ -1153,7 +1149,7 @@ l = {1} <= {2}
 
         let input = "set({1,2,3}, {1,2})";
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 3 args");
+        assert_type_error!(e.exception, "Expected 2, found 3 args");
     }
 
     #[test]
@@ -1198,7 +1194,7 @@ h = type(iter(()))
 
         let input = "tuple([1,2,3], [1,2])";
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 3 args");
+        assert_type_error!(e.exception, "Expected 2, found 3 args");
 
         let input = r#"
 d = (1,2,3)
@@ -1390,6 +1386,18 @@ t = type(slice)
         assert_type_eq!(ctx, "r", Type::Ellipsis);
         assert_type_eq!(ctx, "s", Type::NotImplemented);
         assert_type_eq!(ctx, "t", Type::Type);
+
+        let input = r#"
+type(1, 2)
+"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "type() takes 1 or 3 arguments");
+
+        let input = r#"
+type(1, unexpected=True)
+"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "type() takes no keyword arguments");
     }
 
     #[test]
@@ -2592,7 +2600,7 @@ def test_kwargs(**kwargs):
 "#;
         let ctx = run(input);
 
-        let expected_args = RuntimeParams {
+        let expected_args = Signature {
             args: vec![],
             args_var: None,
             kwargs_var: Some("kwargs".into()),
@@ -2722,7 +2730,7 @@ def test_args(one, two):
 b = test_args(1, 2, 3)
 "#;
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 3 args");
+        assert_type_error!(e.exception, "Expected 2, found 3 args");
 
         let input = r#"
 def test_args(one, two, *args):
@@ -3308,6 +3316,17 @@ bytearray(b'hello')
         assert_eval_eq!(input, bytearray!("hello"));
 
         let input = r#"
+bytearray(b'hello', 'utf-8')
+"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "encoding without a string argument");
+
+        let input = r#"
+bytearray('hello', 'utf-8')
+"#;
+        assert_eval_eq!(input, bytearray!("hello"));
+
+        let input = r#"
 bytearray('hello')
 "#;
         let e = eval_expect_error(input);
@@ -3337,6 +3356,17 @@ bytes()
 
         let input = r#"
 bytes(b'hello')
+"#;
+        assert_eval_eq!(input, bytes!("hello"));
+
+        let input = r#"
+bytes(b'hello', 'utf-8')
+"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "encoding without a string argument");
+
+        let input = r#"
+bytes('hello', 'utf-8')
 "#;
         assert_eval_eq!(input, bytes!("hello"));
 
@@ -3917,7 +3947,7 @@ class Foo:
 c = Foo().make()
 "#;
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 0 args");
+        assert_type_error!(e.exception, "Expected 0, found 1 args");
     }
 
     #[test]
@@ -4611,7 +4641,7 @@ e = frozenset().__contains__
 
         let input = "frozenset([1,2,3], [1,2])";
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 3 args");
+        assert_type_error!(e.exception, "Expected 2, found 3 args");
     }
 
     #[test]
@@ -4742,6 +4772,8 @@ g = issubclass(Foo, object)
 h = issubclass(Foo, Bar)
 i = issubclass(object, object)
 j = issubclass(type, type)
+k = issubclass(Bar, Baz)
+l = issubclass(Bar, (Baz, Foo))
 "#;
 
         let ctx = run(input);
@@ -4756,6 +4788,8 @@ j = issubclass(type, type)
         assert_read_eq!(ctx, "h", bool!(false));
         assert_read_eq!(ctx, "i", bool!(true));
         assert_read_eq!(ctx, "j", bool!(true));
+        assert_read_eq!(ctx, "k", bool!(false));
+        assert_read_eq!(ctx, "l", bool!(true));
 
         let input = r#"
 issubclass([], type)
@@ -5418,6 +5452,28 @@ print(f"Hello {name}.")
     fn stdin_with_extra_arg() {
         let input = r#"input("one", "two")"#;
         let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Found 2 args");
+        assert_type_error!(e.exception, "Expected 1, found 2 args");
+    }
+
+    #[test]
+    fn init_is_not_run_for_wrong_type() {
+        // Before we checked isinstance(obj, class) before running __init__, this would run fine
+        // and return 42.
+        let input = r#"
+class Replacement:
+    def __init__(self, value):
+        self.value = value
+
+
+class Factory:
+    def __new__(cls, value):
+        return object.__new__(Replacement)
+
+
+result = Factory(42)
+result.value
+"#;
+        let e = eval_expect_error(input);
+        assert_attribute_error!(e.exception, "Replacement", "value");
     }
 }

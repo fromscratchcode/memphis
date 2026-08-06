@@ -7,7 +7,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::List,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -48,9 +48,18 @@ impl Iterator for ReversedIter {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 2).raise(interpreter)?;
-        let list = args.get_arg(1).as_list().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls", "sequence"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        // TODO support more than list here, this would require either __reversed__ or
+        // __len__+__getitem__ fallback
+        let list = args.get("sequence").as_list().raise(interpreter)?;
         Ok(TreewalkValue::ReversedIter(ReversedIter::new(list.clone())))
     }
 

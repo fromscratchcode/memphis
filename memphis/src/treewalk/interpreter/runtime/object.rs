@@ -4,7 +4,7 @@ use crate::{
     treewalk::{
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
         types::{Class, Method},
-        utils::Args,
+        utils::InvokeArgs,
     },
 };
 
@@ -12,7 +12,7 @@ impl TreewalkInterpreter {
     pub fn create_object(
         &self,
         class: Container<Class>,
-        args: Args,
+        args: InvokeArgs,
     ) -> TreewalkResult<TreewalkValue> {
         // The [`Class`] must be explicitly passed to the [`Dunder::New`] method as this method is
         // never bound.
@@ -21,11 +21,25 @@ impl TreewalkInterpreter {
         let new_args = args
             .clone()
             .with_bound_new(TreewalkValue::Class(class.clone()));
-        let object = self.call_method(&TreewalkValue::Class(class), Dunder::New, new_args)?;
+        let object =
+            self.call_method(&TreewalkValue::Class(class.clone()), Dunder::New, new_args)?;
 
-        self.call_method(&object, Dunder::Init, args)?;
+        if self.is_instance_of(&object, &class) {
+            self.call_method(&object, Dunder::Init, args)?;
+        }
 
         Ok(object)
+    }
+
+    pub fn is_instance_of(&self, object: &TreewalkValue, class: &Container<Class>) -> bool {
+        let obj_class = self.state.class_of(object);
+
+        let effective_class = match object {
+            TreewalkValue::Class(_) => obj_class.borrow().metaclass(),
+            _ => obj_class,
+        };
+
+        effective_class.is_subclass_of(class)
     }
 
     pub fn resolve_descriptor(

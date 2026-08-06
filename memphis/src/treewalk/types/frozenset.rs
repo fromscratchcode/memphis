@@ -8,8 +8,8 @@ use crate::{
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
-        types::iterators::SetIter,
-        utils::{Args, HashKey, check_args},
+        types::{Tuple, iterators::SetIter},
+        utils::{BoundArgs, HashKey, Parameter, Signature},
     },
 };
 
@@ -64,15 +64,20 @@ struct NewBuiltin;
 struct ContainsBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("iterable", TreewalkValue::Tuple(Tuple::default()))
+                .positional_only(),
+        ])
+    }
 
-        let frozen_set = match args.len() {
-            1 => FrozenSet::default(),
-            2 => FrozenSet::try_eval_from(args.get_arg(1), interpreter)?,
-            _ => unreachable!(),
-        };
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let frozen_set = FrozenSet::try_eval_from(args.get("iterable").clone(), interpreter)?;
         Ok(TreewalkValue::FrozenSet(frozen_set))
     }
 
@@ -82,10 +87,14 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for ContainsBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "object"])
+    }
+
     fn call(
         &self,
         _interpreter: &TreewalkInterpreter,
-        _args: Args,
+        _args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         unimplemented!();
     }

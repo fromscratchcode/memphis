@@ -5,9 +5,8 @@ use crate::{
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::{Callable, NonDataDescriptor},
-        result::Raise,
         types::Class,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -27,12 +26,18 @@ impl Staticmethod {
 pub struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        // The first arg is the class itself, the second arg is the function
-        check_args(&args, |len| len == 2).raise(interpreter)?;
-        let function = args.get_arg(1);
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls", "func"])
+    }
+
+    fn call(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let function = args.get("func");
         Ok(TreewalkValue::Staticmethod(Staticmethod::new(Box::new(
-            function,
+            function.clone(),
         ))))
     }
 

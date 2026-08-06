@@ -1,30 +1,27 @@
 use std::collections::HashMap;
 
 use crate::{
-    parser::types::{CallArgs, KwargsOperation, Params},
+    parser::types::{AstInvokeArgs, AstParams, KwargsOperation},
     treewalk::{
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::for_each_mut,
         protocols::TryEvalFrom,
         result::Raise,
-        types::{
-            Exception, Tuple,
-            function::{RuntimeParam, RuntimeParams},
-        },
-        utils::Args,
+        types::{Exception, Tuple},
+        utils::{InvokeArgs, Parameter, ParameterDefault, ParameterKind, Signature},
     },
 };
 
 impl TreewalkInterpreter {
     /// Evaluate the arguments a function is called with.
-    pub fn evaluate_args(&self, call_args: &CallArgs) -> TreewalkResult<Args> {
-        let mut positional = call_args
-            .args
+    pub fn evaluate_args(&self, args: &AstInvokeArgs) -> TreewalkResult<InvokeArgs> {
+        let mut positional = args
+            .positional
             .iter()
             .map(|arg| self.evaluate_expr(arg))
             .collect::<TreewalkResult<Vec<_>>>()?;
 
-        if let Some(ref args_var) = call_args.args_var {
+        if let Some(ref args_var) = args.args_var {
             let value = self.evaluate_expr(args_var)?;
             let args = Tuple::try_eval_from(value, self)?;
             // Clone each item in place without an intermediate Vec
@@ -32,7 +29,7 @@ impl TreewalkInterpreter {
         };
 
         let mut kwargs = HashMap::default();
-        for kwarg in call_args.kwargs.iter() {
+        for kwarg in args.kwargs.iter() {
             match kwarg {
                 KwargsOperation::Pair(key, value) => {
                     let value = self.evaluate_expr(value)?;
@@ -51,34 +48,32 @@ impl TreewalkInterpreter {
             }
         }
 
-        Ok(Args::new(positional, kwargs))
+        Ok(InvokeArgs::new(positional, kwargs))
     }
 
     /// Evaluate the parameters a function is defined with, specifically any default values.
-    pub fn evaluate_params(&self, call_params: &Params) -> TreewalkResult<RuntimeParams> {
-        let runtime_params = call_params
+    pub fn evaluate_params(&self, params: &AstParams) -> TreewalkResult<Signature> {
+        let runtime_params = params
             .positional
             .iter()
             .map(|param| {
+                // User code cannot generate ParameterDefault::Omitted, only builtins
                 let default = match &param.default {
-                    Some(expr) => Some(self.evaluate_expr(expr)?),
-                    None => None,
+                    Some(expr) => ParameterDefault::Value(self.evaluate_expr(expr)?),
+                    None => ParameterDefault::Required,
                 };
-                Ok(RuntimeParam {
-                    arg: param.arg.to_string(),
+                Ok(Parameter {
+                    name: param.arg.to_string(),
                     default,
+                    kind: ParameterKind::PositionalOrKeyword,
                 })
             })
             .collect::<TreewalkResult<Vec<_>>>()?;
 
-        Ok(RuntimeParams {
+        Ok(Signature {
             args: runtime_params,
-            args_var: call_params.args_var.as_ref().map(|c| c.to_string()).clone(),
-            kwargs_var: call_params
-                .kwargs_var
-                .as_ref()
-                .map(|c| c.to_string())
-                .clone(),
+            args_var: params.args_var.as_ref().map(|c| c.to_string()).clone(),
+            kwargs_var: params.kwargs_var.as_ref().map(|c| c.to_string()).clone(),
         })
     }
 }

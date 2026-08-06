@@ -10,8 +10,8 @@ use crate::{
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         type_system::CloneableIterable,
-        types::{DictItems, DictKeys, DictValues, Exception, iterators::DictKeysIter},
-        utils::{Args, HashKey, check_args},
+        types::{DictItems, DictKeys, DictValues, Exception, Str, iterators::DictKeysIter},
+        utils::{BoundArgs, HashKey, Parameter, Signature},
     },
 };
 
@@ -38,6 +38,15 @@ impl_method_provider!(
 );
 
 impl Dict {
+    pub fn from_symbol_table(table: &HashMap<String, TreewalkValue>) -> Self {
+        let items = table
+            .iter()
+            .map(|(key, value)| (TreewalkValue::Str(Str::new(key)), value.clone()))
+            .collect();
+
+        Dict::from_items(items).expect("All keys should be hashable strings here.")
+    }
+
     pub fn from_items(items: Vec<(TreewalkValue, TreewalkValue)>) -> DomainResult<Self> {
         let mut dict = Dict::default();
         for (k, v) in items {
@@ -52,6 +61,13 @@ impl Dict {
             self.order.push(hash.clone());
         }
         self.items.insert(hash, (key, value));
+        Ok(())
+    }
+
+    pub fn delete(&mut self, key: &TreewalkValue) -> DomainResult<()> {
+        let hash = key.as_hash_key()?;
+        self.items.remove(&hash);
+        self.order.retain(|item| item != &hash);
         Ok(())
     }
 
@@ -215,62 +231,19 @@ struct SetItemBuiltin;
 #[derive(Clone)]
 struct DelItemBuiltin;
 
-impl Callable for DictItemsBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
-        let dict = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
-        let dict_items = dict.borrow().items();
-        Ok(TreewalkValue::DictItems(dict_items))
-    }
-
-    fn name(&self) -> String {
-        "items".into()
-    }
-}
-
-impl Callable for DictKeysBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
-        let dict = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
-        let dict_keys = dict.borrow().keys();
-        Ok(TreewalkValue::DictKeys(dict_keys))
-    }
-
-    fn name(&self) -> String {
-        "keys".into()
-    }
-}
-
-impl Callable for DictValuesBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
-        let dict = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
-        let dict_values = dict.borrow().values();
-        Ok(TreewalkValue::DictValues(dict_values))
-    }
-
-    fn name(&self) -> String {
-        "values".into()
-    }
-}
-
 impl Callable for NewBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional_without_default("iterable").positional_only(),
+        ])
+        .with_varkwargs("kwargs")
+    }
+
     fn call(
         &self,
         _interpreter: &TreewalkInterpreter,
-        _args: Args,
+        _args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         Ok(TreewalkValue::Dict(Container::new(Dict::default())))
     }
@@ -281,27 +254,34 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for InitBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [0, 1].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("self").positional_only(),
+            Parameter::optional_without_default("iterable").positional_only(),
+        ])
+        .with_varkwargs("kwargs")
+    }
 
-        let output = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let output = args.get("self").as_dict().raise(interpreter)?;
 
-        if let Some(pos_arg) = args.get_arg_optional(0) {
-            let input = Container::<Dict>::try_eval_from(pos_arg, interpreter)?;
+        if let Some(iterable) = args.get_optional("iterable") {
+            let input = Container::<Dict>::try_eval_from(iterable.clone(), interpreter)?;
             output
                 .borrow_mut()
                 .extend(&input.borrow())
                 .raise(interpreter)?;
         }
 
-        if args.has_kwargs() {
-            let kwargs = args.kwargs_as_runtime_dict();
-            output.borrow_mut().extend(&kwargs).raise(interpreter)?;
-        }
+        let kwargs = args.get_varkwargs("kwargs");
+        output
+            .borrow_mut()
+            .extend(&kwargs.borrow())
+            .raise(interpreter)?;
 
         Ok(TreewalkValue::None)
     }
@@ -311,23 +291,87 @@ impl Callable for InitBuiltin {
     }
 }
 
+impl Callable for DictItemsBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let dict = args.get("self").as_dict().raise(interpreter)?;
+        let dict_items = dict.borrow().items();
+        Ok(TreewalkValue::DictItems(dict_items))
+    }
+
+    fn name(&self) -> String {
+        "items".into()
+    }
+}
+
+impl Callable for DictKeysBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let dict = args.get("self").as_dict().raise(interpreter)?;
+        let dict_keys = dict.borrow().keys();
+        Ok(TreewalkValue::DictKeys(dict_keys))
+    }
+
+    fn name(&self) -> String {
+        "keys".into()
+    }
+}
+
+impl Callable for DictValuesBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let dict = args.get("self").as_dict().raise(interpreter)?;
+        let dict_values = dict.borrow().values();
+        Ok(TreewalkValue::DictValues(dict_values))
+    }
+
+    fn name(&self) -> String {
+        "values".into()
+    }
+}
+
 impl Callable for GetBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("self").positional_only(),
+            Parameter::required("key").positional_only(),
+            Parameter::optional("default", TreewalkValue::None).positional_only(),
+        ])
+    }
 
-        let dict = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let dict = args.get("self").as_dict().raise(interpreter)?;
+        let key = args.get("key");
 
-        let key = args.get_arg(0);
-
-        let d = dict.borrow().clone();
-        let value = if let Some(val) = d.get(&key) {
+        let value = if let Some(val) = dict.borrow().get(key) {
             val
         } else {
-            args.get_arg_optional(1).unwrap_or(TreewalkValue::None)
+            args.get("default").clone()
         };
 
         Ok(value)
@@ -339,17 +383,18 @@ impl Callable for GetBuiltin {
 }
 
 impl Callable for GetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "key"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
-
-        let value = object.borrow().getitem(&index).raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_dict().raise(interpreter)?;
+        let index = args.get("key");
+        let value = object.borrow().getitem(index).raise(interpreter)?;
         Ok(value)
     }
 
@@ -359,16 +404,18 @@ impl Callable for GetItemBuiltin {
 }
 
 impl Callable for SetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 2).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "key", "value"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
-        let value = args.get_arg(1);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_dict().raise(interpreter)?;
+        let index = args.get("key").clone();
+        let value = args.get("value").clone();
         object
             .borrow_mut()
             .insert(index, value)
@@ -382,18 +429,18 @@ impl Callable for SetItemBuiltin {
 }
 
 impl Callable for DelItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "key"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_dict()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
-
-        let key = index.as_hash_key().raise(interpreter)?;
-        object.borrow_mut().items.remove(&key);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_dict().raise(interpreter)?;
+        let key = args.get("key");
+        object.borrow_mut().delete(key).raise(interpreter)?;
         Ok(TreewalkValue::None)
     }
 

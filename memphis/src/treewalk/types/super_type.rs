@@ -7,7 +7,7 @@ use crate::{
         protocols::{Callable, MemberRead},
         result::Raise,
         types::Exception,
-        utils::Args,
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -62,10 +62,14 @@ impl MemberRead for Super {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls"])
+    }
+
     fn call(
         &self,
         interpreter: &TreewalkInterpreter,
-        _args: Args,
+        _args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         match interpreter.state.current_receiver() {
             None => {

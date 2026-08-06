@@ -88,7 +88,7 @@ impl FunctionAnalysisVisitor {
     fn check_for_accessed_vars(&mut self, statement: &StatementKind) {
         match statement {
             StatementKind::Expression(Expr::FunctionCall { args, .. }) => {
-                for arg in args.args.iter() {
+                for arg in args.positional.iter() {
                     if let Some(name) = arg.as_variable() {
                         self.accessed_vars.push(name.clone());
                     }

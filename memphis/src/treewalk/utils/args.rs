@@ -1,121 +1,64 @@
-use std::{collections::HashMap, slice::Iter};
+use std::collections::HashMap;
 
-use crate::treewalk::{
-    DomainResult, SymbolTable, TreewalkValue, symbol_table_to_runtime_dict,
-    types::{Dict, Exception},
-};
+use crate::treewalk::TreewalkValue;
 
-/// Represents the fully resolved parameter state for all positional and keyword arguments.
-///
-/// For the unresolved state, see [`CallArgs`].
+/// Represents the evaluated positional and keyword arguments supplied to a call, pre-binding.
 #[derive(Default, Debug, Clone)]
-pub struct Args {
-    bound_val: Option<TreewalkValue>,
+pub struct InvokeArgs {
     args: Vec<TreewalkValue>,
-    kwargs: SymbolTable,
+    kwargs: HashMap<String, TreewalkValue>,
 }
 
-impl Args {
+impl InvokeArgs {
     pub fn new(args: Vec<TreewalkValue>, kwargs: HashMap<String, TreewalkValue>) -> Self {
-        Self {
-            bound_val: None,
-            args,
-            kwargs,
-        }
+        Self { args, kwargs }
     }
 
-    pub fn add_arg(&mut self, arg: TreewalkValue) {
-        self.args.push(arg);
-    }
-
-    pub fn with_bound_receiver(mut self, val: Option<TreewalkValue>) -> Self {
-        if let Some(receiver) = val {
-            self.bind(receiver);
-            self
-        } else {
-            self
-        }
-    }
-
+    /// Prepends `cls` for the unbound `__new__` call during object creation
     pub fn with_bound_new(mut self, val: TreewalkValue) -> Self {
-        self.bind_new(val);
+        self.args.insert(0, val);
         self
     }
 
-    fn bind(&mut self, val: TreewalkValue) {
-        self.bound_val = Some(val);
+    pub fn into_binding_input(self, receiver: Option<TreewalkValue>) -> BindingInput {
+        let mut args = self.args;
+        if let Some(receiver) = receiver {
+            args.insert(0, receiver);
+        };
+        BindingInput::new(args, self.kwargs)
     }
+}
 
-    /// The `Dunder::New` method expects the class to be passed in as the first argument but in
-    /// an unbound way.
-    fn bind_new(&mut self, val: TreewalkValue) {
-        self.args.insert(0, val);
-    }
+/// Represents the fully resolved parameter state for positional and keyword arguments, plus any
+/// inserted receivers (post-descriptor protocol). This is what args are actually bound against.
+pub struct BindingInput {
+    args: Vec<TreewalkValue>,
+    kwargs: HashMap<String, TreewalkValue>,
+}
 
-    pub fn get_self(&self) -> DomainResult<TreewalkValue> {
-        match &self.bound_val {
-            Some(b) => Ok(b.clone()),
-            None => Err(Exception::type_error("Unbound method needs an argument")),
-        }
+impl BindingInput {
+    pub fn new(args: Vec<TreewalkValue>, kwargs: HashMap<String, TreewalkValue>) -> Self {
+        Self { args, kwargs }
     }
 
     pub fn args(&self) -> &[TreewalkValue] {
         &self.args
     }
 
-    /// Access a positional argument by index. Bound arguments are not included in this, use
-    /// `get_self` for those.
-    pub fn get_arg(&self, index: usize) -> TreewalkValue {
-        self.args[index].clone()
+    pub fn num_positional(&self) -> usize {
+        self.args.len()
     }
 
-    pub fn get_arg_optional(&self, index: usize) -> Option<TreewalkValue> {
-        self.args.get(index).cloned()
+    pub fn get_positional(&self, index: usize) -> &TreewalkValue {
+        &self.args[index]
     }
 
-    pub fn has_kwargs(&self) -> bool {
-        !self.kwargs.is_empty()
-    }
-
-    pub fn kwargs_as_runtime_dict(&self) -> Dict {
-        symbol_table_to_runtime_dict(&self.kwargs)
-    }
-
-    pub fn get_kwargs(&self) -> &SymbolTable {
+    pub fn kwargs(&self) -> &HashMap<String, TreewalkValue> {
         &self.kwargs
-    }
-
-    /// Access a keyword argument by key.
-    pub fn get_kwarg(&self, key: &str) -> Option<TreewalkValue> {
-        self.kwargs.get(key).cloned()
     }
 
     pub fn has_kwarg(&self, key: &str) -> bool {
         self.kwargs.contains_key(key)
-    }
-
-    pub fn len(&self) -> usize {
-        self.args.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.args.is_empty()
-    }
-
-    pub fn iter_args(&self) -> Iter<'_, TreewalkValue> {
-        self.args.iter()
-    }
-
-    /// When we are loading a symbol table for a new scope, we must join the bound object with
-    /// the positional arguments since the function signature will expect the bound object.
-    pub fn bound_args(&self) -> Vec<TreewalkValue> {
-        let mut base = if let Some(bound) = self.bound_val.clone() {
-            vec![bound]
-        } else {
-            vec![]
-        };
-        base.append(&mut self.args.clone());
-        base
     }
 }
 
@@ -123,28 +66,16 @@ impl Args {
 /// When kwargs are needed, you can use `ResolvedArguments::new`.
 macro_rules! args {
     () => {{
-        Args::default()
+        $crate::treewalk::utils::InvokeArgs::default()
     }};
     // Double curly braces ensure that the entire macro expands into a single expression, which is
     // necessary since we are returning a value from this macro.
     ( $( $arg:expr ),* ) => {{
-        let mut args = $crate::treewalk::utils::Args::default();
-        $(
-            args.add_arg($arg);
-        )*
-        args
+        $crate::treewalk::utils::InvokeArgs::new(
+            vec![$($arg),*],
+            std::collections::HashMap::new(),
+        )
     }};
 }
 
 pub(crate) use args;
-
-pub fn check_args<F>(args: &Args, condition: F) -> DomainResult<()>
-where
-    F: Fn(usize) -> bool,
-{
-    if !condition(args.len()) {
-        Err(Exception::type_error(format!("Found {} args", args.len())))
-    } else {
-        Ok(())
-    }
-}

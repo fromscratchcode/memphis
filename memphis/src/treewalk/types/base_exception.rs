@@ -6,7 +6,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::Exception,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -20,10 +20,15 @@ impl_method_provider!(BaseException, [NewBuiltin,]);
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len >= 1).raise(interpreter)?;
-
-        let class = args.get_arg(0).as_class().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls"]).with_varargs("args")
+    }
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let class = args.get("cls").as_class().raise(interpreter)?;
         let class_ref = class.borrow();
         // TODO this path currently panics for user-defined exception classes. The full fix here is
         // to store the Container<Class> on the Exception instead of the enum ExceptionKind.
@@ -32,8 +37,7 @@ impl Callable for NewBuiltin {
 
         // The first arg to Dunder::New will be the class itself, which should not become part of
         // the exception payload.
-        let payload = args.args()[1..].to_vec();
-
+        let payload = args.get_varargs("args").items().to_vec();
         Ok(TreewalkValue::Exception(Exception::new(kind, payload)))
     }
 

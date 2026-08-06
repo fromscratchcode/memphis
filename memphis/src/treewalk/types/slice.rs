@@ -7,7 +7,7 @@ use crate::{
         macros::*,
         protocols::Callable,
         result::Raise,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -73,26 +73,31 @@ fn adjust_slice_params(slice: &Slice, len: usize) -> (i64, i64, i64) {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [2, 3, 4].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::required("start_or_stop").positional_only(),
+            Parameter::optional_without_default("stop").positional_only(),
+            Parameter::optional("step", TreewalkValue::None).positional_only(),
+        ])
+    }
 
-        let slice = match args.len() {
-            2 => {
-                let stop = args.get_arg(1).as_int().raise(interpreter)?;
-                Slice::new(None, Some(stop), None)
-            }
-            3 => {
-                let start = args.get_arg(1).as_int().raise(interpreter)?;
-                let stop = args.get_arg(2).as_int().raise(interpreter)?;
-                Slice::new(Some(start), Some(stop), None)
-            }
-            4 => {
-                let start = args.get_arg(1).as_int().raise(interpreter)?;
-                let stop = args.get_arg(2).as_int().raise(interpreter)?;
-                let step = args.get_arg(3).as_int().raise(interpreter)?;
-                Slice::new(Some(start), Some(stop), Some(step))
-            }
-            _ => unreachable!(),
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let slice = if let Some(stop) = args.get_optional("stop") {
+            let start = args.get("start_or_stop").as_int().raise(interpreter)?;
+            let stop = stop.as_int().raise(interpreter)?;
+            let step = match args.get("step") {
+                TreewalkValue::None => None,
+                value => Some(value.as_int().raise(interpreter)?),
+            };
+            Slice::new(Some(start), Some(stop), step)
+        } else {
+            let stop = args.get("start_or_stop").as_int().raise(interpreter)?;
+            Slice::new(None, Some(stop), None)
         };
 
         Ok(TreewalkValue::Slice(slice))

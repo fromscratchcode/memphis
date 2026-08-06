@@ -6,7 +6,11 @@ use std::{
 use crate::{
     core::Container,
     domain::FunctionType,
-    treewalk::{TreewalkInterpreter, TreewalkResult, TreewalkValue, types::Class, utils::Args},
+    treewalk::{
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        types::Class,
+        utils::{BoundArgs, Signature},
+    },
 };
 
 pub trait TryEvalFrom: Sized {
@@ -17,7 +21,13 @@ pub trait TryEvalFrom: Sized {
 }
 
 pub trait Callable: Any {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue>;
+    fn signature(&self) -> Signature;
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue>;
 
     fn name(&self) -> String;
 

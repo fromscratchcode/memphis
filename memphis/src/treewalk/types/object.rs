@@ -9,8 +9,8 @@ use crate::{
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
-        types::{Class, Exception, Str},
-        utils::{Args, args, check_args},
+        types::{Class, Dict, Exception, Str},
+        utils::{BoundArgs, Signature, args},
     },
 };
 
@@ -303,10 +303,20 @@ struct HashBuiltin;
 struct StrBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls"])
+            .with_varargs("args")
+            .with_varkwargs("kwargs")
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         // This is builtin for 'object' but the instance is created from the `cls` passed in as the
         // first argument.
-        let class = args.get_arg(0).as_class().raise(interpreter)?;
+        let class = args.get("cls").as_class().raise(interpreter)?;
         Ok(TreewalkValue::Object(Container::new(Object::new(class))))
     }
 
@@ -316,10 +326,16 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for InitBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+            .with_varargs("args")
+            .with_varkwargs("kwargs")
+    }
+
     fn call(
         &self,
         _interpreter: &TreewalkInterpreter,
-        _args: Args,
+        _args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         Ok(TreewalkValue::None)
     }
@@ -332,11 +348,17 @@ impl Callable for InitBuiltin {
 impl Callable for EqBuiltin {
     /// The default behavior in Python for the `==` sign is to compare the object identity. This is
     /// only used when `Dunder::Eq` is not overridden by a user-defined class.
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args.get_self().raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self");
+        let b = args.get("b");
 
         Ok(TreewalkValue::Bool(a == b))
     }
@@ -350,11 +372,17 @@ impl Callable for ContainsBuiltin {
     /// The default behavior in Python for the "in" operator is to iterate and compare element by
     /// element. This is used when `Dunder::Contains` is not overridden by another type or
     /// user-defined class.
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let left = args.get_self().raise(interpreter)?;
-        let right = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let left = args.get("self").clone();
+        let right = args.get("b").clone();
 
         let iter = left.as_iterator().raise(interpreter)?;
         Ok(TreewalkValue::Bool(any(iter, |i| i == right)?))
@@ -366,9 +394,16 @@ impl Callable for ContainsBuiltin {
 }
 
 impl Callable for HashBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
-        let object = args.get_self().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self");
         Ok(TreewalkValue::Int(object.hash() as i64))
     }
 
@@ -380,10 +415,17 @@ impl Callable for HashBuiltin {
 impl Callable for NeBuiltin {
     /// The default behavior in Python for the `!=` sign is to call the `Dunder::Eq` and invert the
     /// result. This is only used when `Dunder::Ne` is not overridden by a user-defined class.
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        let receiver = args.get_self().raise(interpreter)?;
-        let result = interpreter.call_method(&receiver, Dunder::Eq, args![args.get_arg(0)])?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let receiver = args.get("self");
+        let result = interpreter.call_method(receiver, Dunder::Eq, args![args.get("b").clone()])?;
         Ok(result.not())
     }
 
@@ -393,11 +435,17 @@ impl Callable for NeBuiltin {
 }
 
 impl Callable for AddBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -413,11 +461,17 @@ impl Callable for AddBuiltin {
 }
 
 impl Callable for SubBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -433,11 +487,17 @@ impl Callable for SubBuiltin {
 }
 
 impl Callable for MulBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -453,11 +513,17 @@ impl Callable for MulBuiltin {
 }
 
 impl Callable for TruedivBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -473,11 +539,17 @@ impl Callable for TruedivBuiltin {
 }
 
 impl Callable for LtBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -493,11 +565,17 @@ impl Callable for LtBuiltin {
 }
 
 impl Callable for LeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -513,11 +591,17 @@ impl Callable for LeBuiltin {
 }
 
 impl Callable for GtBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -533,11 +617,17 @@ impl Callable for GtBuiltin {
 }
 
 impl Callable for GeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a_type = args.get_self().raise(interpreter)?.get_type();
-        let b_type = args.get_arg(0).get_type();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
 
         // This is only implemented for int and float
         Exception::type_error(format!(
@@ -553,10 +643,14 @@ impl Callable for GeBuiltin {
 }
 
 impl Callable for StrBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
     fn call(
         &self,
         _interpreter: &TreewalkInterpreter,
-        _args: Args,
+        _args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         unimplemented!()
     }
@@ -580,7 +674,8 @@ impl NonDataDescriptor for DictDescriptor {
             Some(i) => i.as_object().raise(interpreter)?.borrow().scope.clone(),
             None => owner.borrow().scope.clone(),
         };
-        Ok(TreewalkValue::Dict(Container::new(scope.to_runtime_dict())))
+        let dict = Dict::from_symbol_table(scope.symbol_table());
+        Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 
     fn name(&self) -> String {

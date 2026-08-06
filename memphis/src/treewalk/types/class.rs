@@ -4,7 +4,9 @@ use crate::{
     treewalk::{
         Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::{Callable, MemberRead, MemberWrite},
-        utils::Args,
+        result::Raise,
+        types::Exception,
+        utils::{BoundArgs, InvokeArgs, Signature},
     },
 };
 
@@ -176,7 +178,7 @@ impl Container<Class> {
     }
 
     pub fn is_subclass_of(&self, other: &Container<Class>) -> bool {
-        self.mro().contains(other)
+        self.mro().iter().any(|c| c.same_identity(other))
     }
 
     pub fn get_from_class(&self, name: &str) -> Option<TreewalkValue> {
@@ -272,16 +274,46 @@ impl MemberWrite for Container<Class> {
 }
 
 impl Callable for Container<Class> {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+    fn signature(&self) -> Signature {
+        Signature::empty()
+            .with_varargs("args")
+            .with_varkwargs("kwargs")
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        bound_args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let args = bound_args.get_varargs("args");
+        let kwargs = bound_args.get_varkwargs("kwargs");
+
         // Calling type() with 1 arg does inspection, not creation.
         // type() with 3 args uses the normal flow and is handled by type.__new__
-        if self.borrow().is_type(&Type::Type) && args.len() == 1 {
-            return Ok(TreewalkValue::Class(
-                interpreter.state.type_of(&args.get_arg(0)),
-            ));
+        if self.borrow().is_type(&Type::Type) {
+            match args.items().len() {
+                1 => {
+                    if !kwargs.borrow().items().items().is_empty() {
+                        return Exception::type_error("type() takes no keyword arguments")
+                            .raise(interpreter);
+                    }
+                    let cls = args.items()[0].clone();
+                    return Ok(TreewalkValue::Class(interpreter.state.type_of(&cls)));
+                }
+                // Do nothing, proceed below
+                3 => {}
+                _ => {
+                    return Exception::type_error("type() takes 1 or 3 arguments")
+                        .raise(interpreter);
+                }
+            }
         }
 
-        interpreter.create_object(self.clone(), args)
+        let invoke_args = InvokeArgs::new(
+            args.items().to_vec(),
+            kwargs.borrow().to_symbol_table().raise(interpreter)?,
+        );
+        interpreter.create_object(self.clone(), invoke_args)
     }
 
     fn name(&self) -> String {

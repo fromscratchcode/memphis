@@ -6,8 +6,8 @@ use crate::{
         macros::*,
         protocols::{Callable, NonDataDescriptor},
         result::Raise,
-        types::{Class, Exception, MappingProxy, Tuple},
-        utils::Args,
+        types::{Class, Dict, MappingProxy, Tuple},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -41,8 +41,9 @@ impl NonDataDescriptor for DictAttribute {
             None => owner.borrow().scope.clone(),
         };
 
+        let dict = Dict::from_symbol_table(scope.symbol_table());
         Ok(TreewalkValue::MappingProxy(MappingProxy::new(
-            Container::new(scope.to_runtime_dict()),
+            Container::new(dict),
         )))
     }
 
@@ -86,36 +87,39 @@ impl NonDataDescriptor for MroAttribute {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        match args.len() {
-            2 => unreachable!("type() with 1 arg is special-cased and handled eslewhere"),
-            4 => {
-                let mcls = args.get_arg(0).as_class().raise(interpreter)?;
-                let name = args.get_arg(1).as_string().raise(interpreter)?;
-                // Default to the `Type::Object` class.
-                let parent_classes = args
-                    .get_arg(2)
-                    .as_tuple()
-                    .raise(interpreter)?
-                    .into_iter()
-                    .map(|c| c.as_class())
-                    .collect::<DomainResult<Vec<_>>>()
-                    .raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        // type() with 1 arg is special-cased and by Callable for Container<Class>
+        Signature::positional_only(["mcls", "name", "bases", "dict"])
+    }
 
-                let parent_classes = if parent_classes.is_empty() {
-                    vec![interpreter.state.class_of_type(&Type::Object)]
-                } else {
-                    parent_classes
-                };
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let mcls = args.get("mcls").as_class().raise(interpreter)?;
+        let name = args.get("name").as_string().raise(interpreter)?;
+        let bases = args
+            .get("bases")
+            .as_tuple()
+            .raise(interpreter)?
+            .into_iter()
+            .map(|c| c.as_class())
+            .collect::<DomainResult<Vec<_>>>()
+            .raise(interpreter)?;
 
-                let symbol_table = args.get_arg(3).as_symbol_table().raise(interpreter)?;
+        // Default to the `Type::Object` class.
+        let parent_classes = if bases.is_empty() {
+            vec![interpreter.state.class_of_type(&Type::Object)]
+        } else {
+            bases
+        };
 
-                let mut class = Class::new_direct(name, Some(mcls), parent_classes);
-                class.scope = Scope::new(symbol_table);
-                Ok(TreewalkValue::Class(Container::new(class)))
-            }
-            _ => Exception::type_error("type() takes 1 or 3 arguments").raise(interpreter),
-        }
+        let dict = args.get("dict").as_symbol_table().raise(interpreter)?;
+
+        let mut class = Class::new_direct(name, Some(mcls), parent_classes);
+        class.scope = Scope::new(dict);
+        Ok(TreewalkValue::Class(Container::new(class)))
     }
 
     fn name(&self) -> String {

@@ -545,7 +545,7 @@ mod tests {
 
     use crate::parser::{
         test_utils::*,
-        types::{ExceptHandler, Params, StatementKind, ast},
+        types::{AstParams, ExceptHandler, StatementKind, ast},
     };
 
     fn ident(input: &str) -> Identifier {
@@ -1233,7 +1233,7 @@ def test_args(*args):
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_args"),
-            args: Params {
+            args: AstParams {
                 positional: vec![],
                 args_var: Some(ident("args")),
                 kwargs_var: None,
@@ -1250,7 +1250,7 @@ def test_args(*args, **kwargs):
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_args"),
-            args: Params {
+            args: AstParams {
                 positional: vec![],
                 args_var: Some(ident("args")),
                 kwargs_var: Some(ident("kwargs")),
@@ -1267,7 +1267,7 @@ def test_kwargs(**kwargs):
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
             name: ident("test_kwargs"),
-            args: Params {
+            args: AstParams {
                 positional: vec![],
                 args_var: None,
                 kwargs_var: Some(ident("kwargs")),

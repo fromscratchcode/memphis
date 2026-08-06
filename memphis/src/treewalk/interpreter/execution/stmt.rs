@@ -2,8 +2,8 @@ use crate::{
     core::{Container, LogLevel, log},
     domain::{Dunder, FromImportPath, Identifier, Type, resolve_absolute_path},
     parser::types::{
-        Ast, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex,
-        Params, RaiseKind, RegularImport, Statement, StatementKind,
+        Ast, AstParams, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind,
+        LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
     },
     treewalk::{
         DomainResult, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
@@ -11,7 +11,7 @@ use crate::{
         iterator::{LoopControl, try_for_each_mut},
         result::Raise,
         types::{Exception, Function, Tuple},
-        utils::{Args, args},
+        utils::args,
     },
 };
 
@@ -226,7 +226,7 @@ impl TreewalkInterpreter {
     fn evaluate_function_def(
         &self,
         name: &Identifier,
-        params: &Params,
+        params: &AstParams,
         body: &Ast,
         decorators: &[Expr],
         is_async: &bool,

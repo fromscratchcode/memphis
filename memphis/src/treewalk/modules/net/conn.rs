@@ -6,7 +6,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::Exception,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -20,11 +20,19 @@ struct ConnSend;
 struct ConnClose;
 
 impl Callable for ConnRecv {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        let n = args.get_arg(0).as_int().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "bytes"])
+    }
 
-        let self_val = args.get_self().raise(interpreter)?;
-        let mut conn = self_val
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let n = args.get("bytes").as_int().raise(interpreter)?;
+
+        let mut conn = args
+            .get("self")
             .as_native_object_mut::<Connection>()
             .raise(interpreter)?;
         let bytes = conn
@@ -41,13 +49,19 @@ impl Callable for ConnRecv {
 }
 
 impl Callable for ConnSend {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "data"])
+    }
 
-        let data = args.get_arg(0).as_bytes().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let data = args.get("data").as_bytes().raise(interpreter)?;
 
-        let self_val = args.get_self().raise(interpreter)?;
-        let mut conn = self_val
+        let mut conn = args
+            .get("self")
             .as_native_object_mut::<Connection>()
             .raise(interpreter)?;
         conn.send(&data)
@@ -63,11 +77,17 @@ impl Callable for ConnSend {
 }
 
 impl Callable for ConnClose {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
 
-        let self_val = args.get_self().raise(interpreter)?;
-        let mut conn = self_val
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let mut conn = args
+            .get("self")
             .as_native_object_mut::<Connection>()
             .raise(interpreter)?;
         conn.close()

@@ -8,7 +8,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::{Exception, Object, Str, Tuple},
-        utils::Args,
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -18,9 +18,19 @@ impl_method_provider!(Socket, [AcceptBuiltin]);
 struct AcceptBuiltin;
 
 impl Callable for AcceptBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        let self_val = args.get_self().raise(interpreter)?;
-        let socket = self_val.as_native_object::<Socket>().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let socket = args
+            .get("self")
+            .as_native_object::<Socket>()
+            .raise(interpreter)?;
 
         let (stream, addr) = socket
             .accept()
@@ -42,7 +52,7 @@ impl Callable for AcceptBuiltin {
 
         Ok(TreewalkValue::Tuple(Tuple::new(vec![
             TreewalkValue::Object(Container::new(conn_obj)),
-            TreewalkValue::Str(Str::new(&addr.to_string())),
+            TreewalkValue::Str(Str::new(addr.to_string())),
         ])))
     }
 

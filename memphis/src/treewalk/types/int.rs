@@ -6,7 +6,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::Exception,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -83,15 +83,19 @@ fn parse_int_constructor_arg(val: &TreewalkValue) -> DomainResult<i64> {
 }
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("val", TreewalkValue::Int(0)),
+        ])
+    }
 
-        let int = match args.len() {
-            1 => 0,
-            2 => parse_int_constructor_arg(&args.get_arg(1)).raise(interpreter)?,
-            _ => unreachable!(),
-        };
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let int = parse_int_constructor_arg(args.get("val")).raise(interpreter)?;
         Ok(TreewalkValue::Int(int))
     }
 
@@ -101,15 +105,17 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for AddBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a + b))
@@ -126,15 +132,17 @@ impl Callable for AddBuiltin {
 }
 
 impl Callable for SubBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a - b))
@@ -151,15 +159,17 @@ impl Callable for SubBuiltin {
 }
 
 impl Callable for MulBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a * b))
@@ -176,15 +186,17 @@ impl Callable for MulBuiltin {
 }
 
 impl Callable for TruedivBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             if b == 0 {
@@ -209,15 +221,17 @@ impl Callable for TruedivBuiltin {
 }
 
 impl Callable for FloordivBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             if b == 0 {
@@ -242,15 +256,17 @@ impl Callable for FloordivBuiltin {
 }
 
 impl Callable for ModBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             if b == 0 {
@@ -269,15 +285,17 @@ impl Callable for ModBuiltin {
 }
 
 impl Callable for AndBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a & b))
@@ -292,15 +310,17 @@ impl Callable for AndBuiltin {
 }
 
 impl Callable for OrBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a | b))
@@ -315,15 +335,17 @@ impl Callable for OrBuiltin {
 }
 
 impl Callable for XorBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a ^ b))
@@ -338,15 +360,17 @@ impl Callable for XorBuiltin {
 }
 
 impl Callable for LshiftBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             if b > 100 {
@@ -367,15 +391,17 @@ impl Callable for LshiftBuiltin {
 }
 
 impl Callable for RshiftBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Int(a >> b))
@@ -390,15 +416,17 @@ impl Callable for RshiftBuiltin {
 }
 
 impl Callable for PowBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             if b >= 0 {
@@ -417,15 +445,17 @@ impl Callable for PowBuiltin {
 }
 
 impl Callable for LtBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Bool(a < b))
@@ -442,15 +472,17 @@ impl Callable for LtBuiltin {
 }
 
 impl Callable for LeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Bool(a <= b))
@@ -467,15 +499,17 @@ impl Callable for LeBuiltin {
 }
 
 impl Callable for GtBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Bool(a > b))
@@ -492,15 +526,17 @@ impl Callable for GtBuiltin {
 }
 
 impl Callable for GeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_int()
-            .raise(interpreter)?;
-        let b = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_int().raise(interpreter)?;
+        let b = args.get("b").clone();
 
         if let TreewalkValue::Int(b) = b {
             Ok(TreewalkValue::Bool(a >= b))

@@ -6,7 +6,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::Exception,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -60,35 +60,36 @@ impl Complex {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2, 3].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("real_or_str", TreewalkValue::Float(DEFAULT_RE)),
+            Parameter::optional_without_default("imag"),
+        ])
+    }
 
-        let complex = match args.len() {
-            1 => Complex::new(DEFAULT_RE, DEFAULT_IM),
-            2 => match args.get_arg(1).coerce_to_float() {
-                Ok(re) => Complex::new(re, DEFAULT_IM),
-                Err(_) => {
-                    let input = &args
-                        .get_arg(1)
-                        .as_string()
-                        .map_err(|_| {
-                            Exception::type_error(format!(
-                                "complex() first argument must be a string or a number, not '{}'",
-                                interpreter.state.type_name(&args.get_arg(1))
-                            ))
-                        })
-                        .raise(interpreter)?;
-                    Complex::from_str(input)
-                        .ok_or_else(|| Exception::type_error("Expected a complex number"))
-                        .raise(interpreter)?
-                }
-            },
-            3 => {
-                let re = args.get_arg(1).coerce_to_float().raise(interpreter)?;
-                let im = args.get_arg(2).coerce_to_float().raise(interpreter)?;
-                Complex::new(re, im)
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let real = args.get("real_or_str");
+        let imag = args.get_optional("imag");
+        let complex = match (real, imag) {
+            (TreewalkValue::Str(_), Some(_)) => {
+                return Exception::type_error(
+                    "complex() can't take second arg if first is a string",
+                )
+                .raise(interpreter);
             }
-            _ => unreachable!(),
+            (TreewalkValue::Str(s), None) => Complex::from_str(s)
+                .ok_or_else(|| Exception::type_error("Expected a complex number"))
+                .raise(interpreter)?,
+            (real, Some(imag)) => Complex::new(
+                real.coerce_to_float().raise(interpreter)?,
+                imag.coerce_to_float().raise(interpreter)?,
+            ),
+            (real, None) => Complex::new(real.coerce_to_float().raise(interpreter)?, DEFAULT_IM),
         };
 
         Ok(TreewalkValue::Complex(complex))

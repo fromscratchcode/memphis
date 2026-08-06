@@ -200,7 +200,7 @@ pub struct Param {
 /// Function parameter list and any args/kwargs parameters.
 #[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug, Default)]
-pub struct Params {
+pub struct AstParams {
     /// The variables for all the positional arguments.
     /// ```python
     /// def foo(a, b):
@@ -241,12 +241,12 @@ pub enum KwargsOperation {
 /// Call-site argument list
 #[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug, Default)]
-pub struct CallArgs {
+pub struct AstInvokeArgs {
     /// Any args passed in positionally.
     /// ```python
     /// foo(1, 2)
     /// ```
-    pub args: Vec<Expr>,
+    pub positional: Vec<Expr>,
 
     /// Any keyword arguments passed in as literals or variables. For example,
     /// ```python
@@ -345,7 +345,7 @@ pub enum Expr {
     },
     FunctionCall {
         callee: Callee,
-        args: CallArgs,
+        args: AstInvokeArgs,
     },
     GeneratorComprehension {
         clauses: Vec<ForClause>,
@@ -365,7 +365,7 @@ pub enum Expr {
         value_body: Box<Expr>,
     },
     Lambda {
-        args: Params,
+        args: AstParams,
         expr: Box<Expr>,
     },
     TypeNode(TypeNode),
@@ -555,7 +555,7 @@ pub enum StatementKind {
     },
     FunctionDef {
         name: Identifier,
-        args: Params,
+        args: AstParams,
         body: Ast,
         decorators: Vec<Expr>,
         is_async: bool,

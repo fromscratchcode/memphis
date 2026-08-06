@@ -8,7 +8,7 @@ use crate::{
         result::Raise,
         type_system::CloneableCallable,
         types::Module,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -20,10 +20,16 @@ pub struct AsyncioSleepBuiltin;
 pub struct AsyncioCreateTaskBuiltin;
 
 impl Callable for AsyncioRunBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([Parameter::required("main")])
+    }
 
-        let coroutine = args.get_arg(0).as_coroutine().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let coroutine = args.get("main").as_coroutine().raise(interpreter)?;
         interpreter.with_executor(|exec| exec.run(interpreter, coroutine))
     }
 
@@ -33,9 +39,16 @@ impl Callable for AsyncioRunBuiltin {
 }
 
 impl Callable for AsyncioSleepBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
-        let duration = args.get_arg(0).coerce_to_float().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([Parameter::required("delay")])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let duration = args.get("delay").coerce_to_float().raise(interpreter)?;
         Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep(duration)))
     }
 
@@ -45,10 +58,16 @@ impl Callable for AsyncioSleepBuiltin {
 }
 
 impl Callable for AsyncioCreateTaskBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([Parameter::required("coro")])
+    }
 
-        let coroutine = args.get_arg(0).as_coroutine().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let coroutine = args.get("coro").as_coroutine().raise(interpreter)?;
         interpreter.with_executor(|exec| exec.spawn(coroutine))
     }
 

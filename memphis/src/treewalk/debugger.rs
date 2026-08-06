@@ -47,16 +47,14 @@ impl TreewalkDebugSession {
     fn prepare_function_call(&self, expr: &Expr) -> TreewalkResult<Option<PendingFunctionCall>> {
         if let Expr::FunctionCall { callee, args } = expr {
             let callable = self.interpreter.evaluate_callable(callee)?;
-            let Ok(function) = self.interpreter.expect_function(callable) else {
+            let Ok(function) = self.interpreter.expect_function(callable.clone()) else {
                 // we found a non-user-function. Since we cannot step into those, return as if we
                 // did not find a function call
                 return Ok(None);
             };
             let args = self.interpreter.evaluate_args(args)?;
-            let scope = function
-                .borrow()
-                .create_scope(&args)
-                .raise(&self.interpreter)?;
+            let bound_args = self.interpreter.bind_callable(callable, args)?;
+            let scope = Container::new(Scope::new(bound_args.into_symbol_table()));
             Ok(Some(PendingFunctionCall { function, scope }))
         } else {
             Ok(None)

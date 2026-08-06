@@ -10,7 +10,7 @@ use crate::{
         result::Raise,
         type_system::{CloneableCallable, MethodProvider},
         types::{Class, Exception, Module, Object},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -21,10 +21,16 @@ mod socket;
 pub struct NetListenBuiltin;
 
 impl Callable for NetListenBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["host_port"])
+    }
 
-        let host_port = args.get_arg(0).as_tuple().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let host_port = args.get("host_port").as_tuple().raise(interpreter)?;
         let host = host_port.first().as_string().raise(interpreter)?;
         let port = host_port.second().as_int().raise(interpreter)?;
 
@@ -115,7 +121,10 @@ mod tests {
         let args = args![tuple![str!("127.0.0.1"), int!(port)]];
         let interpreter = TreewalkInterpreter::default();
 
-        let result = builtin.call(&interpreter, args);
+        let bound_args = interpreter
+            .bind_callable(Box::new(builtin.clone()), args)
+            .unwrap();
+        let result = builtin.call(&interpreter, bound_args);
 
         assert!(result.is_err());
         let err_binding = result.unwrap_err();

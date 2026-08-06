@@ -181,11 +181,11 @@ impl Container<TreewalkState> {
     }
 
     pub fn read_globals(&self) -> Dict {
-        let scope = self.borrow().scope_manager.read_module().borrow().clone();
+        let module = self.borrow().scope_manager.read_module().borrow().clone();
 
         // This will make another function call to hash the keys so we do this in a separate
         // statement to avoid a mutable borrow error.
-        scope.as_dict()
+        Dict::from_symbol_table(module.symbol_table())
     }
 
     // It feels like this should be optional?
@@ -262,11 +262,7 @@ impl Container<TreewalkState> {
 
     pub fn debug_snapshot(&self) -> DomainResult<DebugSnapshot> {
         let globals = self.read_globals().to_symbol_table()?;
-        let locals = self
-            .read_locals()
-            .borrow()
-            .to_runtime_dict()
-            .to_symbol_table()?;
+        let locals = self.read_locals().borrow().symbol_table().clone();
         Ok(DebugSnapshot { globals, locals })
     }
 }

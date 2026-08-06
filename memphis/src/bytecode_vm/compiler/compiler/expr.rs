@@ -5,7 +5,7 @@ use crate::{
     },
     domain::Identifier,
     parser::types::{
-        BinOp, CallArgs, Callee, CompareOp, DictOperation, Expr, FStringPart, FormatOption,
+        AstInvokeArgs, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart, FormatOption,
         LogicalOp, UnaryOp,
     },
 };
@@ -235,7 +235,11 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_function_call(&mut self, callee: &Callee, args: &CallArgs) -> CompilerResult<()> {
+    fn compile_function_call(
+        &mut self,
+        callee: &Callee,
+        args: &AstInvokeArgs,
+    ) -> CompilerResult<()> {
         match callee {
             Callee::Expr(callee) => self.compile_expr(callee)?,
             Callee::Symbol(name) => self.compile_load(name),
@@ -243,11 +247,11 @@ impl Compiler {
 
         // We push the args onto the stack in reverse call order so that we will pop
         // them off in call order.
-        for arg in args.args.iter().rev() {
+        for arg in args.positional.iter().rev() {
             self.compile_expr(arg)?;
         }
 
-        self.emit(Opcode::Call(args.args.len()));
+        self.emit(Opcode::Call(args.positional.len()));
         Ok(())
     }
 

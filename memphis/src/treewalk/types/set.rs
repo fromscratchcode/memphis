@@ -9,7 +9,8 @@ use crate::{
         macros::*,
         protocols::{Callable, TryEvalFrom},
         result::Raise,
-        utils::{Args, HashKey, check_args},
+        types::Tuple,
+        utils::{BoundArgs, HashKey, Parameter, Signature},
     },
 };
 
@@ -99,15 +100,20 @@ struct AddBuiltin;
 struct LeBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("iterable", TreewalkValue::Tuple(Tuple::default()))
+                .positional_only(),
+        ])
+    }
 
-        let set = match args.len() {
-            1 => Set::default(),
-            2 => Set::try_eval_from(args.get_arg(1), interpreter)?,
-            _ => unreachable!(),
-        };
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let set = Set::try_eval_from(args.get("iterable").clone(), interpreter)?;
         Ok(TreewalkValue::Set(Container::new(set)))
     }
 
@@ -117,16 +123,20 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for AddBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "object"])
+    }
 
-        let set = args
-            .get_self()
-            .raise(interpreter)?
-            .as_set()
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let set = args.get("self").as_set().raise(interpreter)?;
+        let result = set
+            .borrow_mut()
+            .add(args.get("object").clone())
             .raise(interpreter)?;
-        let result = set.borrow_mut().add(args.get_arg(0)).raise(interpreter)?;
-
         Ok(TreewalkValue::Bool(result))
     }
 
@@ -136,18 +146,19 @@ impl Callable for AddBuiltin {
 }
 
 impl Callable for LeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "value"])
+    }
 
-        let left_set = args
-            .get_self()
-            .raise(interpreter)?
-            .as_set()
-            .raise(interpreter)?;
-        let right_set = args.get_arg(0).as_set().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let left_set = args.get("self").as_set().raise(interpreter)?;
+        let right_set = args.get("value").as_set().raise(interpreter)?;
         let l = left_set.borrow().clone();
         let r = right_set.borrow().clone();
-
         Ok(TreewalkValue::Bool(l.subset(&r)))
     }
 

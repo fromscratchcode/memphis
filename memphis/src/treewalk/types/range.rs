@@ -6,7 +6,7 @@ use crate::{
         macros::*,
         protocols::Callable,
         result::Raise,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -32,10 +32,6 @@ impl Range {
 
     fn with_stop(stop: i64) -> Self {
         Self::new(Self::DEFAULT_START, stop, Self::DEFAULT_STEP)
-    }
-
-    fn with_start_stop(start: i64, stop: i64) -> Self {
-        Self::new(start, stop, Self::DEFAULT_STEP)
     }
 }
 
@@ -88,26 +84,28 @@ impl Iterator for RangeIter {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [2, 3, 4].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::required("start_or_stop").positional_only(),
+            Parameter::optional_without_default("stop").positional_only(),
+            Parameter::optional("step", TreewalkValue::Int(1)).positional_only(),
+        ])
+    }
 
-        let range = match args.len() {
-            2 => {
-                let stop = args.get_arg(1).as_int().raise(interpreter)?;
-                Range::with_stop(stop)
-            }
-            3 => {
-                let start = args.get_arg(1).as_int().raise(interpreter)?;
-                let stop = args.get_arg(2).as_int().raise(interpreter)?;
-                Range::with_start_stop(start, stop)
-            }
-            4 => {
-                let start = args.get_arg(1).as_int().raise(interpreter)?;
-                let stop = args.get_arg(2).as_int().raise(interpreter)?;
-                let step = args.get_arg(3).as_int().raise(interpreter)?;
-                Range::new(start, stop, step)
-            }
-            _ => unreachable!(),
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let range = if let Some(stop) = args.get_optional("stop") {
+            let start = args.get("start_or_stop").as_int().raise(interpreter)?;
+            let stop = stop.as_int().raise(interpreter)?;
+            let step = args.get("step").as_int().raise(interpreter)?;
+            Range::new(start, stop, step)
+        } else {
+            let stop = args.get("start_or_stop").as_int().raise(interpreter)?;
+            Range::with_stop(stop)
         };
 
         Ok(TreewalkValue::Range(range))

@@ -7,7 +7,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::{Dict, DictItems},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -32,17 +32,18 @@ impl MappingProxy {
 struct GetItemBuiltin;
 
 impl Callable for GetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> crate::treewalk::utils::Signature {
+        Signature::positional_only(["self", "index"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_mapping_proxy()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
-
-        let value = object.0.borrow().getitem(&index).raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_mapping_proxy().raise(interpreter)?;
+        let index = args.get("index");
+        let value = object.0.borrow().getitem(index).raise(interpreter)?;
         Ok(value)
     }
 

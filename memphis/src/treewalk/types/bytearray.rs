@@ -1,13 +1,13 @@
 use crate::{
     core::Container,
-    domain::{Dunder, Type},
+    domain::{Dunder, Encoding, Type},
     treewalk::{
         TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::Callable,
         result::Raise,
         types::Exception,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -32,25 +32,42 @@ impl ByteArray {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2, 3].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("source", TreewalkValue::Bytes(vec![])).positional_only(),
+            Parameter::optional_without_default("encoding"),
+        ])
+    }
 
-        let byte_array = match args.len() {
-            1 => Container::new(ByteArray::new("".into())),
-            2 => match args.get_arg(1) {
-                TreewalkValue::Str(_) => {
-                    return Exception::type_error("string argument without an encoding")
-                        .raise(interpreter);
-                }
-                TreewalkValue::Bytes(s) => Container::new(ByteArray::new(s)),
-                _ => todo!(),
-            },
-            // TODO support an optional encoding
-            3 => todo!(),
-            _ => unreachable!(),
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let source = args.get("source").clone();
+        let encoding = args.get_optional("encoding");
+
+        let bytes = match (source, encoding) {
+            (TreewalkValue::Bytes(_), Some(_)) => {
+                return Exception::type_error("encoding without a string argument")
+                    .raise(interpreter);
+            }
+            (TreewalkValue::Bytes(b), None) => b,
+            (TreewalkValue::Str(s), Some(encoding)) => {
+                let encoding_str = encoding.as_string().raise(interpreter)?;
+                let encoding = Encoding::try_from(encoding_str.as_str()).raise(interpreter)?;
+                s.encode(encoding)
+            }
+            (TreewalkValue::Str(_), None) => {
+                return Exception::type_error("string argument without an encoding")
+                    .raise(interpreter);
+            }
+            _ => return Exception::type_error("cannot convert object to bytes").raise(interpreter),
         };
-
-        Ok(TreewalkValue::ByteArray(byte_array))
+        Ok(TreewalkValue::ByteArray(Container::new(ByteArray::new(
+            bytes,
+        ))))
     }
 
     fn name(&self) -> String {

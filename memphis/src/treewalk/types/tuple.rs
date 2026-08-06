@@ -8,7 +8,7 @@ use crate::{
         protocols::{Callable, TryEvalFrom},
         result::Raise,
         types::{Exception, Slice},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -117,16 +117,21 @@ struct NewBuiltin;
 struct GetItemBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("iterable", TreewalkValue::Tuple(Tuple::default()))
+                .positional_only(),
+        ])
+    }
 
-        let set = match args.len() {
-            1 => Tuple::default(),
-            2 => Tuple::try_eval_from(args.get_arg(1), interpreter)?,
-            _ => unreachable!(),
-        };
-
-        Ok(TreewalkValue::Tuple(set))
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let tuple = Tuple::try_eval_from(args.get("iterable").clone(), interpreter)?;
+        Ok(TreewalkValue::Tuple(tuple))
     }
 
     fn name(&self) -> String {
@@ -135,26 +140,28 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for GetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "key"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_tuple()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_tuple().raise(interpreter)?;
+        let index = args.get("key");
 
         let value = match index {
             TreewalkValue::Int(i) => object
-                .get_normalized(i)
+                .get_normalized(*i)
                 .ok_or_else(|| Exception::index_error("tuple index out of range"))
                 .raise(interpreter)?,
-            TreewalkValue::Slice(s) => TreewalkValue::Tuple(object.slice(&s)),
+            TreewalkValue::Slice(s) => TreewalkValue::Tuple(object.slice(s)),
             _ => {
                 return Exception::type_error(format!(
                     "tuple indices must be integers or slices, not {}",
-                    interpreter.state.type_name(&index)
+                    interpreter.state.type_name(index)
                 ))
                 .raise(interpreter);
             }

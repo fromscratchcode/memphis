@@ -9,7 +9,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::{Exception, List, Slice},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -35,8 +35,8 @@ impl_method_provider!(
 impl_iterable!(StrIter);
 
 impl Str {
-    pub fn new(str: &str) -> Self {
-        Self(str.to_string())
+    pub fn new(str: impl Into<String>) -> Self {
+        Self(str.into())
     }
 
     pub fn as_str(&self) -> &str {
@@ -157,17 +157,18 @@ struct EncodeBuiltin;
 struct GetItemBuiltin;
 
 impl Callable for AddBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         // implements a + b
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
-        let b = args.get_arg(0).as_string().raise(interpreter)?;
-
+        let a = args.get("self").as_string().raise(interpreter)?;
+        let b = args.get("b").as_string().raise(interpreter)?;
         Ok(TreewalkValue::Str(Str::from(a + &b)))
     }
 
@@ -177,17 +178,18 @@ impl Callable for AddBuiltin {
 }
 
 impl Callable for MulBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
-        let n = args.get_arg(0).as_int().raise(interpreter)?;
-
-        Ok(TreewalkValue::Str(Str::from(a.repeat(n as usize))))
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_string().raise(interpreter)?;
+        let b = args.get("b").as_int().raise(interpreter)?;
+        Ok(TreewalkValue::Str(Str::from(a.repeat(b as usize))))
     }
 
     fn name(&self) -> String {
@@ -196,15 +198,17 @@ impl Callable for MulBuiltin {
 }
 
 impl Callable for LtBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
-        let b = args.get_arg(0).as_string().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_string().raise(interpreter)?;
+        let b = args.get("b").as_string().raise(interpreter)?;
         Ok(TreewalkValue::Bool(a < b))
     }
 
@@ -214,16 +218,17 @@ impl Callable for LtBuiltin {
 }
 
 impl Callable for ContainsBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "item"])
+    }
 
-        let a = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
-        let b = args.get_arg(0).as_string().raise(interpreter)?;
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a = args.get("self").as_string().raise(interpreter)?;
+        let b = args.get("item").as_string().raise(interpreter)?;
         Ok(TreewalkValue::Bool(a.contains(&b)))
     }
 
@@ -233,17 +238,18 @@ impl Callable for ContainsBuiltin {
 }
 
 impl Callable for JoinBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "iterable"])
+    }
 
-        let delim = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
-        let items = args.get_arg(0).as_list().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let delim = args.get("self").as_string().raise(interpreter)?;
+        let items = args.get("iterable").as_list().raise(interpreter)?;
         let joined = items.borrow().join(&delim).raise(interpreter)?;
-
         Ok(TreewalkValue::Str(Str::from(joined)))
     }
 
@@ -257,43 +263,64 @@ fn collect_parts<'a>(iter: impl Iterator<Item = &'a str>) -> Vec<TreewalkValue> 
 }
 
 impl Callable for SplitBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [0, 1, 2].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("self").positional_only(),
+            Parameter::optional("sep", TreewalkValue::None),
+            Parameter::optional("maxsplit", TreewalkValue::Int(-1)),
+        ])
+    }
 
-        let text = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let text = args.get("self").as_string().raise(interpreter)?;
+        let max_split = args.get("maxsplit").as_int().raise(interpreter)?;
 
-        // This first clause is essentially saying the first positional arg has a default.
         // str.split(sep=None, maxsplit=-1)
-        // But we don't have a great way to model that on builtins right now.
-        let parts = if args.is_empty() || args.get_arg(0).is(&TreewalkValue::None) {
-            collect_parts(text.split_whitespace())
-        } else {
-            let delim = args.get_arg(0).as_string().raise(interpreter)?;
-            if delim.is_empty() {
-                return Exception::value_error("empty separator").raise(interpreter);
-            }
+        if args.get("sep").is(&TreewalkValue::None) {
+            let parts = if max_split < 0 {
+                collect_parts(text.split_whitespace())
+            } else {
+                let mut parts = Vec::new();
+                let mut remaining = text.as_str();
 
-            // TODO this whole thing would be a lot simpler if we had a way to handle default
-            // arguments on builtin function signatures
-            let max_split = args
-                .get_arg_optional(1)
-                .map(|i| i.as_int())
-                .transpose()
-                .raise(interpreter)?;
-            match max_split {
-                // Negative values for max split are ignored
-                None | Some(..=-1) => collect_parts(text.split(&delim)),
-                Some(max_split) => {
-                    // Python's value for maxsplit is the number of splits done, while Rust
-                    // interprets it as the number of items in the resulting list. Therefore,
-                    // we must add one.
-                    collect_parts(text.splitn((max_split as usize) + 1, &delim))
+                for _ in 0..max_split {
+                    let trimmed = remaining.trim_start_matches(char::is_whitespace);
+                    if trimmed.is_empty() {
+                        break;
+                    }
+
+                    let word_end = trimmed.find(char::is_whitespace).unwrap_or(trimmed.len());
+                    parts.push(TreewalkValue::Str(Str::new(&trimmed[..word_end])));
+                    remaining = &trimmed[word_end..];
                 }
-            }
+
+                let final_part = remaining.trim_start_matches(char::is_whitespace);
+                if !final_part.is_empty() {
+                    parts.push(TreewalkValue::Str(Str::new(final_part)));
+                }
+                parts
+            };
+
+            return Ok(TreewalkValue::List(Container::new(List::new(parts))));
+        }
+
+        let delim = args.get("sep").as_string().raise(interpreter)?;
+        if delim.is_empty() {
+            return Exception::value_error("empty separator").raise(interpreter);
+        }
+
+        let parts = if max_split < 0 {
+            // Negative values for max split are ignored
+            collect_parts(text.split(&delim))
+        } else {
+            // Python's value for maxsplit is the number of splits done, while Rust
+            // interprets it as the number of items in the resulting list. Therefore,
+            // we must add one.
+            collect_parts(text.splitn((max_split as usize) + 1, &delim))
         };
 
         Ok(TreewalkValue::List(Container::new(List::new(parts))))
@@ -305,13 +332,16 @@ impl Callable for SplitBuiltin {
 }
 
 impl Callable for LowerBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
-        let text = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let text = args.get("self").as_string().raise(interpreter)?;
         Ok(TreewalkValue::Str(Str::from(text.to_lowercase())))
     }
 
@@ -321,13 +351,16 @@ impl Callable for LowerBuiltin {
 }
 
 impl Callable for UpperBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
-        let text = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let text = args.get("self").as_string().raise(interpreter)?;
         Ok(TreewalkValue::Str(Str::from(text.to_uppercase())))
     }
 
@@ -337,23 +370,24 @@ impl Callable for UpperBuiltin {
 }
 
 impl Callable for EncodeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [0, 1].contains(&len)).raise(interpreter)?;
-        let text = args
-            .get_self()
-            .raise(interpreter)?
-            .as_string()
-            .raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("self").positional_only(),
+            Parameter::optional(
+                "encoding",
+                TreewalkValue::Str(Str::new(Encoding::default().to_string())),
+            ),
+        ])
+    }
 
-        let encoding = match args.len() {
-            0 => Encoding::default(),
-            1 => {
-                let encoding_str = args.get_arg(0).as_string().raise(interpreter)?;
-                Encoding::try_from(encoding_str.as_str()).raise(interpreter)?
-            }
-            _ => unreachable!(),
-        };
-
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let text = args.get("self").as_string().raise(interpreter)?;
+        let encoding_str = args.get("encoding").as_string().raise(interpreter)?;
+        let encoding = Encoding::try_from(encoding_str.as_str()).raise(interpreter)?;
         Ok(TreewalkValue::Bytes(Str::from(text).encode(encoding)))
     }
 
@@ -363,27 +397,29 @@ impl Callable for EncodeBuiltin {
 }
 
 impl Callable for GetItemBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "subscript"])
+    }
 
-        let object = args
-            .get_self()
-            .raise(interpreter)?
-            .as_str()
-            .raise(interpreter)?;
-        let index = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("self").as_str().raise(interpreter)?;
+        let index = args.get("subscript");
 
         let value = match index {
             TreewalkValue::Int(i) => object
-                .get_normalized(i)
+                .get_normalized(*i)
                 .map(TreewalkValue::Str)
                 .ok_or_else(|| Exception::index_error("string index out of range"))
                 .raise(interpreter)?,
-            TreewalkValue::Slice(s) => TreewalkValue::Str(object.slice(&s)),
+            TreewalkValue::Slice(s) => TreewalkValue::Str(object.slice(s)),
             _ => {
                 return Exception::type_error(format!(
                     "string indices must be integers, not '{}'",
-                    interpreter.state.type_name(&index)
+                    interpreter.state.type_name(index)
                 ))
                 .raise(interpreter);
             }

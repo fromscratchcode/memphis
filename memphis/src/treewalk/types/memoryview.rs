@@ -1,8 +1,10 @@
 use crate::{
     domain::{Dunder, Type},
     treewalk::{
-        TreewalkInterpreter, TreewalkResult, TreewalkValue, macros::*, protocols::Callable,
-        utils::Args,
+        TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        macros::*,
+        protocols::Callable,
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -17,10 +19,14 @@ impl_method_provider!(Memoryview, [NewBuiltin]);
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::empty()
+    }
+
     fn call(
         &self,
         _interpreter: &TreewalkInterpreter,
-        _args: Args,
+        _args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         unimplemented!()
     }

@@ -3,28 +3,14 @@ use crate::{
     domain::{DebugStackFrame, Dunder, FunctionType, ToDebugStackFrame, Type},
     parser::types::Ast,
     treewalk::{
-        DomainResult, Scope, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkState,
-        TreewalkValue,
+        Scope, TreewalkInterpreter, TreewalkResult, TreewalkState, TreewalkValue,
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
         types::{Cell, Class, Dict, Module, Str, Tuple},
-        utils::{Args, EnvironmentFrame, bind_args},
+        utils::{BoundArgs, EnvironmentFrame, Signature},
     },
 };
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct RuntimeParam {
-    pub arg: String,
-    pub default: Option<TreewalkValue>,
-}
-
-#[derive(Clone, Debug, PartialEq, Default)]
-pub struct RuntimeParams {
-    pub args: Vec<RuntimeParam>,
-    pub args_var: Option<String>,
-    pub kwargs_var: Option<String>,
-}
 
 /// This is a placeholder for what is calcuated on a functions [`Dunder::Code`].
 /// TODO this is a stub, we may need to flesh this out with bytecode if we ever want to support
@@ -35,7 +21,7 @@ pub struct Code;
 #[derive(Clone, Debug)]
 pub struct Function {
     name: String,
-    pub args: RuntimeParams,
+    pub args: Signature,
     pub body: Ast,
     pub module: Container<Module>,
     pub class_context: Option<Container<Class>>,
@@ -77,7 +63,7 @@ impl Function {
     pub fn new(
         state: Container<TreewalkState>,
         name: &str,
-        args: RuntimeParams,
+        args: Signature,
         body: Ast,
         is_async: bool,
         line_number: usize,
@@ -108,7 +94,7 @@ impl Function {
         }
     }
 
-    pub fn new_lambda(state: Container<TreewalkState>, args: RuntimeParams, body: Ast) -> Self {
+    pub fn new_lambda(state: Container<TreewalkState>, args: Signature, body: Ast) -> Self {
         // TODO add line number
         Self::new(state, "<lambda>", args, body, false, 1)
     }
@@ -118,7 +104,7 @@ impl Function {
         Self::new(
             state,
             "<anonymous_generator>",
-            RuntimeParams::default(),
+            Signature::default(),
             body,
             false,
             1,
@@ -153,17 +139,6 @@ impl Function {
         }
 
         TreewalkValue::Tuple(Tuple::new(items))
-    }
-
-    /// Bind the provided `Args` to this `Function` signature, returning a `SymbolTable` which can
-    /// be turned into a runtime `Scope`.
-    pub fn bind_args(&self, args: &Args) -> DomainResult<SymbolTable> {
-        bind_args(self.name(), args, &self.args)
-    }
-
-    pub fn create_scope(&self, args: &Args) -> DomainResult<Container<Scope>> {
-        let symbol_table = self.bind_args(args)?;
-        Ok(Container::new(Scope::new(symbol_table)))
     }
 }
 
@@ -223,8 +198,16 @@ impl MemberWrite for Container<Function> {
 }
 
 impl Callable for Container<Function> {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        let scope = self.borrow().create_scope(&args).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        self.borrow().args.clone()
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let scope = Container::new(Scope::new(args.into_symbol_table()));
         interpreter.run_function(self.clone(), scope)
     }
 
@@ -491,7 +474,8 @@ impl NonDataDescriptor for DictDescriptor {
             Some(i) => i.as_function().raise(interpreter)?.borrow().scope.clone(),
             None => owner.borrow().scope.clone(),
         };
-        Ok(TreewalkValue::Dict(Container::new(scope.to_runtime_dict())))
+        let dict = Dict::from_symbol_table(scope.symbol_table());
+        Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 
     fn name(&self) -> String {

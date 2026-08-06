@@ -8,11 +8,10 @@ use crate::{
         result::Raise,
         type_system::CloneableIterable,
         types::{Exception, Tuple},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
-#[derive(Default)]
 pub struct ZipIterator(Vec<Box<dyn CloneableIterable>>);
 
 impl Clone for ZipIterator {
@@ -65,45 +64,40 @@ impl Iterable for ZipIterator {
 struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        // This function cannot be called with 2 args (1 unbound arg) because there would be
-        // nothing to zip.
-        check_args(&args, |len| len == 1 || len >= 3).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("strict", TreewalkValue::Bool(false)).keyword_only(),
+        ])
+        .with_varargs("iterables")
+    }
 
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         // The default behavior will stop zipping when the shortest iterator is exhausted,
         // which matches default behavior from Python. Using strict=True causes this to throw an
         // exception instead.
-        let zip = match args.len() {
-            1 => ZipIterator::default(),
-            n if n >= 3 => {
-                // The first arg is the class, so we must consume it before beginning the zip
-                // operation.
-                let mut iter = args.iter_args();
-                iter.next();
+        let iters = args
+            .get_varargs("iterables")
+            .items()
+            .iter()
+            .map(|a| a.as_iterator())
+            .collect::<DomainResult<Vec<Box<dyn CloneableIterable>>>>()
+            .raise(interpreter)?;
 
-                let iters = iter
-                    .map(|a| a.as_iterator())
-                    .collect::<DomainResult<Vec<Box<dyn CloneableIterable>>>>()
-                    .raise(interpreter)?;
+        let zip = ZipIterator::new(iters);
 
-                let zip = ZipIterator::new(iters);
+        if args.get("strict") == &TreewalkValue::Bool(true) {
+            let lengths = zip.lengths()?;
+            let all_equal = lengths.is_empty() || lengths.iter().all(|&x| x == lengths[0]);
 
-                if args
-                    .get_kwarg("strict")
-                    .is_some_and(|k| k == TreewalkValue::Bool(true))
-                {
-                    let lengths = zip.lengths()?;
-                    let all_equal = lengths.is_empty() || lengths.iter().all(|&x| x == lengths[0]);
-
-                    if !all_equal {
-                        return Exception::runtime_error().raise(interpreter);
-                    }
-                }
-
-                zip
+            if !all_equal {
+                return Exception::runtime_error().raise(interpreter);
             }
-            _ => unreachable!(),
-        };
+        }
 
         Ok(TreewalkValue::Zip(zip))
     }

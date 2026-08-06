@@ -6,7 +6,7 @@ use crate::{
         protocols::Callable,
         result::Raise,
         types::{Exception, Str},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Parameter, Signature},
     },
 };
 
@@ -23,22 +23,38 @@ struct NewBuiltin;
 struct DecodeBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [1, 2, 3].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("cls").positional_only(),
+            Parameter::optional("source", TreewalkValue::Bytes(vec![])).positional_only(),
+            Parameter::optional_without_default("encoding"),
+        ])
+    }
 
-        let bytes = match args.len() {
-            1 => "".into(),
-            2 => match args.get_arg(1) {
-                TreewalkValue::Bytes(b) => b,
-                TreewalkValue::Str(_) => {
-                    return Exception::type_error("string argument without an encoding")
-                        .raise(interpreter);
-                }
-                _ => todo!(),
-            },
-            // TODO support an optional encoding
-            3 => todo!(),
-            _ => unreachable!(),
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let source = args.get("source").clone();
+        let encoding = args.get_optional("encoding");
+
+        let bytes = match (source, encoding) {
+            (TreewalkValue::Bytes(_), Some(_)) => {
+                return Exception::type_error("encoding without a string argument")
+                    .raise(interpreter);
+            }
+            (TreewalkValue::Bytes(b), None) => b,
+            (TreewalkValue::Str(s), Some(encoding)) => {
+                let encoding_str = encoding.as_string().raise(interpreter)?;
+                let encoding = Encoding::try_from(encoding_str.as_str()).raise(interpreter)?;
+                s.encode(encoding)
+            }
+            (TreewalkValue::Str(_), None) => {
+                return Exception::type_error("string argument without an encoding")
+                    .raise(interpreter);
+            }
+            _ => return Exception::type_error("cannot convert object to bytes").raise(interpreter),
         };
 
         Ok(TreewalkValue::Bytes(bytes))
@@ -50,23 +66,24 @@ impl Callable for NewBuiltin {
 }
 
 impl Callable for DecodeBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [0, 1].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("self").positional_only(),
+            Parameter::optional(
+                "encoding",
+                TreewalkValue::Str(Str::new(Encoding::default().to_string())),
+            ),
+        ])
+    }
 
-        let encoding = match args.len() {
-            0 => Encoding::default(),
-            1 => {
-                let encoding_str = args.get_arg(0).as_string().raise(interpreter)?;
-                Encoding::try_from(encoding_str.as_str()).raise(interpreter)?
-            }
-            _ => unreachable!(),
-        };
-
-        let bytes = args
-            .get_self()
-            .raise(interpreter)?
-            .as_bytes()
-            .raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let bytes = args.get("self").as_bytes().raise(interpreter)?;
+        let encoding_str = args.get("encoding").as_string().raise(interpreter)?;
+        let encoding = Encoding::try_from(encoding_str.as_str()).raise(interpreter)?;
         let str_value = Str::decode(&bytes, encoding).raise(interpreter)?;
         Ok(TreewalkValue::Str(str_value))
     }

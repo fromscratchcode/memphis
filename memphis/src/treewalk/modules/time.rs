@@ -9,7 +9,7 @@ use crate::{
         result::Raise,
         type_system::CloneableCallable,
         types::Module,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -17,10 +17,16 @@ use crate::{
 pub struct TimeSleepBuiltin;
 
 impl Callable for TimeSleepBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["duration"])
+    }
 
-        let duration_in_s = args.get_arg(0).as_float().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let duration_in_s = args.get("duration").as_float().raise(interpreter)?;
         let micros = duration_in_s * 1_000_000.0;
         let dur = Duration::from_micros(micros as u64);
         std::thread::sleep(dur);

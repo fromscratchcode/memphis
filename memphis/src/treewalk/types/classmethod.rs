@@ -8,7 +8,7 @@ use crate::{
         result::Raise,
         type_system::CloneableCallable,
         types::{Class, Method},
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -28,10 +28,15 @@ impl Classmethod {
 pub struct NewBuiltin;
 
 impl Callable for NewBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        // The first arg is the class itself, the second arg is the function
-        check_args(&args, |len| len == 2).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls", "func"])
+    }
 
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         // This is a workaround for Generic type behavior found in _collections_abc.py.
         // _weakrefset.py also uses this.
         //
@@ -39,11 +44,11 @@ impl Callable for NewBuiltin {
         // GenericAlias = type(list[int])
         // __class_getitem__ = classmethod(GenericAlias)
         // ```
-        if args.get_arg(1).as_class().is_ok() {
+        if args.get("func").as_class().is_ok() {
             return Ok(TreewalkValue::None);
         }
 
-        let function = args.get_arg(1).as_callable().raise(interpreter)?;
+        let function = args.get("func").clone().as_callable().raise(interpreter)?;
         Ok(TreewalkValue::Classmethod(Classmethod::new(function)))
     }
 

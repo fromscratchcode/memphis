@@ -5,8 +5,8 @@ use crate::{
     },
     domain::{FromImportPath, FunctionType, Identifier, resolve_import_path},
     parser::types::{
-        Ast, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind, LoopIndex,
-        Params, RaiseKind, RegularImport, Statement, StatementKind,
+        Ast, AstParams, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind,
+        LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
     },
 };
 
@@ -276,7 +276,7 @@ impl Compiler {
     fn compile_function_definition(
         &mut self,
         name: &Identifier,
-        args: &Params,
+        args: &AstParams,
         body: &Ast,
         decorators: &[Expr],
         is_async: &bool,

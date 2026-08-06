@@ -13,9 +13,8 @@ use crate::{
             StepResult, Suspension,
         },
         protocols::Callable,
-        result::Raise,
         types::Function,
-        utils::{Args, check_args},
+        utils::{BoundArgs, Signature},
     },
 };
 
@@ -137,8 +136,15 @@ struct CloseBuiltin;
 // ResourceWarning, but I'm not doing anything when I invoke a coroutine right now that would lead
 // to this.
 impl Callable for CloseBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self"])
+    }
+
+    fn call(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        _args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         Ok(TreewalkValue::None)
     }
 

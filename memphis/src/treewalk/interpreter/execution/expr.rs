@@ -2,8 +2,8 @@ use crate::{
     core::Container,
     domain::{Identifier, MemphisValue},
     parser::types::{
-        Ast, BinOp, CallArgs, Callee, CompareOp, DictOperation, Expr, FStringPart, ForClause,
-        FormatOption, LogicalOp, Params, SliceParams, TypeNode, UnaryOp,
+        Ast, AstInvokeArgs, AstParams, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart,
+        ForClause, FormatOption, LogicalOp, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
         TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
@@ -257,7 +257,7 @@ impl TreewalkInterpreter {
     fn evaluate_function_call(
         &self,
         callee: &Callee,
-        call_args: &CallArgs,
+        call_args: &AstInvokeArgs,
     ) -> TreewalkResult<TreewalkValue> {
         let args = self.evaluate_args(call_args)?;
         let function = self.evaluate_callable(callee)?;
@@ -334,7 +334,7 @@ impl TreewalkInterpreter {
         Ok(TreewalkValue::Str(Str::from(result)))
     }
 
-    fn evaluate_lambda(&self, params: &Params, expr: &Expr) -> TreewalkResult<TreewalkValue> {
+    fn evaluate_lambda(&self, params: &AstParams, expr: &Expr) -> TreewalkResult<TreewalkValue> {
         let block = Ast::from_expr(expr.clone());
         let runtime_params = self.evaluate_params(params)?;
 

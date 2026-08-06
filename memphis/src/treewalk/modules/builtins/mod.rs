@@ -8,8 +8,8 @@ use crate::{
         protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableCallable,
-        types::{Class, Exception, List, Module, Str},
-        utils::{Args, args, check_args},
+        types::{Exception, List, Module, Str},
+        utils::{BoundArgs, Parameter, Signature, args},
     },
 };
 
@@ -81,9 +81,18 @@ pub struct PrintBuiltin;
 pub struct InputBuiltin;
 
 impl Callable for CallableBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
-        Ok(TreewalkValue::Bool(args.get_arg(0).as_callable().is_ok()))
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj"])
+    }
+
+    fn call(
+        &self,
+        _interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        Ok(TreewalkValue::Bool(
+            args.get("obj").clone().as_callable().is_ok(),
+        ))
     }
 
     fn name(&self) -> String {
@@ -92,10 +101,20 @@ impl Callable for CallableBuiltin {
 }
 
 impl Callable for DirBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        // TODO we don't yet handle the dir() version, which just returns the names in the current
+        // local scope
+        Signature::positional_only(["obj"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         let dir = args
-            .get_arg(0)
+            .get("obj")
+            .clone()
             .into_member_reader(interpreter)
             .dir()
             .iter()
@@ -110,27 +129,32 @@ impl Callable for DirBuiltin {
 }
 
 impl Callable for GetattrBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [2, 3].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("obj").positional_only(),
+            Parameter::required("field").positional_only(),
+            Parameter::optional_without_default("default").positional_only(),
+        ])
+    }
 
-        let object = args.get_arg(0);
-        let field = args.get_arg(1).as_string().raise(interpreter)?;
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("obj");
+        let field = args.get("field").as_string().raise(interpreter)?;
 
         let attr = object
             .clone()
             .into_member_reader(interpreter)
             .get_member(interpreter, field.as_str())?;
 
-        if let Some(attr) = attr {
-            Ok(attr)
-        } else {
-            // Use the default value if provided
-            if args.len() == 3 {
-                Ok(args.get_arg(2))
-            } else {
-                Exception::attribute_error(interpreter.state.class_name(&object), field)
-                    .raise(interpreter)
-            }
+        match (attr, args.get_optional("default")) {
+            (Some(attr), _) => Ok(attr),
+            (None, Some(default)) => Ok(default.clone()),
+            (None, None) => Exception::attribute_error(interpreter.state.class_name(object), field)
+                .raise(interpreter),
         }
     }
 
@@ -140,21 +164,27 @@ impl Callable for GetattrBuiltin {
 }
 
 impl Callable for SetattrBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 3).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj", "field", "value"])
+    }
 
-        let object = args.get_arg(0);
-        let field = args.get_arg(1).as_string().raise(interpreter)?;
-        let value = args.get_arg(2);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let object = args.get("obj");
+        let field = args.get("field").as_string().raise(interpreter)?;
+        let value = args.get("value");
 
         object
             .clone()
             .into_member_writer()
             .ok_or_else(|| {
-                Exception::attribute_error(interpreter.state.class_name(&object), field.as_str())
+                Exception::attribute_error(interpreter.state.class_name(object), field.as_str())
             })
             .raise(interpreter)?
-            .set_member(interpreter, field.as_str(), value)?;
+            .set_member(interpreter, field.as_str(), value.clone())?;
 
         Ok(TreewalkValue::None)
     }
@@ -165,8 +195,15 @@ impl Callable for SetattrBuiltin {
 }
 
 impl Callable for GlobalsBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 0).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::empty()
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        _args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         Ok(TreewalkValue::Dict(Container::new(
             interpreter.state.read_globals(),
         )))
@@ -178,15 +215,21 @@ impl Callable for GlobalsBuiltin {
 }
 
 impl Callable for HashBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj"])
+    }
 
-        let arg = args.get_arg(0);
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let arg = args.get("obj");
         if arg.as_class().is_ok() {
             return Ok(TreewalkValue::Int(arg.hash() as i64));
         }
 
-        let result = interpreter.call_method(&arg, Dunder::Hash, args![])?;
+        let result = interpreter.call_method(arg, Dunder::Hash, args![])?;
 
         if let TreewalkValue::Int(_) = result {
             Ok(result)
@@ -202,13 +245,19 @@ impl Callable for HashBuiltin {
 }
 
 impl Callable for IsinstanceBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 2).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj", "classinfo"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let obj = args.get("obj");
         let message = "isinstance() arg 2 must be a type, a tuple of types, or a union";
 
-        let instance_class = interpreter.state.class_of(&args.get_arg(0));
-
-        let reference_class = match args.get_arg(1) {
+        let reference_class = match args.get("classinfo").clone() {
             TreewalkValue::Class(class) => vec![class],
             TreewalkValue::Tuple(tuple) => tuple
                 .into_iter()
@@ -219,11 +268,9 @@ impl Callable for IsinstanceBuiltin {
             _ => return Exception::type_error(message).raise(interpreter),
         };
 
-        let isinstance = if args.get_arg(0).as_class().is_ok() {
-            has_class_overlap(&reference_class, &instance_class.borrow().metaclass().mro())
-        } else {
-            has_class_overlap(&reference_class, &instance_class.mro())
-        };
+        let isinstance = reference_class
+            .iter()
+            .any(|class| interpreter.is_instance_of(obj, class));
 
         Ok(TreewalkValue::Bool(isinstance))
     }
@@ -234,28 +281,39 @@ impl Callable for IsinstanceBuiltin {
 }
 
 impl Callable for IssubclassBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 2).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["cls", "classinfo"])
+    }
 
-        let instance_class = args
-            .get_arg(0)
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let candidate_class = args
+            .get("cls")
             .as_class()
             .map_err(|_| Exception::type_error("issubclass() arg 1 must be a class"))
             .raise(interpreter)?;
 
-        let reference_class = args
-            .get_arg(1)
-            .as_class()
-            .map_err(|_| {
-                Exception::type_error(
-                    "issubclass() arg 2 must be a type, a tuple of types, or a union",
-                )
-            })
-            .raise(interpreter)?;
+        let message = "issubclass() arg 2 must be a type, a tuple of types, or a union";
 
-        Ok(TreewalkValue::Bool(
-            instance_class.is_subclass_of(&reference_class),
-        ))
+        let reference_class = match args.get("classinfo").clone() {
+            TreewalkValue::Class(class) => vec![class],
+            TreewalkValue::Tuple(tuple) => tuple
+                .into_iter()
+                .map(|item| item.as_class())
+                .collect::<DomainResult<Vec<_>>>()
+                .map_err(|_| Exception::type_error(message))
+                .raise(interpreter)?,
+            _ => return Exception::type_error(message).raise(interpreter),
+        };
+
+        let issubclass = reference_class
+            .iter()
+            .any(|class| candidate_class.is_subclass_of(class));
+
+        Ok(TreewalkValue::Bool(issubclass))
     }
 
     fn name(&self) -> String {
@@ -264,13 +322,20 @@ impl Callable for IssubclassBuiltin {
 }
 
 impl Callable for PrintBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
+    fn signature(&self) -> Signature {
+        Signature::empty().with_varargs("args")
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
         let value = args
-            .iter_args()
-            .map(|a| {
-                let mv: MemphisValue = a.clone().into();
-                mv.to_string()
-            })
+            .get_varargs("args")
+            .items()
+            .iter()
+            .map(|value| MemphisValue::from(value.clone()).to_string())
             .collect::<Vec<_>>()
             .join(" ");
         interpreter.memphis_state.borrow_mut().io.println(&value);
@@ -283,11 +348,17 @@ impl Callable for PrintBuiltin {
 }
 
 impl Callable for InputBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| [0, 1].contains(&len)).raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::new([Parameter::optional_without_default("prompt").positional_only()])
+    }
 
-        if let Some(prompt) = args.get_arg_optional(0) {
-            let mv = MemphisValue::from(prompt).to_string();
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        if let Some(prompt) = args.get_optional("prompt") {
+            let mv = MemphisValue::from(prompt.clone()).to_string();
             interpreter.memphis_state.borrow_mut().io.print(&mv);
         }
 
@@ -304,9 +375,16 @@ impl Callable for InputBuiltin {
 }
 
 impl Callable for LenBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
-        let iter = args.get_arg(0).as_iterator().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let iter = args.get("obj").as_iterator().raise(interpreter)?;
         let count = count(iter)?;
         Ok(TreewalkValue::Int(count as i64))
     }
@@ -317,9 +395,20 @@ impl Callable for LenBuiltin {
 }
 
 impl Callable for NextBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
-        let mut iterator = args.get_arg(0).as_iterator_strict().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let mut iterator = args
+            .get("obj")
+            .clone()
+            .as_iterator_strict()
+            .raise(interpreter)?;
         match iterator.try_next()? {
             NextResult::Yielded(val) => Ok(val),
             NextResult::Exhausted(None) => Exception::stop_iteration().raise(interpreter),
@@ -335,9 +424,16 @@ impl Callable for NextBuiltin {
 }
 
 impl Callable for IterBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
-        args.get_arg(0).as_iterable().raise(interpreter)
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["obj"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        args.get("obj").clone().as_iterable().raise(interpreter)
     }
 
     fn name(&self) -> String {
@@ -346,9 +442,16 @@ impl Callable for IterBuiltin {
 }
 
 impl Callable for SortedBuiltin {
-    fn call(&self, interpreter: &TreewalkInterpreter, args: Args) -> TreewalkResult<TreewalkValue> {
-        check_args(&args, |len| len == 1).raise(interpreter)?;
-        let iter = args.get_arg(0).as_iterator().raise(interpreter)?;
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["iterable"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let iter = args.get("iterable").as_iterator().raise(interpreter)?;
         let mut items = collect(iter)?;
         interpreter.python_sort(&mut items)?;
         Ok(TreewalkValue::List(Container::new(List::new(items))))
@@ -357,9 +460,4 @@ impl Callable for SortedBuiltin {
     fn name(&self) -> String {
         "sorted".into()
     }
-}
-
-fn has_class_overlap(left: &[Container<Class>], right: &[Container<Class>]) -> bool {
-    left.iter()
-        .any(|a| right.iter().any(|b| a.same_identity(b)))
 }

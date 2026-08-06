@@ -5,7 +5,7 @@ use crate::{
     parser::{
         Parser, ParserError, ParserResult,
         types::{
-            BinOp, CallArg, CallArgs, Callee, CompareOp, DictOperation, Expr, ExprFormat,
+            AstInvokeArgs, BinOp, CallArg, Callee, CompareOp, DictOperation, Expr, ExprFormat,
             FStringPart, ForClause, FormatOption, KwargsOperation, LogicalOp, SliceParams,
             TypeNode, UnaryOp,
         },
@@ -845,7 +845,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_function_call_args(&mut self) -> ParserResult<CallArgs> {
+    fn parse_function_call_args(&mut self) -> ParserResult<AstInvokeArgs> {
         self.consume(&Token::LParen)?;
 
         let mut args = Vec::new();
@@ -908,8 +908,8 @@ impl Parser<'_> {
 
         self.consume(&Token::RParen)?;
 
-        Ok(CallArgs {
-            args,
+        Ok(AstInvokeArgs {
+            positional: args,
             kwargs,
             args_var,
         })
@@ -1079,8 +1079,8 @@ mod tests {
         let input = "a(*self.args, **self.kwargs)";
         let expected_ast = func_call!(
             "a",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![KwargsOperation::Unpacking(member_access!(
                     var!("self"),
                     "kwargs"
@@ -1120,8 +1120,8 @@ mod tests {
         let input = "test_kwargs(a=1, b=2)";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![
                     KwargsOperation::Pair(ident("a"), int!(1)),
                     KwargsOperation::Pair(ident("b"), int!(2)),
@@ -1134,8 +1134,8 @@ mod tests {
         let input = "test_kwargs(**{'a':1, 'b':2})";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![
                     KwargsOperation::Pair(ident("a"), int!(1)),
                     KwargsOperation::Pair(ident("b"), int!(2)),
@@ -1148,8 +1148,8 @@ mod tests {
         let input = "test_kwargs(**{'a':1, 'b':2}, **{'c': 3})";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![
                     KwargsOperation::Pair(ident("a"), int!(1)),
                     KwargsOperation::Pair(ident("b"), int!(2)),
@@ -1163,8 +1163,8 @@ mod tests {
         let input = "test_kwargs(**first, **second)";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![
                     KwargsOperation::Unpacking(var!("first")),
                     KwargsOperation::Unpacking(var!("second")),
@@ -1177,8 +1177,8 @@ mod tests {
         let input = "test_kwargs(**kwargs)";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![KwargsOperation::Unpacking(var!("kwargs"))],
                 args_var: None,
             }
@@ -1188,8 +1188,8 @@ mod tests {
         let input = "test_kwargs(*args)";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![],
                 args_var: Some(Box::new(var!("args"))),
             }
@@ -1199,8 +1199,8 @@ mod tests {
         let input = "test_kwargs(*args, **kwargs)";
         let expected_ast = func_call!(
             "test_kwargs",
-            CallArgs {
-                args: vec![],
+            AstInvokeArgs {
+                positional: vec![],
                 kwargs: vec![KwargsOperation::Unpacking(var!("kwargs"))],
                 args_var: Some(Box::new(var!("args"))),
             }
@@ -1217,8 +1217,8 @@ deprecated("collections.abc.ByteString",
         let input = "foo(a, *b[1:])";
         let expected_ast = func_call!(
             "foo",
-            CallArgs {
-                args: vec![var!("a")],
+            AstInvokeArgs {
+                positional: vec![var!("a")],
                 kwargs: vec![],
                 args_var: Some(Box::new(slice_op!(
                     var!("b"),
