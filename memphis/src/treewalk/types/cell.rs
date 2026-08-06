@@ -1,21 +1,19 @@
 use crate::treewalk::{
-    Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::MemberRead,
+    SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::MemberRead,
 };
 
 /// This corresponds to the Python internal `Cell` class, which is returned for values captured in
 /// a closure.
 #[derive(Clone)]
 pub struct Cell {
-    scope: Scope,
+    symbol_table: SymbolTable,
 }
 
 impl Cell {
     pub fn new(value: TreewalkValue) -> Self {
-        let mut scope = Scope::default();
-        scope.insert("cell_contents", value);
-        Self {
-            scope: scope.to_owned(),
-        }
+        let mut symbol_table = SymbolTable::default();
+        symbol_table.insert("cell_contents", value);
+        Self { symbol_table }
     }
 }
 
@@ -25,6 +23,6 @@ impl MemberRead for Cell {
         _interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        Ok(self.scope.get(name))
+        Ok(self.symbol_table.get(name).cloned())
     }
 }

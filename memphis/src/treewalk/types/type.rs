@@ -2,7 +2,7 @@ use crate::{
     core::Container,
     domain::{Dunder, Type},
     treewalk::{
-        DomainResult, Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         macros::*,
         protocols::{Callable, NonDataDescriptor},
         result::Raise,
@@ -31,17 +31,17 @@ impl NonDataDescriptor for DictAttribute {
         instance: Option<TreewalkValue>,
         owner: Container<Class>,
     ) -> TreewalkResult<TreewalkValue> {
-        let scope = match instance {
+        let symbol_table = match instance {
             Some(instance) => instance
                 .as_class()
                 .raise(interpreter)?
                 .borrow()
-                .scope
+                .symbol_table()
                 .clone(),
-            None => owner.borrow().scope.clone(),
+            None => owner.borrow().symbol_table().clone(),
         };
 
-        let dict = Dict::from_symbol_table(scope.symbol_table());
+        let dict = Dict::from_symbol_table(&symbol_table);
         Ok(TreewalkValue::MappingProxy(MappingProxy::new(
             Container::new(dict),
         )))
@@ -117,8 +117,7 @@ impl Callable for NewBuiltin {
 
         let dict = args.get("dict").as_symbol_table().raise(interpreter)?;
 
-        let mut class = Class::new_direct(name, Some(mcls), parent_classes);
-        class.scope = Scope::new(dict);
+        let class = Class::new_direct(name, Some(mcls), parent_classes, dict);
         Ok(TreewalkValue::Class(Container::new(class)))
     }
 

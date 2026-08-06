@@ -5,7 +5,7 @@ use crate::{
     },
     domain::{ModuleName, Type},
     treewalk::{
-        ModuleStore, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
+        ModuleStore, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
         protocols::Callable,
         result::Raise,
         type_system::{CloneableCallable, MethodProvider},
@@ -66,7 +66,12 @@ fn register_native_class<T: MethodProvider>(
     let object_class = type_registry.type_class(&Type::Object);
     let type_class = type_registry.type_class(&Type::Type);
 
-    let mut class = Class::new_direct(name, Some(type_class.clone()), vec![object_class.clone()]);
+    let mut class = Class::new_direct(
+        name,
+        Some(type_class.clone()),
+        vec![object_class.clone()],
+        SymbolTable::default(),
+    );
 
     for builtin in T::get_methods() {
         class.set_on_class(&builtin.name(), TreewalkValue::BuiltinMethod(builtin));

@@ -38,7 +38,7 @@ impl_method_provider!(
 );
 
 impl Dict {
-    pub fn from_symbol_table(table: &HashMap<String, TreewalkValue>) -> Self {
+    pub fn from_symbol_table(table: &SymbolTable) -> Self {
         let items = table
             .iter()
             .map(|(key, value)| (TreewalkValue::Str(Str::new(key)), value.clone()))
@@ -122,14 +122,14 @@ impl Dict {
     /// Turn this `Dict` into a `SymbolTable`, which is another key-value store but where the keys
     /// are all confirmed to be valid Python identifiers.
     pub fn to_symbol_table(&self) -> DomainResult<SymbolTable> {
-        let mut table = HashMap::new();
+        let mut table = SymbolTable::default();
 
         let dict_items = self.items();
         for pair in dict_items {
             let tuple = pair.as_tuple()?;
             let key = tuple.first().as_string()?;
             let value = tuple.second();
-            table.insert(key, value);
+            table.insert(&key, value);
         }
 
         Ok(table)

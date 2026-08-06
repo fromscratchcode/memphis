@@ -4,11 +4,47 @@ use crate::treewalk::TreewalkValue;
 
 /// This is similar to our runtime `Dict` object, but where keys must be valid Python runtime
 /// identifiers (basically, strings).
-// TODO make this a real type.
-pub type SymbolTable = HashMap<String, TreewalkValue>;
+#[derive(Debug, Clone, Default)]
+pub struct SymbolTable {
+    values: HashMap<String, TreewalkValue>,
+}
+
+impl SymbolTable {
+    pub fn new(values: HashMap<String, TreewalkValue>) -> Self {
+        Self { values }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&TreewalkValue> {
+        self.values.get(name)
+    }
+
+    pub fn symbols(&self) -> Vec<String> {
+        self.values.keys().cloned().collect()
+    }
+
+    pub fn delete(&mut self, name: &str) -> Option<TreewalkValue> {
+        self.values.remove(name)
+    }
+
+    pub fn insert(&mut self, name: &str, value: TreewalkValue) {
+        self.values.insert(name.to_string(), value);
+    }
+
+    pub fn has(&self, name: &str) -> bool {
+        self.values.contains_key(name)
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, TreewalkValue> {
+        self.values.iter()
+    }
+
+    pub fn into_inner(self) -> HashMap<String, TreewalkValue> {
+        self.values
+    }
+}
 
 /// This represents a symbol table for a given scope.
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Scope {
     symbol_table: SymbolTable,
 
@@ -27,26 +63,6 @@ impl Scope {
             global_vars: HashSet::new(),
             nonlocal_vars: HashSet::new(),
         }
-    }
-
-    pub fn get(&self, name: &str) -> Option<TreewalkValue> {
-        self.symbol_table.get(name).cloned()
-    }
-
-    /// Return a list of all the symbols available in this `Scope`.
-    pub fn symbols(&self) -> Vec<String> {
-        self.symbol_table.keys().cloned().collect()
-    }
-
-    pub fn delete(&mut self, name: &str) -> Option<TreewalkValue> {
-        self.symbol_table.remove(name)
-    }
-
-    /// Insert an `TreewalkValue` to this `Scope`. The `Scope` is returned to allow calls to be
-    /// chained.
-    pub fn insert(&mut self, name: &str, value: TreewalkValue) -> &mut Self {
-        self.symbol_table.insert(name.to_string(), value);
-        self
     }
 
     /// Given a variable `var`, indicate that `var` should refer to the variable in the
@@ -71,7 +87,23 @@ impl Scope {
         self.nonlocal_vars.contains(name)
     }
 
-    pub fn symbol_table(&self) -> &HashMap<String, TreewalkValue> {
+    pub fn symbol_table(&self) -> &SymbolTable {
         &self.symbol_table
+    }
+
+    pub fn get(&self, name: &str) -> Option<TreewalkValue> {
+        self.symbol_table.get(name).cloned()
+    }
+
+    pub fn symbols(&self) -> Vec<String> {
+        self.symbol_table.symbols()
+    }
+
+    pub fn delete(&mut self, name: &str) -> Option<TreewalkValue> {
+        self.symbol_table.delete(name)
+    }
+
+    pub fn insert(&mut self, name: &str, value: TreewalkValue) {
+        self.symbol_table.insert(name, value);
     }
 }

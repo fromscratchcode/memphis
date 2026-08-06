@@ -2,7 +2,7 @@ use crate::{
     core::{Container, LogLevel, log},
     domain::Type,
     treewalk::{
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::{Callable, MemberRead, MemberWrite},
         result::Raise,
         types::Exception,
@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Class {
     name: String,
 
@@ -20,7 +20,8 @@ pub struct Class {
     /// This is semantically required. See `Class::metaclass()` for an explanation of why it is
     /// optional in the struct definition.
     metaclass: Option<Container<Class>>,
-    pub scope: Scope,
+
+    symbol_table: SymbolTable,
 
     // TODO consider whether we can deprecate this field.
     builtin_type: Option<Type>,
@@ -33,12 +34,13 @@ impl Class {
         name: impl Into<String>,
         metaclass: Option<Container<Class>>,
         parent_classes: Vec<Container<Class>>,
+        symbol_table: SymbolTable,
     ) -> Self {
         Self {
             name: name.into(),
             parent_classes,
             metaclass,
-            scope: Scope::default(),
+            symbol_table,
             builtin_type: None,
         }
     }
@@ -52,7 +54,7 @@ impl Class {
             name: String::from(&type_),
             parent_classes,
             metaclass,
-            scope: Scope::default(),
+            symbol_table: SymbolTable::default(),
             builtin_type: Some(type_),
         }
     }
@@ -82,6 +84,14 @@ impl Class {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn symbol_table(&self) -> &SymbolTable {
+        &self.symbol_table
+    }
+
+    pub fn set_symbol_table(&mut self, symbol_table: SymbolTable) {
+        self.symbol_table = symbol_table;
     }
 
     fn find_metaclass_inner(
@@ -131,7 +141,7 @@ impl Class {
     /// Insert into the class scope. Used by `MemberWriter` or anywhere we do not have an
     /// `Interpreter`, like in the `TypeRegistry` on startup.
     pub fn set_on_class(&mut self, name: &str, value: TreewalkValue) {
-        self.scope.insert(name, value);
+        self.symbol_table.insert(name, value);
     }
 }
 
@@ -199,8 +209,8 @@ impl Container<Class> {
 /// Search for the give attribute in the list of classes. MRO should happen before this!
 fn search(iterable: &[Container<Class>], name: &str) -> Option<TreewalkValue> {
     for class in iterable {
-        if let Some(attr) = class.borrow().scope.get(name) {
-            return Some(attr);
+        if let Some(attr) = class.borrow().symbol_table.get(name) {
+            return Some(attr.clone());
         }
     }
 
@@ -244,7 +254,7 @@ impl MemberRead for Container<Class> {
     }
 
     fn dir(&self) -> Vec<String> {
-        let mut symbols = self.borrow().scope.symbols();
+        let mut symbols = self.borrow().symbol_table.symbols();
         symbols.sort();
         symbols
     }
@@ -256,7 +266,7 @@ impl MemberWrite for Container<Class> {
         _interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<()> {
-        self.borrow_mut().scope.delete(name);
+        self.borrow_mut().symbol_table.delete(name);
 
         // TODO support delete attributes from parent classes?
         todo!();
@@ -311,7 +321,11 @@ impl Callable for Container<Class> {
 
         let invoke_args = InvokeArgs::new(
             args.items().to_vec(),
-            kwargs.borrow().to_symbol_table().raise(interpreter)?,
+            kwargs
+                .borrow()
+                .to_symbol_table()
+                .raise(interpreter)?
+                .into_inner(),
         );
         interpreter.create_object(self.clone(), invoke_args)
     }

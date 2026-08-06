@@ -1,9 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use crate::{
     domain::{DebugStackFrame, Dunder, ModuleName, ModuleOrigin, ScriptPath, ToDebugStackFrame},
     treewalk::{
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::MemberRead,
+        SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue, protocols::MemberRead,
         types::Str,
     },
 };
@@ -13,18 +13,18 @@ pub struct Module {
     name: ModuleName,
     package: Option<ModuleName>,
     origin: ModuleOrigin,
-    scope: Scope,
+    symbol_table: SymbolTable,
 }
 
 impl Module {
     pub fn new(name: ModuleName, package: Option<ModuleName>, origin: ModuleOrigin) -> Self {
-        let scope = init_scope(&name, &package);
+        let symbol_table = init_symbol_table(&name, &package);
 
         Self {
             name,
             package,
             origin,
-            scope,
+            symbol_table,
         }
     }
 
@@ -57,34 +57,34 @@ impl Module {
     }
 
     pub fn get(&self, name: &str) -> Option<TreewalkValue> {
-        self.scope.get(name)
+        self.symbol_table.get(name).cloned()
     }
 
     pub fn insert(&mut self, name: &str, value: TreewalkValue) {
-        self.scope.insert(name, value);
+        self.symbol_table.insert(name, value);
     }
 
     pub fn delete(&mut self, name: &str) -> Option<TreewalkValue> {
-        self.scope.delete(name)
+        self.symbol_table.delete(name)
     }
 
-    pub fn symbol_table(&self) -> &HashMap<String, TreewalkValue> {
-        self.scope.symbol_table()
+    pub fn symbol_table(&self) -> &SymbolTable {
+        &self.symbol_table
     }
 }
 
-fn init_scope(module: &ModuleName, package: &Option<ModuleName>) -> Scope {
-    let mut scope = Scope::default();
-    scope.insert(&Dunder::Name, TreewalkValue::Str(Str::new(module.as_str())));
+fn init_symbol_table(module: &ModuleName, package: &Option<ModuleName>) -> SymbolTable {
+    let mut symbol_table = SymbolTable::default();
+    symbol_table.insert(&Dunder::Name, TreewalkValue::Str(Str::new(module.as_str())));
 
     let package_value = if let Some(package) = package {
         TreewalkValue::Str(Str::new(package.as_str()))
     } else {
         TreewalkValue::None
     };
-    scope.insert(&Dunder::Package, package_value);
+    symbol_table.insert(&Dunder::Package, package_value);
 
-    scope
+    symbol_table
 }
 
 impl MemberRead for Module {
@@ -93,11 +93,11 @@ impl MemberRead for Module {
         _interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<Option<TreewalkValue>> {
-        Ok(self.scope.get(name))
+        Ok(self.symbol_table.get(name).cloned())
     }
 
     fn dir(&self) -> Vec<String> {
-        self.scope.symbols()
+        self.symbol_table.symbols()
     }
 }
 

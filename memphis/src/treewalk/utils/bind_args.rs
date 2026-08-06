@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
 use crate::{
     core::Container,
     treewalk::{
-        TreewalkValue,
+        SymbolTable, TreewalkValue,
         types::{Dict, Exception, Tuple},
         utils::{BindingInput, BoundArgs, InvokeArgs, ParameterDefault, Signature},
     },
@@ -79,7 +77,7 @@ fn bind_input(
         });
     }
 
-    let mut table = HashMap::new();
+    let mut table = SymbolTable::default();
     let mut missing_args = vec![];
 
     for (index, arg_def) in signature.args.iter().enumerate() {
@@ -106,14 +104,14 @@ fn bind_input(
             }
         };
 
-        table.insert(arg_def.name.clone(), value);
+        table.insert(&arg_def.name, value);
     }
 
     for (key, value) in binding_input.kwargs().iter() {
         // Is this keyword name something that belongs to the function, either because it was
         // already bound, or because it’s one of the declared parameters?
-        if table.contains_key(key) || signature.args.iter().any(|a| &a.name == key) {
-            table.insert(key.clone(), value.clone());
+        if table.has(key) || signature.args.iter().any(|a| &a.name == key) {
+            table.insert(key, value.clone());
         } else if signature.kwargs_var.is_none() {
             return Err(ArgBindError::UnexpectedKeyword {
                 name: key.to_string(),
@@ -136,13 +134,14 @@ fn bind_input(
             .cloned()
             .collect();
         let args_value = TreewalkValue::Tuple(Tuple::new(left_over));
-        table.insert(args_var.to_string(), args_value);
+        table.insert(args_var, args_value);
     }
 
     if let Some(ref kwargs_var) = signature.kwargs_var {
-        let kwargs = Dict::from_symbol_table(binding_input.kwargs());
+        let symbol_table = SymbolTable::new(binding_input.kwargs().clone());
+        let kwargs = Dict::from_symbol_table(&symbol_table);
         let kwargs_value = TreewalkValue::Dict(Container::new(kwargs));
-        table.insert(kwargs_var.to_string(), kwargs_value);
+        table.insert(kwargs_var, kwargs_value);
     }
 
     Ok(BoundArgs::new(table))

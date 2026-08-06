@@ -6,8 +6,8 @@ use crate::{
         LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
     },
     treewalk::{
-        DomainResult, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue,
+        DomainResult, Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult,
+        TreewalkSignal, TreewalkValue,
         iterator::{LoopControl, try_for_each_mut},
         result::Raise,
         types::{Exception, Function, Tuple},
@@ -365,20 +365,23 @@ impl TreewalkInterpreter {
         // each function defined inside it.
         let class = self.build_class(name.as_str(), parent_classes, metaclass)?;
 
-        // We must use the class scope here in case it received any initialization from its
+        // We must use the class symbol table here in case it received any initialization from its
         // metaclass `Dunder::New` method.
+        let initial_symbols = class.borrow().symbol_table().clone();
         self.state
-            .push_local(Container::new(class.borrow().scope.clone()));
+            .push_local(Container::new(Scope::new(initial_symbols)));
         self.state.push_class(class.clone());
         self.execute_ast(body)?;
         self.state.pop_class();
-        class.borrow_mut().scope = self
+        let symbol_table = self
             .state
             .pop_local()
             .ok_or_else(Exception::runtime_error)
             .raise(self)?
             .borrow()
+            .symbol_table()
             .clone();
+        class.borrow_mut().set_symbol_table(symbol_table);
 
         self.store_var(name.as_str(), TreewalkValue::Class(class));
 

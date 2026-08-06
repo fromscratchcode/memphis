@@ -4,7 +4,7 @@ use crate::{
     core::{Container, LogLevel, log},
     domain::{Dunder, Type},
     treewalk::{
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkValue,
+        SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::any,
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
@@ -17,21 +17,8 @@ use crate::{
 #[derive(Debug)]
 pub struct Object {
     class: Container<Class>,
-    scope: Scope,
+    symbol_table: SymbolTable,
     native_payload: Option<Box<dyn Any>>,
-}
-
-impl PartialEq for Object {
-    fn eq(&self, other: &Self) -> bool {
-        // If these are both native objects, compare pointer identity
-        if let (Some(a), Some(b)) = (&self.native_payload, &other.native_payload)
-            && (**a).type_id() == (**b).type_id()
-        {
-            return std::ptr::eq(a.as_ref(), b.as_ref());
-        }
-
-        self.class == other.class && self.scope == other.scope
-    }
 }
 
 impl_typed!(Object, Type::Object);
@@ -63,7 +50,7 @@ impl Object {
     pub fn new(class: Container<Class>) -> Object {
         Self {
             class,
-            scope: Scope::default(),
+            symbol_table: SymbolTable::default(),
             native_payload: None,
         }
     }
@@ -71,7 +58,7 @@ impl Object {
     pub fn with_payload<T: Any>(class: Container<Class>, payload: T) -> Object {
         Self {
             class,
-            scope: Scope::default(),
+            symbol_table: SymbolTable::default(),
             native_payload: Some(Box::new(payload)),
         }
     }
@@ -101,11 +88,11 @@ impl MemberRead for Container<Object> {
             format!("Searching for: {self:?}.{name}")
         });
 
-        if let Some(attr) = self.borrow().scope.get(name) {
+        if let Some(attr) = self.borrow().symbol_table.get(name) {
             log(LogLevel::Trace, || {
                 format!("Found: {self:?}.{name} on instance")
             });
-            return Ok(Some(attr));
+            return Ok(Some(attr.clone()));
         }
 
         if let Some(attr) = self.borrow().class.get_from_class(name) {
@@ -129,7 +116,7 @@ impl MemberRead for Container<Object> {
     }
 
     fn dir(&self) -> Vec<String> {
-        let mut symbols = self.borrow().scope.symbols();
+        let mut symbols = self.borrow().symbol_table.symbols();
         symbols.sort();
         symbols
     }
@@ -159,7 +146,7 @@ impl MemberWrite for Container<Object> {
         log(LogLevel::Debug, || {
             format!("Setting: {self:?}.{name} on instance")
         });
-        self.borrow_mut().scope.insert(name, value);
+        self.borrow_mut().symbol_table.insert(name, value);
         Ok(())
     }
 
@@ -209,7 +196,7 @@ impl MemberWrite for Container<Object> {
         log(LogLevel::Debug, || {
             format!("Deleting: {self:?}.{name} on instance")
         });
-        self.borrow_mut().scope.delete(name);
+        self.borrow_mut().symbol_table.delete(name);
         Ok(())
     }
 }
@@ -670,11 +657,16 @@ impl NonDataDescriptor for DictDescriptor {
         instance: Option<TreewalkValue>,
         owner: Container<Class>,
     ) -> TreewalkResult<TreewalkValue> {
-        let scope = match instance {
-            Some(i) => i.as_object().raise(interpreter)?.borrow().scope.clone(),
-            None => owner.borrow().scope.clone(),
+        let symbol_table = match instance {
+            Some(i) => i
+                .as_object()
+                .raise(interpreter)?
+                .borrow()
+                .symbol_table
+                .clone(),
+            None => owner.borrow().symbol_table().clone(),
         };
-        let dict = Dict::from_symbol_table(scope.symbol_table());
+        let dict = Dict::from_symbol_table(&symbol_table);
         Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 

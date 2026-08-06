@@ -3,7 +3,7 @@ use crate::{
     domain::{DebugStackFrame, Dunder, FunctionType, ToDebugStackFrame, Type},
     parser::types::Ast,
     treewalk::{
-        Scope, TreewalkInterpreter, TreewalkResult, TreewalkState, TreewalkValue,
+        Scope, SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkState, TreewalkValue,
         macros::*,
         protocols::{Callable, DataDescriptor, MemberRead, MemberWrite, NonDataDescriptor},
         result::Raise,
@@ -28,7 +28,7 @@ pub struct Function {
     line_number: usize,
     function_type: FunctionType,
     pub captured_env: Container<EnvironmentFrame>,
-    scope: Scope,
+    symbol_table: SymbolTable,
     free_vars: Vec<String>,
 }
 
@@ -90,7 +90,7 @@ impl Function {
             line_number,
             function_type,
             captured_env,
-            scope: Scope::default(),
+            symbol_table: SymbolTable::default(),
         }
     }
 
@@ -154,9 +154,9 @@ impl MemberRead for Container<Function> {
             format!("Searching for: {self:?}.{name}")
         });
 
-        if let Some(attr) = self.borrow().scope.get(name) {
+        if let Some(attr) = self.borrow().symbol_table.get(name) {
             log(LogLevel::Trace, || format!("Found: {self:?}.{name}"));
-            return Ok(Some(attr));
+            return Ok(Some(attr.clone()));
         }
 
         let class = interpreter.state.class_of_type(&Type::Function);
@@ -183,7 +183,7 @@ impl MemberWrite for Container<Function> {
         name: &str,
         value: TreewalkValue,
     ) -> TreewalkResult<()> {
-        self.borrow_mut().scope.insert(name, value);
+        self.borrow_mut().symbol_table.insert(name, value);
         Ok(())
     }
 
@@ -192,7 +192,7 @@ impl MemberWrite for Container<Function> {
         _interpreter: &TreewalkInterpreter,
         name: &str,
     ) -> TreewalkResult<()> {
-        self.borrow_mut().scope.delete(name);
+        self.borrow_mut().symbol_table.delete(name);
         Ok(())
     }
 }
@@ -470,11 +470,16 @@ impl NonDataDescriptor for DictDescriptor {
         instance: Option<TreewalkValue>,
         owner: Container<Class>,
     ) -> TreewalkResult<TreewalkValue> {
-        let scope = match instance {
-            Some(i) => i.as_function().raise(interpreter)?.borrow().scope.clone(),
-            None => owner.borrow().scope.clone(),
+        let symbol_table = match instance {
+            Some(i) => i
+                .as_function()
+                .raise(interpreter)?
+                .borrow()
+                .symbol_table
+                .clone(),
+            None => owner.borrow().symbol_table().clone(),
         };
-        let dict = Dict::from_symbol_table(scope.symbol_table());
+        let dict = Dict::from_symbol_table(&symbol_table);
         Ok(TreewalkValue::Dict(Container::new(dict)))
     }
 

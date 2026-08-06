@@ -1,11 +1,11 @@
-use std::{cell::UnsafeCell, collections::HashMap};
+use std::cell::UnsafeCell;
 
 use crate::{
     core::Container,
     domain::{FromImportPath, ModuleName, Type, resolve_import_path},
     treewalk::{
         DomainResult, ExecutionContextManager, Executor, ModuleStore, RaisedException, Scope,
-        ScopeManager, TreewalkValue, TypeRegistry,
+        ScopeManager, SymbolTable, TreewalkValue, TypeRegistry,
         modules::builtins,
         types::{Class, Dict, Exception, Function, Module},
         utils::EnvironmentFrame,
@@ -13,8 +13,8 @@ use crate::{
 };
 
 pub struct DebugSnapshot {
-    globals: HashMap<String, TreewalkValue>,
-    locals: HashMap<String, TreewalkValue>,
+    globals: SymbolTable,
+    locals: SymbolTable,
 }
 
 impl DebugSnapshot {
