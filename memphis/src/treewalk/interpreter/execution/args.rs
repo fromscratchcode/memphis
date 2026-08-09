@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    parser::types::{AstInvokeArgs, AstParams, KwargsOperation},
+    parser::types::{AstInvokeArgs, AstParams, KwargsOperation, Param},
     treewalk::{
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         iterator::for_each_mut,
@@ -53,27 +53,41 @@ impl TreewalkInterpreter {
 
     /// Evaluate the parameters a function is defined with, specifically any default values.
     pub fn evaluate_params(&self, params: &AstParams) -> TreewalkResult<Signature> {
-        let runtime_params = params
-            .positional
+        let args = params
+            .positional_only
             .iter()
-            .map(|param| {
-                // User code cannot generate ParameterDefault::Omitted, only builtins
-                let default = match &param.default {
-                    Some(expr) => ParameterDefault::Value(self.evaluate_expr(expr)?),
-                    None => ParameterDefault::Required,
-                };
-                Ok(Parameter {
-                    name: param.arg.to_string(),
-                    default,
-                    kind: ParameterKind::PositionalOrKeyword,
-                })
-            })
+            .map(|param| self.evaluate_param(param, ParameterKind::PositionalOnly))
+            .chain(
+                params
+                    .positional_or_keyword
+                    .iter()
+                    .map(|param| self.evaluate_param(param, ParameterKind::PositionalOrKeyword)),
+            )
+            .chain(
+                params
+                    .keyword_only
+                    .iter()
+                    .map(|param| self.evaluate_param(param, ParameterKind::KeywordOnly)),
+            )
             .collect::<TreewalkResult<Vec<_>>>()?;
 
         Ok(Signature {
-            args: runtime_params,
+            args,
             args_var: params.args_var.as_ref().map(|c| c.to_string()).clone(),
             kwargs_var: params.kwargs_var.as_ref().map(|c| c.to_string()).clone(),
+        })
+    }
+
+    fn evaluate_param(&self, param: &Param, kind: ParameterKind) -> TreewalkResult<Parameter> {
+        // User code cannot generate ParameterDefault::Omitted, only builtins
+        let default = match &param.default {
+            Some(expr) => ParameterDefault::Value(self.evaluate_expr(expr)?),
+            None => ParameterDefault::Required,
+        };
+        Ok(Parameter {
+            name: param.arg.to_string(),
+            default,
+            kind,
         })
     }
 }

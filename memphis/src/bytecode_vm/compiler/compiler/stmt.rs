@@ -290,7 +290,7 @@ impl Compiler {
         };
 
         let varnames = args
-            .positional
+            .positional_or_keyword
             .iter()
             .map(|p| p.arg.to_string())
             .collect::<Vec<String>>();
@@ -566,10 +566,6 @@ mod tests_bytecode_stmt {
         },
     };
 
-    fn ident(input: &str) -> Identifier {
-        Identifier::new(input).expect("Invalid identifier")
-    }
-
     #[test]
     fn assignment() {
         let s = stmt_assign!(var!("var"), bin_op!(int!(5), Sub, int!(2)));
@@ -666,7 +662,7 @@ mod tests_bytecode_stmt {
     #[test]
     fn for_in_loop() {
         let s = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Variable(ident("i")),
+            index: LoopIndex::Variable(ident!("i")),
             iterable: list![int!(1), int!(2)],
             body: ast![stmt_assign!(var!("a"), int!(-1))],
             else_block: None

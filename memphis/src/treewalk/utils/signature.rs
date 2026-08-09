@@ -65,6 +65,10 @@ impl Parameter {
     pub fn accepts_positional(&self) -> bool {
         self.kind != ParameterKind::KeywordOnly
     }
+
+    pub fn accepts_keyword(&self) -> bool {
+        self.kind != ParameterKind::PositionalOnly
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -107,6 +111,10 @@ impl Signature {
     pub fn with_varkwargs(mut self, name: impl Into<String>) -> Self {
         self.kwargs_var = Some(name.into());
         self
+    }
+
+    pub fn parameter_named(&self, key: &str) -> Option<&Parameter> {
+        self.args.iter().find(|param| param.name == key)
     }
 }
 

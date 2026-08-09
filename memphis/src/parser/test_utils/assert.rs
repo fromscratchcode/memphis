@@ -18,6 +18,20 @@ macro_rules! assert_stmt_eq {
     };
 }
 
+macro_rules! assert_signature_eq {
+    ($input:expr, $expected:expr) => {
+        let ast = parse!($input);
+        assert_eq!(ast.len(), 1, "Expected a single Statement!");
+        let stmt = ast.first().unwrap();
+        match &stmt.kind {
+            $crate::parser::types::StatementKind::FunctionDef { args, .. } => {
+                assert_eq!(args, &$expected);
+            }
+            _ => panic!("Expected function definition"),
+        }
+    };
+}
+
 macro_rules! assert_expr_eq {
     ($input:expr, $expected:expr) => {
         let ast = parse!($input);
@@ -318,4 +332,5 @@ pub fn assert_stmt_eq_inner(actual: &Statement, expected: &Statement) {
 
 pub(crate) use assert_ast_eq;
 pub(crate) use assert_expr_eq;
+pub(crate) use assert_signature_eq;
 pub(crate) use assert_stmt_eq;

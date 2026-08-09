@@ -1,3 +1,9 @@
+macro_rules! ident {
+    ($name:expr) => {
+        $crate::domain::Identifier::new($name).expect("invalid test identifier")
+    };
+}
+
 macro_rules! var {
     ($name:expr) => {
         $crate::parser::types::Expr::Variable($crate::domain::Identifier::new($name).unwrap())
@@ -321,8 +327,10 @@ macro_rules! param {
 macro_rules! params {
     ($($expr:expr),* $(,)?) => {
         $crate::parser::types::AstParams {
-            positional: vec![$($expr),*],
+            positional_only: vec![],
+            positional_or_keyword: vec![$($expr),*],
             args_var: None,
+            keyword_only: vec![],
             kwargs_var: None,
         }
     };
@@ -482,6 +490,7 @@ pub(crate) use from_import_item;
 pub(crate) use from_import_list;
 pub(crate) use func_call;
 pub(crate) use func_call_callee;
+pub(crate) use ident;
 pub(crate) use import;
 pub(crate) use index_access;
 pub(crate) use int;

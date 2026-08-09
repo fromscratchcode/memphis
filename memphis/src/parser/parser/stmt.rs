@@ -548,10 +548,6 @@ mod tests {
         types::{AstParams, ExceptHandler, StatementKind, ast},
     };
 
-    fn ident(input: &str) -> Identifier {
-        Identifier::new(input).expect("Invalid identifier")
-    }
-
     #[test]
     fn variable_assignment() {
         let input = "a = 2";
@@ -585,7 +581,7 @@ def add(x, y):
     return x + y
 ";
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("add"),
+            name: ident!("add"),
             args: params![param!("x"), param!("y")],
             body: ast![stmt_return![bin_op!(var!("x"), Add, var!("y"))]],
             decorators: vec![],
@@ -595,7 +591,7 @@ def add(x, y):
 
         let input = "def _f(): pass";
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("_f"),
+            name: ident!("_f"),
             args: params![],
             body: ast![stmt_pass!()],
             decorators: vec![],
@@ -610,8 +606,14 @@ def __init__(
     pass
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("__init__"),
-            args: params![param!("self"), param!("indent", none!())],
+            name: ident!("__init__"),
+            args: AstParams {
+                positional_only: vec![],
+                positional_or_keyword: vec![param!("self")],
+                args_var: None,
+                keyword_only: vec![param!("indent", none!())],
+                kwargs_var: None,
+            },
             body: ast![stmt_pass!()],
             decorators: vec![],
             is_async: false,
@@ -773,19 +775,19 @@ class Foo:
         print(self.x)
 "#;
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("Foo"),
+            name: ident!("Foo"),
             parents: vec![],
             metaclass: None,
             body: ast![
                 stmt!(StatementKind::FunctionDef {
-                    name: ident("__init__"),
+                    name: ident!("__init__"),
                     args: params![param!("self")],
                     body: ast![stmt_assign!(member_access!(var!("self"), "x"), int!(0))],
                     decorators: vec![],
                     is_async: false,
                 }),
                 stmt!(StatementKind::FunctionDef {
-                    name: ident("bar"),
+                    name: ident!("bar"),
                     args: params![param!("self")],
                     body: ast![stmt_expr!(func_call!(
                         "print",
@@ -800,7 +802,7 @@ class Foo:
 
         let input = "class Foo(Bar, Baz): pass";
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("Foo"),
+            name: ident!("Foo"),
             parents: vec![var!("Bar"), var!("Baz")],
             metaclass: None,
             body: ast![stmt_pass!()],
@@ -809,7 +811,7 @@ class Foo:
 
         let input = "class Foo(module.Bar): pass";
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("Foo"),
+            name: ident!("Foo"),
             parents: vec![member_access!(var!("module"), "Bar")],
             metaclass: None,
             body: ast![stmt_pass!()],
@@ -831,7 +833,7 @@ def foo():
     import a, b as c
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("foo"),
+            name: ident!("foo"),
             args: params![],
             body: ast![stmt_reg_import![import!("a"), import!("b", "c"),]],
             decorators: vec![],
@@ -993,7 +995,7 @@ class Foo(Parent):
     pass
 "#;
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("Foo"),
+            name: ident!("Foo"),
             parents: vec![var!("Parent")],
             metaclass: None,
             body: ast![stmt_pass!()],
@@ -1005,9 +1007,9 @@ class Foo(metaclass=Parent):
     pass
 "#;
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("Foo"),
+            name: ident!("Foo"),
             parents: vec![],
-            metaclass: Some(ident("Parent")),
+            metaclass: Some(ident!("Parent")),
             body: ast![stmt_pass!()],
         });
         assert_stmt_eq!(input, expected_ast);
@@ -1017,9 +1019,9 @@ class Foo(Bar, metaclass=Parent):
     pass
 "#;
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("Foo"),
+            name: ident!("Foo"),
             parents: vec![var!("Bar")],
-            metaclass: Some(ident("Parent")),
+            metaclass: Some(ident!("Parent")),
             body: ast![stmt_pass!()],
         });
         assert_stmt_eq!(input, expected_ast);
@@ -1029,7 +1031,7 @@ class InterfaceMeta(type):
     pass
 "#;
         let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident("InterfaceMeta"),
+            name: ident!("InterfaceMeta"),
             parents: vec![var!("type")],
             metaclass: None,
             body: ast![stmt_pass!()],
@@ -1045,7 +1047,7 @@ async def main():
     return await task_1
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("main"),
+            name: ident!("main"),
             args: params![],
             body: ast![
                 stmt_assign!(
@@ -1106,7 +1108,7 @@ finally:
             try_block: ast![stmt_expr!(bin_op!(int!(4), Div, int!(0)))],
             handlers: vec![ExceptHandler::typed(
                 var!("ZeroDivisionError"),
-                Some(ident("e")),
+                Some(ident!("e")),
                 ast![stmt_assign!(var!("a"), int!(2))]
             )],
             else_block: None,
@@ -1124,7 +1126,7 @@ except (ZeroDivisionError, IOError) as e:
             try_block: ast![stmt_expr!(bin_op!(int!(4), Div, int!(0)))],
             handlers: vec![ExceptHandler::typed(
                 tuple![var!("ZeroDivisionError"), var!("IOError")],
-                Some(ident("e")),
+                Some(ident!("e")),
                 ast![stmt_assign!(var!("a"), int!(2))]
             )],
             else_block: None,
@@ -1164,7 +1166,7 @@ finally:
             try_block: ast![stmt_expr!(bin_op!(int!(4), Div, int!(0)))],
             handlers: vec![ExceptHandler::typed(
                 var!("ZeroDivisionError"),
-                Some(ident("e")),
+                Some(ident!("e")),
                 ast![stmt_assign!(var!("a"), int!(2))]
             )],
             else_block: Some(ast![stmt_assign!(var!("a"), int!(4))]),
@@ -1226,73 +1228,6 @@ except:
     }
 
     #[test]
-    fn args_and_kwargs() {
-        let input = r#"
-def test_args(*args):
-    pass
-"#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("test_args"),
-            args: AstParams {
-                positional: vec![],
-                args_var: Some(ident("args")),
-                kwargs_var: None,
-            },
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
-        assert_stmt_eq!(input, expected_ast);
-
-        let input = r#"
-def test_args(*args, **kwargs):
-    pass
-"#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("test_args"),
-            args: AstParams {
-                positional: vec![],
-                args_var: Some(ident("args")),
-                kwargs_var: Some(ident("kwargs")),
-            },
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
-        assert_stmt_eq!(input, expected_ast);
-
-        let input = r#"
-def test_kwargs(**kwargs):
-    pass
-"#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("test_kwargs"),
-            args: AstParams {
-                positional: vec![],
-                args_var: None,
-                kwargs_var: Some(ident("kwargs")),
-            },
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
-        assert_stmt_eq!(input, expected_ast);
-
-        let input = r#"
-def test_default(file=None):
-    pass
-"#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("test_default"),
-            args: params![param!("file", none!())],
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
-        assert_stmt_eq!(input, expected_ast);
-    }
-
-    #[test]
     fn decorators() {
         let input = r#"
 @test_decorator
@@ -1300,7 +1235,7 @@ def get_val():
     return 2
 "#;
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("get_val"),
+            name: ident!("get_val"),
             args: params![],
             body: ast![stmt_return![int!(2)]],
             decorators: vec![var!("test_decorator")],
@@ -1339,7 +1274,7 @@ with open('test.txt') as f:
 "#;
         let expected_ast = stmt!(StatementKind::ContextManager {
             expr: func_call!("open", call_args![str!("test.txt")]),
-            variable: Some(ident("f")),
+            variable: Some(ident!("f")),
             block: ast![stmt_pass!()],
         });
         assert_stmt_eq!(input, expected_ast);
@@ -1464,23 +1399,6 @@ else:
     }
 
     #[test]
-    fn type_hints() {
-        let input = "
-def add(x: str, y: str) -> str:
-    pass
-";
-        // For now, we just ensure the type hints are ignored.
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("add"),
-            args: params![param!("x"), param!("y")],
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
-        assert_stmt_eq!(input, expected_ast);
-    }
-
-    #[test]
     fn closures() {
         let input = "
 def outer():
@@ -1491,13 +1409,13 @@ def outer():
         print(a)
 ";
         let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("outer"),
+            name: ident!("outer"),
             args: params![],
             body: ast![
                 stmt_assign!(var!("a"), int!(1)),
                 stmt_assign!(var!("b"), int!(2)),
                 stmt!(StatementKind::FunctionDef {
-                    name: ident("inner"),
+                    name: ident!("inner"),
                     args: params![],
                     body: ast![
                         stmt_assign!(var!("b"), int!(3)),
@@ -1516,35 +1434,19 @@ def outer():
     #[test]
     fn scope_modifiers() {
         let input = "nonlocal var";
-        let expected_ast = stmt!(StatementKind::Nonlocal(vec![ident("var")]));
+        let expected_ast = stmt!(StatementKind::Nonlocal(vec![ident!("var")]));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "nonlocal var, var2";
-        let expected_ast = stmt!(StatementKind::Nonlocal(vec![ident("var"), ident("var2")]));
+        let expected_ast = stmt!(StatementKind::Nonlocal(vec![ident!("var"), ident!("var2")]));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "global var";
-        let expected_ast = stmt!(StatementKind::Global(vec![ident("var")]));
+        let expected_ast = stmt!(StatementKind::Global(vec![ident!("var")]));
         assert_stmt_eq!(input, expected_ast);
 
         let input = "global var, var2";
-        let expected_ast = stmt!(StatementKind::Global(vec![ident("var"), ident("var2")]));
-        assert_stmt_eq!(input, expected_ast);
-    }
-
-    #[test]
-    fn default_args() {
-        let input = r#"
-def foo(data=None):
-    pass
-"#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident("foo"),
-            args: params![param!("data", none!())],
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
+        let expected_ast = stmt!(StatementKind::Global(vec![ident!("var"), ident!("var2")]));
         assert_stmt_eq!(input, expected_ast);
     }
 

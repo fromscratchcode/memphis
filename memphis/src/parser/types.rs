@@ -206,7 +206,9 @@ pub struct AstParams {
     /// def foo(a, b):
     ///     ...
     /// ```
-    pub positional: Vec<Param>,
+    pub positional_only: Vec<Param>,
+
+    pub positional_or_keyword: Vec<Param>,
 
     /// An optional variable to hold arguments passed in for variable arity.
     /// ```python
@@ -215,12 +217,32 @@ pub struct AstParams {
     /// ```
     pub args_var: Option<Identifier>,
 
+    pub keyword_only: Vec<Param>,
+
     /// An optional variable to hold arguments passed in by keyword.
     /// ```python
     /// def foo(**kwargs):
     ///     ...
     /// ```
     pub kwargs_var: Option<Identifier>,
+}
+
+impl AstParams {
+    pub fn names(&self) -> impl Iterator<Item = &Identifier> {
+        self.positional_only
+            .iter()
+            .chain(self.positional_or_keyword.iter())
+            .map(|p| &p.arg)
+            .chain(self.args_var.iter())
+            .chain(self.keyword_only.iter().map(|p| &p.arg))
+            .chain(self.kwargs_var.iter())
+    }
+
+    pub fn positional_params(&self) -> impl Iterator<Item = &Param> {
+        self.positional_only
+            .iter()
+            .chain(self.positional_or_keyword.iter())
+    }
 }
 
 /// Call-site argument

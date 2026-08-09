@@ -1040,10 +1040,6 @@ mod tests {
 
     use crate::parser::test_utils::*;
 
-    fn ident(input: &str) -> Identifier {
-        Identifier::new(input).expect("Invalid identifier")
-    }
-
     #[test]
     fn expression() {
         let input = "2 + 3 * (4 - 1)";
@@ -1123,8 +1119,8 @@ mod tests {
             AstInvokeArgs {
                 positional: vec![],
                 kwargs: vec![
-                    KwargsOperation::Pair(ident("a"), int!(1)),
-                    KwargsOperation::Pair(ident("b"), int!(2)),
+                    KwargsOperation::Pair(ident!("a"), int!(1)),
+                    KwargsOperation::Pair(ident!("b"), int!(2)),
                 ],
                 args_var: None,
             }
@@ -1137,8 +1133,8 @@ mod tests {
             AstInvokeArgs {
                 positional: vec![],
                 kwargs: vec![
-                    KwargsOperation::Pair(ident("a"), int!(1)),
-                    KwargsOperation::Pair(ident("b"), int!(2)),
+                    KwargsOperation::Pair(ident!("a"), int!(1)),
+                    KwargsOperation::Pair(ident!("b"), int!(2)),
                 ],
                 args_var: None,
             }
@@ -1151,9 +1147,9 @@ mod tests {
             AstInvokeArgs {
                 positional: vec![],
                 kwargs: vec![
-                    KwargsOperation::Pair(ident("a"), int!(1)),
-                    KwargsOperation::Pair(ident("b"), int!(2)),
-                    KwargsOperation::Pair(ident("c"), int!(3)),
+                    KwargsOperation::Pair(ident!("a"), int!(1)),
+                    KwargsOperation::Pair(ident!("b"), int!(2)),
+                    KwargsOperation::Pair(ident!("c"), int!(3)),
                 ],
                 args_var: None,
             }
@@ -1871,15 +1867,15 @@ tuple((1,
     fn type_alias() {
         let input = "list[int]";
         let expected_ast = Expr::TypeNode(TypeNode::Generic {
-            base_type: ident("list"),
-            parameters: vec![TypeNode::Basic(ident("int"))],
+            base_type: ident!("list"),
+            parameters: vec![TypeNode::Basic(ident!("int"))],
         });
         assert_expr_eq!(input, expected_ast);
 
         let input = "int | str";
         let expected_ast = Expr::TypeNode(TypeNode::Union(vec![
-            TypeNode::Basic(ident("int")),
-            TypeNode::Basic(ident("str")),
+            TypeNode::Basic(ident!("int")),
+            TypeNode::Basic(ident!("str")),
         ]));
         assert_expr_eq!(input, expected_ast);
     }

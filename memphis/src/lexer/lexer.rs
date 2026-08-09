@@ -642,11 +642,9 @@ fn consume_bytes_literal(chars: &mut Peekable<Chars>, end_char: char) -> Vec<u8>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::parser::test_utils::ident;
 
-    fn ident(input: &str) -> Identifier {
-        Identifier::new(input).expect("Invalid identifier")
-    }
+    use super::*;
 
     fn tokenize(input: &str) -> Vec<Token> {
         let trimmed = input.trim_matches('\n');
@@ -679,20 +677,20 @@ def add(x, y):
             vec![
                 Token::Newline,
                 Token::Def,
-                Token::Identifier(ident("add")),
+                Token::Identifier(ident!("add")),
                 Token::LParen,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Comma,
-                Token::Identifier(ident("y")),
+                Token::Identifier(ident!("y")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Newline,
                 Token::Indent,
                 Token::Return,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Plus,
-                Token::Identifier(ident("y")),
+                Token::Identifier(ident!("y")),
                 Token::Newline,
             ]
         );
@@ -716,20 +714,20 @@ def add(x, y):
             vec![
                 Token::Newline,
                 Token::Def,
-                Token::Identifier(ident("add")),
+                Token::Identifier(ident!("add")),
                 Token::LParen,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Comma,
-                Token::Identifier(ident("y")),
+                Token::Identifier(ident!("y")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Newline,
                 Token::Indent,
                 Token::Return,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Plus,
-                Token::Identifier(ident("y")),
+                Token::Identifier(ident!("y")),
                 Token::Newline,
                 Token::Dedent,
                 Token::Newline,
@@ -749,19 +747,19 @@ def add(x, y):
             tokens,
             vec![
                 Token::Def,
-                Token::Identifier(ident("add")),
+                Token::Identifier(ident!("add")),
                 Token::LParen,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Comma,
-                Token::Identifier(ident("y")),
+                Token::Identifier(ident!("y")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
                 Token::Return,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Plus,
-                Token::Identifier(ident("y")),
+                Token::Identifier(ident!("y")),
                 Token::Newline,
                 Token::Dedent,
             ]
@@ -822,9 +820,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::GreaterThan,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -834,9 +832,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::LessThan,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -846,9 +844,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Equal,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -858,9 +856,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::NotEqual,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -870,9 +868,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::GreaterThanOrEqual,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -882,9 +880,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::LessThanOrEqual,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -897,9 +895,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::And,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -909,9 +907,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Or,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -921,9 +919,9 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::In,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -933,7 +931,7 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Is,
                 Token::None,
                 Token::Newline,
@@ -944,7 +942,7 @@ def add(x, y):
         let tokens = tokenize(input);
         assert_eq!(
             tokens,
-            vec![Token::Not, Token::Identifier(ident("b")), Token::Newline,]
+            vec![Token::Not, Token::Identifier(ident!("b")), Token::Newline,]
         );
 
         let input = "not (b or c)";
@@ -954,9 +952,9 @@ def add(x, y):
             vec![
                 Token::Not,
                 Token::LParen,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Or,
-                Token::Identifier(ident("c")),
+                Token::Identifier(ident!("c")),
                 Token::RParen,
                 Token::Newline,
             ]
@@ -970,7 +968,7 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::BooleanLiteral(true),
                 Token::Newline,
@@ -982,7 +980,7 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::BooleanLiteral(false),
                 Token::Newline,
@@ -994,7 +992,7 @@ def add(x, y):
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::None,
                 Token::Newline,
@@ -1021,27 +1019,27 @@ else:
             tokens,
             vec![
                 Token::If,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::GreaterThan,
                 Token::Integer(0),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("print")),
+                Token::Identifier(ident!("print")),
                 Token::LParen,
                 Token::StringLiteral("Greater".to_string()),
                 Token::RParen,
                 Token::Newline,
                 Token::Dedent,
                 Token::Elif,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::GreaterThan,
                 Token::Minus,
                 Token::Integer(10),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("print")),
+                Token::Identifier(ident!("print")),
                 Token::LParen,
                 Token::StringLiteral("Middle".to_string()),
                 Token::RParen,
@@ -1051,7 +1049,7 @@ else:
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("print")),
+                Token::Identifier(ident!("print")),
                 Token::LParen,
                 Token::StringLiteral("Less".to_string()),
                 Token::RParen,
@@ -1076,7 +1074,7 @@ while True:
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("print")),
+                Token::Identifier(ident!("print")),
                 Token::LParen,
                 Token::StringLiteral("busy loop".to_string()),
                 Token::RParen,
@@ -1101,38 +1099,38 @@ class Foo:
             tokens,
             vec![
                 Token::Class,
-                Token::Identifier(ident("Foo")),
+                Token::Identifier(ident!("Foo")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
                 Token::Def,
-                Token::Identifier(ident("__init__")),
+                Token::Identifier(ident!("__init__")),
                 Token::LParen,
-                Token::Identifier(ident("self")),
+                Token::Identifier(ident!("self")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("self")),
+                Token::Identifier(ident!("self")),
                 Token::Dot,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::Integer(0),
                 Token::Newline,
                 Token::Newline,
                 Token::Dedent,
                 Token::Def,
-                Token::Identifier(ident("bar")),
+                Token::Identifier(ident!("bar")),
                 Token::LParen,
-                Token::Identifier(ident("self")),
+                Token::Identifier(ident!("self")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
                 Token::Return,
-                Token::Identifier(ident("self")),
+                Token::Identifier(ident!("self")),
                 Token::Dot,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Newline,
                 Token::Dedent,
                 Token::Dedent,
@@ -1147,9 +1145,9 @@ class Foo:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("foo")),
+                Token::Identifier(ident!("foo")),
                 Token::Assign,
-                Token::Identifier(ident("Foo")),
+                Token::Identifier(ident!("Foo")),
                 Token::LParen,
                 Token::RParen,
                 Token::Newline,
@@ -1167,15 +1165,15 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("foo")),
+                Token::Identifier(ident!("foo")),
                 Token::Assign,
-                Token::Identifier(ident("Foo")),
+                Token::Identifier(ident!("Foo")),
                 Token::LParen,
                 Token::RParen,
                 Token::Newline,
-                Token::Identifier(ident("foo")),
+                Token::Identifier(ident!("foo")),
                 Token::Dot,
-                Token::Identifier(ident("bar")),
+                Token::Identifier(ident!("bar")),
                 Token::LParen,
                 Token::RParen,
                 Token::Newline,
@@ -1191,7 +1189,7 @@ foo.bar()
             tokens,
             vec![
                 Token::Import,
-                Token::Identifier(ident("other")),
+                Token::Identifier(ident!("other")),
                 Token::Newline,
             ]
         );
@@ -1205,9 +1203,9 @@ foo.bar()
             tokens,
             vec![
                 Token::From,
-                Token::Identifier(ident("other")),
+                Token::Identifier(ident!("other")),
                 Token::Import,
-                Token::Identifier(ident("something")),
+                Token::Identifier(ident!("something")),
                 Token::Newline,
             ]
         );
@@ -1218,11 +1216,11 @@ foo.bar()
             tokens,
             vec![
                 Token::From,
-                Token::Identifier(ident("other")),
+                Token::Identifier(ident!("other")),
                 Token::Import,
-                Token::Identifier(ident("something")),
+                Token::Identifier(ident!("something")),
                 Token::As,
-                Token::Identifier(ident("something_else")),
+                Token::Identifier(ident!("something_else")),
                 Token::Newline,
             ]
         );
@@ -1233,7 +1231,7 @@ foo.bar()
             tokens,
             vec![
                 Token::From,
-                Token::Identifier(ident("other")),
+                Token::Identifier(ident!("other")),
                 Token::Import,
                 Token::Asterisk,
                 Token::Newline,
@@ -1246,11 +1244,11 @@ foo.bar()
             tokens,
             vec![
                 Token::From,
-                Token::Identifier(ident("other")),
+                Token::Identifier(ident!("other")),
                 Token::Import,
-                Token::Identifier(ident("something")),
+                Token::Identifier(ident!("something")),
                 Token::Comma,
-                Token::Identifier(ident("something_else")),
+                Token::Identifier(ident!("something_else")),
                 Token::Newline,
             ]
         );
@@ -1267,17 +1265,17 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("foo")),
+                Token::Identifier(ident!("foo")),
                 Token::Assign,
-                Token::Identifier(ident("Foo")),
+                Token::Identifier(ident!("Foo")),
                 Token::LParen,
                 Token::Integer(3),
                 Token::RParen,
                 Token::Newline,
                 Token::Newline,
-                Token::Identifier(ident("foo")),
+                Token::Identifier(ident!("foo")),
                 Token::Dot,
-                Token::Identifier(ident("bar")),
+                Token::Identifier(ident!("bar")),
                 Token::LParen,
                 Token::RParen,
                 Token::Newline,
@@ -1292,7 +1290,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::FloatingPoint(3.84),
                 Token::Newline,
@@ -1304,7 +1302,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::FloatingPoint(2.5e-3),
                 Token::Newline,
@@ -1316,7 +1314,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::FloatingPoint(2.5e-3),
                 Token::Newline,
@@ -1328,7 +1326,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::FloatingPoint(2e-3),
                 Token::Newline,
@@ -1340,7 +1338,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::FloatingPoint(2e3),
                 Token::Newline,
@@ -1390,7 +1388,7 @@ foo.bar()
             vec![
                 Token::Integer(3),
                 Token::Minus,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::Newline,
             ]
         );
@@ -1476,7 +1474,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::LBracket,
                 Token::Integer(1),
@@ -1494,7 +1492,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("list")),
+                Token::Identifier(ident!("list")),
                 Token::LParen,
                 Token::LBracket,
                 Token::Integer(1),
@@ -1548,7 +1546,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::LBrace,
                 Token::Integer(1),
@@ -1566,7 +1564,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("set")),
+                Token::Identifier(ident!("set")),
                 Token::LParen,
                 Token::LBrace,
                 Token::Integer(1),
@@ -1588,7 +1586,7 @@ foo.bar()
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::LBracket,
                 Token::Integer(0),
                 Token::RBracket,
@@ -1625,15 +1623,15 @@ for i in a:
             tokens,
             vec![
                 Token::For,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::In,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("print")),
+                Token::Identifier(ident!("print")),
                 Token::LParen,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::RParen,
                 Token::Newline,
                 Token::Dedent,
@@ -1650,16 +1648,16 @@ b = [ i * 2 for i in a ]
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Assign,
                 Token::LBracket,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::Asterisk,
                 Token::Integer(2),
                 Token::For,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::In,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::RBracket,
                 Token::Newline,
             ]
@@ -1682,7 +1680,7 @@ print((1,2))
                 Token::Integer(2),
                 Token::RParen,
                 Token::Newline,
-                Token::Identifier(ident("print")),
+                Token::Identifier(ident!("print")),
                 Token::LParen,
                 Token::LParen,
                 Token::Integer(1),
@@ -1708,26 +1706,26 @@ def countdown(n):
             tokens,
             vec![
                 Token::Def,
-                Token::Identifier(ident("countdown")),
+                Token::Identifier(ident!("countdown")),
                 Token::LParen,
-                Token::Identifier(ident("n")),
+                Token::Identifier(ident!("n")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
                 Token::While,
-                Token::Identifier(ident("n")),
+                Token::Identifier(ident!("n")),
                 Token::GreaterThan,
                 Token::Integer(0),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
                 Token::Yield,
-                Token::Identifier(ident("n")),
+                Token::Identifier(ident!("n")),
                 Token::Newline,
-                Token::Identifier(ident("n")),
+                Token::Identifier(ident!("n")),
                 Token::Assign,
-                Token::Identifier(ident("n")),
+                Token::Identifier(ident!("n")),
                 Token::Minus,
                 Token::Integer(1),
                 Token::Newline,
@@ -1749,24 +1747,24 @@ class Foo(Parent):
             tokens,
             vec![
                 Token::Class,
-                Token::Identifier(ident("Foo")),
+                Token::Identifier(ident!("Foo")),
                 Token::LParen,
-                Token::Identifier(ident("Parent")),
+                Token::Identifier(ident!("Parent")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
                 Token::Def,
-                Token::Identifier(ident("__init__")),
+                Token::Identifier(ident!("__init__")),
                 Token::LParen,
-                Token::Identifier(ident("self")),
+                Token::Identifier(ident!("self")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("self")),
+                Token::Identifier(ident!("self")),
                 Token::Dot,
-                Token::Identifier(ident("x")),
+                Token::Identifier(ident!("x")),
                 Token::Assign,
                 Token::Integer(0),
                 Token::Newline,
@@ -1785,7 +1783,7 @@ a = { "b": 4, 'c': 5 }
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::LBrace,
                 Token::StringLiteral("b".to_string()),
@@ -1814,25 +1812,25 @@ async def main():
             vec![
                 Token::Async,
                 Token::Def,
-                Token::Identifier(ident("main")),
+                Token::Identifier(ident!("main")),
                 Token::LParen,
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("task_1")),
+                Token::Identifier(ident!("task_1")),
                 Token::Assign,
-                Token::Identifier(ident("asyncio")),
+                Token::Identifier(ident!("asyncio")),
                 Token::Dot,
-                Token::Identifier(ident("create_task")),
+                Token::Identifier(ident!("create_task")),
                 Token::LParen,
-                Token::Identifier(ident("task1")),
+                Token::Identifier(ident!("task1")),
                 Token::LParen,
                 Token::RParen,
                 Token::RParen,
                 Token::Newline,
                 Token::Await,
-                Token::Identifier(ident("task_1")),
+                Token::Identifier(ident!("task_1")),
                 Token::Newline,
                 Token::Dedent,
             ]
@@ -1863,7 +1861,7 @@ a = 1
             vec![
                 Token::StringLiteral("comment 5-lines\n5-types\n".into()),
                 Token::Newline,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::Integer(1),
                 Token::Newline,
@@ -1882,7 +1880,7 @@ a = 1
             vec![
                 Token::StringLiteral("comment 5-lines\n5-types\n".into()),
                 Token::Newline,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::Integer(1),
                 Token::Newline,
@@ -1927,7 +1925,7 @@ finally:
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::Integer(2),
                 Token::Newline,
@@ -1936,7 +1934,7 @@ finally:
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::Integer(3),
                 Token::Newline,
@@ -1955,11 +1953,11 @@ b
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::HexLiteral("0x0010".into()),
                 Token::Newline,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -1972,7 +1970,7 @@ b
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::OctalLiteral("0o0010".into()),
                 Token::Newline,
@@ -1987,7 +1985,7 @@ b
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::BinaryLiteral("0b0010".into()),
                 Token::Newline,
@@ -2006,13 +2004,13 @@ def add(*args, **kwargs):
             tokens,
             vec![
                 Token::Def,
-                Token::Identifier(ident("add")),
+                Token::Identifier(ident!("add")),
                 Token::LParen,
                 Token::Asterisk,
-                Token::Identifier(ident("args")),
+                Token::Identifier(ident!("args")),
                 Token::Comma,
                 Token::DoubleAsterisk,
-                Token::Identifier(ident("kwargs")),
+                Token::Identifier(ident!("kwargs")),
                 Token::RParen,
                 Token::Colon,
                 Token::Newline,
@@ -2036,10 +2034,10 @@ def get_val():
             tokens,
             vec![
                 Token::AtSign,
-                Token::Identifier(ident("test_decorator")),
+                Token::Identifier(ident!("test_decorator")),
                 Token::Newline,
                 Token::Def,
-                Token::Identifier(ident("get_val")),
+                Token::Identifier(ident!("get_val")),
                 Token::LParen,
                 Token::RParen,
                 Token::Colon,
@@ -2061,7 +2059,7 @@ def get_val():
             tokens,
             vec![
                 Token::Raise,
-                Token::Identifier(ident("Exception")),
+                Token::Identifier(ident!("Exception")),
                 Token::Newline,
             ]
         );
@@ -2078,18 +2076,18 @@ with open('test.txt') as f:
             tokens,
             vec![
                 Token::With,
-                Token::Identifier(ident("open")),
+                Token::Identifier(ident!("open")),
                 Token::LParen,
                 Token::StringLiteral("test.txt".into()),
                 Token::RParen,
                 Token::As,
-                Token::Identifier(ident("f")),
+                Token::Identifier(ident!("f")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
-                Token::Identifier(ident("f")),
+                Token::Identifier(ident!("f")),
                 Token::Dot,
-                Token::Identifier(ident("read")),
+                Token::Identifier(ident!("read")),
                 Token::LParen,
                 Token::RParen,
                 Token::Newline,
@@ -2105,7 +2103,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("type")),
+                Token::Identifier(ident!("type")),
                 Token::LParen,
                 Token::Ellipsis,
                 Token::RParen,
@@ -2118,7 +2116,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("type")),
+                Token::Identifier(ident!("type")),
                 Token::LParen,
                 Token::Ellipsis,
                 Token::RParen,
@@ -2133,7 +2131,7 @@ with open('test.txt') as f:
         let tokens = tokenize(input);
         assert_eq!(
             tokens,
-            vec![Token::Del, Token::Identifier(ident("a")), Token::Newline,]
+            vec![Token::Del, Token::Identifier(ident!("a")), Token::Newline,]
         );
     }
 
@@ -2206,7 +2204,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::PlusEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2218,7 +2216,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::MinusEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2230,7 +2228,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::AsteriskEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2242,7 +2240,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::SlashEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2254,7 +2252,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::BitwiseAndEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2266,7 +2264,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::BitwiseXorEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2278,7 +2276,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::BitwiseOrEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2290,7 +2288,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::DoubleSlashEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2302,7 +2300,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::LeftShiftEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2314,7 +2312,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::ModEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2326,7 +2324,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::MatMulEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2338,7 +2336,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::ExpoEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2350,7 +2348,7 @@ with open('test.txt') as f:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::RightShiftEquals,
                 Token::Integer(1),
                 Token::Newline,
@@ -2370,7 +2368,7 @@ f"Hello {name}"
                 Token::FStringStart,
                 Token::StringLiteral("Hello ".into()),
                 Token::LBrace,
-                Token::Identifier(ident("name")),
+                Token::Identifier(ident!("name")),
                 Token::RBrace,
                 Token::FStringEnd,
                 Token::Newline,
@@ -2387,7 +2385,7 @@ f'Hello {name}'
                 Token::FStringStart,
                 Token::StringLiteral("Hello ".into()),
                 Token::LBrace,
-                Token::Identifier(ident("name")),
+                Token::Identifier(ident!("name")),
                 Token::RBrace,
                 Token::FStringEnd,
                 Token::Newline,
@@ -2418,11 +2416,11 @@ f"Hello {name} goodbye {other}."
                 Token::FStringStart,
                 Token::StringLiteral("Hello ".into()),
                 Token::LBrace,
-                Token::Identifier(ident("name")),
+                Token::Identifier(ident!("name")),
                 Token::RBrace,
                 Token::StringLiteral(" goodbye ".into()),
                 Token::LBrace,
-                Token::Identifier(ident("other")),
+                Token::Identifier(ident!("other")),
                 Token::RBrace,
                 Token::StringLiteral(".".into()),
                 Token::FStringEnd,
@@ -2439,10 +2437,10 @@ f"{first}{last}"
             vec![
                 Token::FStringStart,
                 Token::LBrace,
-                Token::Identifier(ident("first")),
+                Token::Identifier(ident!("first")),
                 Token::RBrace,
                 Token::LBrace,
-                Token::Identifier(ident("last")),
+                Token::Identifier(ident!("last")),
                 Token::RBrace,
                 Token::FStringEnd,
                 Token::Newline,
@@ -2459,7 +2457,7 @@ f"environ({{{formatted_items}}})"
                 Token::FStringStart,
                 Token::StringLiteral("environ({".into()),
                 Token::LBrace,
-                Token::Identifier(ident("formatted_items")),
+                Token::Identifier(ident!("formatted_items")),
                 Token::RBrace,
                 Token::StringLiteral("})".into()),
                 Token::FStringEnd,
@@ -2477,7 +2475,7 @@ f"environ({{{formatted_items}after}})"
                 Token::FStringStart,
                 Token::StringLiteral("environ({".into()),
                 Token::LBrace,
-                Token::Identifier(ident("formatted_items")),
+                Token::Identifier(ident!("formatted_items")),
                 Token::RBrace,
                 Token::StringLiteral("after})".into()),
                 Token::FStringEnd,
@@ -2498,7 +2496,7 @@ f"environ({{{formatted_items}after}})"
             vec![
                 Token::Indent,
                 Token::Def,
-                Token::Identifier(ident("__repr__")),
+                Token::Identifier(ident!("__repr__")),
                 Token::LParen,
                 Token::RParen,
                 Token::Colon,
@@ -2508,7 +2506,7 @@ f"environ({{{formatted_items}after}})"
                 Token::FStringStart,
                 Token::StringLiteral("environ({".into()),
                 Token::LBrace,
-                Token::Identifier(ident("formatted_items")),
+                Token::Identifier(ident!("formatted_items")),
                 Token::RBrace,
                 Token::StringLiteral("})".into()),
                 Token::FStringEnd,
@@ -2516,7 +2514,7 @@ f"environ({{{formatted_items}after}})"
                 Token::Newline,
                 Token::Dedent,
                 Token::Def,
-                Token::Identifier(ident("copy")),
+                Token::Identifier(ident!("copy")),
                 Token::LParen,
                 Token::RParen,
                 Token::Colon,
@@ -2536,12 +2534,12 @@ f"environ({{{formatted_items}after}})"
             vec![
                 Token::FStringStart,
                 Token::LBrace,
-                Token::Identifier(ident("first")),
+                Token::Identifier(ident!("first")),
                 Token::RBrace,
                 Token::LBrace,
-                Token::Identifier(ident("last")),
+                Token::Identifier(ident!("last")),
                 Token::Exclamation,
-                Token::Identifier(ident("r")),
+                Token::Identifier(ident!("r")),
                 Token::RBrace,
                 Token::FStringEnd,
                 Token::Newline,
@@ -2558,7 +2556,7 @@ f"environ({{{formatted_items}after}})"
             vec![
                 Token::FStringStart,
                 Token::LBrace,
-                Token::Identifier(ident("first")),
+                Token::Identifier(ident!("first")),
                 Token::RBrace,
                 Token::StringLiteral("\n".into()),
                 Token::FStringEnd,
@@ -2630,9 +2628,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::DoubleSlash,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2642,9 +2640,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::BitwiseAnd,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2654,9 +2652,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::BitwiseOr,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2666,9 +2664,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::BitwiseXor,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2678,9 +2676,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Modulo,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2691,7 +2689,7 @@ This exports:
             tokens,
             vec![
                 Token::BitwiseNot,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Newline,
             ]
         );
@@ -2701,9 +2699,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::LeftShift,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2713,9 +2711,9 @@ This exports:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::RightShift,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Newline,
             ]
         );
@@ -2732,9 +2730,9 @@ for i in a:
             tokens,
             vec![
                 Token::For,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::In,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
@@ -2753,9 +2751,9 @@ for i in a:
             tokens,
             vec![
                 Token::For,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::In,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
@@ -2792,18 +2790,18 @@ def add(a: str, b: str) -> int:
             tokens,
             vec![
                 Token::Def,
-                Token::Identifier(ident("add")),
+                Token::Identifier(ident!("add")),
                 Token::LParen,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Colon,
-                Token::Identifier(ident("str")),
+                Token::Identifier(ident!("str")),
                 Token::Comma,
-                Token::Identifier(ident("b")),
+                Token::Identifier(ident!("b")),
                 Token::Colon,
-                Token::Identifier(ident("str")),
+                Token::Identifier(ident!("str")),
                 Token::RParen,
                 Token::ReturnTypeArrow,
-                Token::Identifier(ident("int")),
+                Token::Identifier(ident!("int")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
@@ -2822,7 +2820,7 @@ def add(a: str, b: str) -> int:
             tokens,
             vec![
                 Token::Nonlocal,
-                Token::Identifier(ident("var")),
+                Token::Identifier(ident!("var")),
                 Token::Newline,
             ]
         );
@@ -2833,7 +2831,7 @@ def add(a: str, b: str) -> int:
             tokens,
             vec![
                 Token::Global,
-                Token::Identifier(ident("var")),
+                Token::Identifier(ident!("var")),
                 Token::Newline,
             ]
         );
@@ -2853,7 +2851,7 @@ def add(a: str, b: str) -> int:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Dot,
                 Token::Integer(123),
                 Token::Newline,
@@ -2874,9 +2872,9 @@ for i in a:
             tokens,
             vec![
                 Token::For,
-                Token::Identifier(ident("i")),
+                Token::Identifier(ident!("i")),
                 Token::In,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Colon,
                 Token::Newline,
                 Token::Indent,
@@ -2894,13 +2892,13 @@ for i in a:
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Assign,
                 Token::Integer(10),
                 Token::Semicolon,
                 Token::Integer(4),
                 Token::Plus,
-                Token::Identifier(ident("a")),
+                Token::Identifier(ident!("a")),
                 Token::Newline,
             ]
         );

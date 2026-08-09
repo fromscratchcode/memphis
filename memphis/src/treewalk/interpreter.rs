@@ -4554,18 +4554,6 @@ Foo().run
     }
 
     #[test]
-    fn slash_args() {
-        let input = r#"
-def foo(cls, /):
-    pass
-"#;
-
-        let ctx = run(input);
-
-        assert_variant!(ctx, "foo", Function);
-    }
-
-    #[test]
     fn globals_builtin() {
         let input = r#"
 a = 4
@@ -5475,5 +5463,57 @@ result.value
 "#;
         let e = eval_expect_error(input);
         assert_attribute_error!(e.exception, "Replacement", "value");
+    }
+
+    #[test]
+    fn position_only_and_keyword_only() {
+        let input = r#"
+def f(a, /, b, *args, c, **kwargs):
+    return a, b, args, c, kwargs
+
+f(1, 2, 3, 4, c=5, extra=6)
+"#;
+        assert_eval_eq!(
+            input,
+            tuple![
+                int!(1),
+                int!(2),
+                tuple![int!(3), int!(4)],
+                int!(5),
+                dict!({ str!("extra") => int!(6) })
+            ]
+        );
+
+        let input = r#"
+def f(a, /, b):
+    pass
+
+f(a=1, b=2)
+"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "f() got some positional-only arguments passed as keyword arguments: 'a'"
+        );
+
+        let input = r#"
+def f(a, /, **kwargs):
+    return a, kwargs
+
+f(1, a=2)
+"#;
+        assert_eval_eq!(input, tuple![int!(1), dict!({ str!("a") => int!(2) })]);
+
+        let input = r#"
+def f(a, /, **kwargs):
+    return a, kwargs
+
+f(a=2)
+        "#;
+        let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "f() missing 1 required positional argument: 'a'"
+        );
     }
 }

@@ -11,6 +11,7 @@ use crate::{
 pub enum ArgBindError {
     TooManyPositional { given: usize, expected: usize },
     MissingRequired { names: Vec<String> },
+    PositionalOnlyAsKeyword { names: Vec<String> },
     UnexpectedKeyword { name: String },
 }
 
@@ -34,6 +35,16 @@ impl ArgBindError {
                     .join(" and ");
                 Exception::type_error(format!(
                     "{callee_name}() missing {num_missing} required positional {noun}: {arg_names}"
+                ))
+            }
+            Self::PositionalOnlyAsKeyword { names } => {
+                let arg_names = names
+                    .iter()
+                    .map(|a| format!("'{a}'"))
+                    .collect::<Vec<_>>()
+                    .join(" and ");
+                Exception::type_error(format!(
+                    "{callee_name}() got some positional-only arguments passed as keyword arguments: {arg_names}"
                 ))
             }
             Self::UnexpectedKeyword { name } => Exception::type_error(format!(
@@ -78,11 +89,10 @@ fn bind_input(
     }
 
     let mut table = SymbolTable::default();
-    let mut missing_args = vec![];
-
+    let mut missing_positional = Vec::new();
     for (index, arg_def) in signature.args.iter().enumerate() {
         // Check if already satisfied by a keyword argument
-        if binding_input.has_kwarg(&arg_def.name) {
+        if binding_input.has_kwarg(&arg_def.name) && arg_def.accepts_keyword() {
             // We'll bind it later in the keyword override pass
             continue;
         }
@@ -95,7 +105,7 @@ fn bind_input(
                 ParameterDefault::Omitted => continue,
                 ParameterDefault::Value(default_value) => default_value.clone(),
                 ParameterDefault::Required => {
-                    missing_args.push(arg_def.name.clone());
+                    missing_positional.push(arg_def.name.clone());
                     // We use None here only because if we hit this case, we will return an
                     // error shortly after this loop. We can't do it here because we need to
                     // find all the missing args first.
@@ -107,10 +117,22 @@ fn bind_input(
         table.insert(&arg_def.name, value);
     }
 
+    let mut positional_only_passed_as_keyword = Vec::new();
     for (key, value) in binding_input.kwargs().iter() {
-        // Is this keyword name something that belongs to the function, either because it was
-        // already bound, or because it’s one of the declared parameters?
-        if table.has(key) || signature.args.iter().any(|a| &a.name == key) {
+        let parameter = signature.parameter_named(key);
+        if let Some(param) = parameter
+            && !param.accepts_keyword()
+        {
+            // If there's nowhere to put this kwarg and there's a positional-only slot, reject it
+            if signature.kwargs_var.is_none() {
+                positional_only_passed_as_keyword.push(key.to_string());
+            // Otherwise, wait and bind it later in kwargs
+            } else {
+                continue;
+            }
+        }
+
+        if parameter.is_some() {
             table.insert(key, value.clone());
         } else if signature.kwargs_var.is_none() {
             return Err(ArgBindError::UnexpectedKeyword {
@@ -119,10 +141,17 @@ fn bind_input(
         }
     }
 
+    if !positional_only_passed_as_keyword.is_empty() {
+        return Err(ArgBindError::PositionalOnlyAsKeyword {
+            names: positional_only_passed_as_keyword,
+        });
+    }
+
     // Function expects more positional args than it was invoked with.
-    if !missing_args.is_empty() {
+    // We must do this after the PositionalOnlyAsKeyword case, which takes precedence
+    if !missing_positional.is_empty() {
         return Err(ArgBindError::MissingRequired {
-            names: missing_args,
+            names: missing_positional,
         });
     }
 
@@ -138,7 +167,15 @@ fn bind_input(
     }
 
     if let Some(ref kwargs_var) = signature.kwargs_var {
-        let symbol_table = SymbolTable::new(binding_input.kwargs().clone());
+        let mut symbol_table = SymbolTable::new(binding_input.kwargs().clone());
+        // Remove any kwargs that were added earlier
+        for symbol in symbol_table.symbols().iter().filter(|sym| table.has(sym)) {
+            if let Some(param) = signature.parameter_named(symbol)
+                && param.accepts_keyword()
+            {
+                symbol_table.delete(symbol);
+            }
+        }
         let kwargs = Dict::from_symbol_table(&symbol_table);
         let kwargs_value = TreewalkValue::Dict(Container::new(kwargs));
         table.insert(kwargs_var, kwargs_value);
