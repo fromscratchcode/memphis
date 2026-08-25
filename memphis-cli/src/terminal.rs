@@ -1,4 +1,7 @@
-use memphis::{ReplResult, ReplSession, ReplStep};
+use memphis::{
+    Capture, Container, HostIo, HostIoError, Input, InputResult, Output, ReplResult, ReplSession,
+    ReplStep,
+};
 use std::{panic, process};
 
 use crossterm::{
@@ -45,6 +48,35 @@ fn install_custom_panic_hook() {
     }));
 }
 
+struct TerminalReplIo {
+    output: Container<Capture>,
+}
+
+impl TerminalReplIo {
+    fn new() -> (Self, Container<Capture>) {
+        let capture = Container::new(Capture::new());
+        let io = Self {
+            output: capture.clone(),
+        };
+        (io, capture)
+    }
+}
+
+impl Input for TerminalReplIo {
+    fn input(&mut self, _prompt: &str) -> Result<InputResult, HostIoError> {
+        unimplemented!()
+    }
+}
+
+impl Output for TerminalReplIo {
+    fn write(&mut self, text: &str) -> Result<(), HostIoError> {
+        self.output.borrow_mut().append(text);
+        Ok(())
+    }
+}
+
+impl HostIo for TerminalReplIo {}
+
 /// The Memphis Read-Evaluate-Print-Loop (REPL).
 pub struct TerminalRepl {
     session: ReplSession,
@@ -52,8 +84,9 @@ pub struct TerminalRepl {
 
 impl TerminalRepl {
     pub fn new(engine: Engine) -> Self {
+        let (io, output) = TerminalReplIo::new();
         Self {
-            session: ReplSession::new(engine),
+            session: ReplSession::new(engine, io, output),
         }
     }
 

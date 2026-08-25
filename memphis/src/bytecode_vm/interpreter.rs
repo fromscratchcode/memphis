@@ -1,9 +1,11 @@
 #[cfg(test)]
 mod tests_vm_interpreter {
     use crate::{
-        bytecode_vm::test_utils::*,
+        ModuleOrigin,
+        bytecode_vm::{VmContext, test_utils::*},
         domain::{Text, test_utils::*},
         interpreter::Interpreter as _,
+        test_io::TestIo,
     };
 
     #[test]
@@ -710,36 +712,36 @@ b, c
 
     #[test]
     fn stdin() {
-        let mut context = init();
-        context.set_input(["Name"]);
-        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        let (io, _) = TestIo::with_input(["Name"]);
+        let mut ctx = VmContext::init(ModuleOrigin::Stdin, io);
+        let result = ctx.eval(Text::new("input()")).expect("Eval failed");
         assert_eq!(result, str!("Name"));
 
-        let mut context = init();
-        context.set_input(["  Name  "]);
-        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        let (io, _) = TestIo::with_input(["  Name  "]);
+        let mut ctx = VmContext::init(ModuleOrigin::Stdin, io);
+        let result = ctx.eval(Text::new("input()")).expect("Eval failed");
         assert_eq!(result, str!("  Name  "));
 
-        let mut context = init();
-        context.set_input(["  Name  \r\n"]);
-        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        let (io, _) = TestIo::with_input(["  Name  \r\n"]);
+        let mut ctx = VmContext::init(ModuleOrigin::Stdin, io);
+        let result = ctx.eval(Text::new("input()")).expect("Eval failed");
         assert_eq!(result, str!("  Name  "));
 
-        let mut context = init();
-        context.set_input(["\n"]);
-        let result = context.eval(Text::new("input()")).expect("Eval failed");
+        let (io, _) = TestIo::with_input(["\n"]);
+        let mut ctx = VmContext::init(ModuleOrigin::Stdin, io);
+        let result = ctx.eval(Text::new("input()")).expect("Eval failed");
         assert_eq!(result, str!(""));
     }
 
     #[test]
     fn stdin_eoferror() {
-        let mut context = init();
-        context.set_input(["Name"]);
+        let (io, _) = TestIo::with_input(["Name"]);
+        let mut ctx = VmContext::init(ModuleOrigin::Stdin, io);
 
-        let first = context.eval(Text::new("input()")).expect("Eval failed");
+        let first = ctx.eval(Text::new("input()")).expect("Eval failed");
         assert_eq!(first, str!("Name"));
 
-        let result = context.eval(Text::new("input()")).unwrap_err();
+        let result = ctx.eval(Text::new("input()")).unwrap_err();
         assert_eof_error!(result.exception, "EOF when reading a line");
     }
 
@@ -749,14 +751,13 @@ b, c
 name = input("Enter your name: ")
 print(f"Hello {name}.")
 "#;
-        let mut context = init();
-        context.set_input(["John"]);
-        context.enable_capture();
+        let (io, capture) = TestIo::with_input(["John"]);
+        let mut ctx = VmContext::init(ModuleOrigin::Stdin, io);
 
-        let _ = context.eval(Text::new(input)).expect("Eval failed");
+        let _ = ctx.eval(Text::new(input)).expect("Eval failed");
 
         assert_eq!(
-            context.take_output().unwrap(),
+            capture.borrow_mut().take_output(),
             "Enter your name: Hello John.\n"
         );
     }

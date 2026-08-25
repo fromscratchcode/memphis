@@ -75,6 +75,10 @@ impl Exception {
         Self::new(ExceptionKind::AttributeError, vec![msg])
     }
 
+    pub fn io_error(msg: Reference) -> Self {
+        Self::new(ExceptionKind::IOError, vec![msg])
+    }
+
     pub fn eof_error(msg: Reference) -> Self {
         Self::new(ExceptionKind::EOFError, vec![msg])
     }

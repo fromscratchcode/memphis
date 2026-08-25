@@ -109,8 +109,10 @@ mod tests {
     use std::net::TcpListener;
 
     use crate::{
+        ModuleOrigin,
         domain::ExceptionKind,
-        treewalk::{test_utils::*, utils::args},
+        test_io::TestIo,
+        treewalk::{TreewalkContext, test_utils::*, utils::args},
     };
 
     use super::*;
@@ -124,12 +126,15 @@ mod tests {
         // Call the builtin directly
         let builtin = NetListenBuiltin;
         let args = args![tuple![str!("127.0.0.1"), int!(port)]];
-        let interpreter = TreewalkInterpreter::default();
+
+        let (io, _) = TestIo::new();
+        let ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
+        let interpreter = ctx.interpreter();
 
         let bound_args = interpreter
             .bind_callable(Box::new(builtin.clone()), args)
             .unwrap();
-        let result = builtin.call(&interpreter, bound_args);
+        let result = builtin.call(interpreter, bound_args);
 
         assert!(result.is_err());
         let err_binding = result.unwrap_err();

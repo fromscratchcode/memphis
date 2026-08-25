@@ -1,11 +1,14 @@
 use crate::{
+    Capture, Container, ModuleOrigin,
     domain::{Source, Text},
+    test_io::TestIo,
     treewalk::{RaisedException, TreewalkContext, TreewalkValue},
 };
 use std::path::{Path, PathBuf};
 
-pub fn init() -> TreewalkContext {
-    TreewalkContext::stdin()
+fn init() -> TreewalkContext {
+    let (io, _) = TestIo::new();
+    TreewalkContext::init(ModuleOrigin::Stdin, io)
 }
 
 fn resolve_workspace_path(path: &str) -> PathBuf {
@@ -17,10 +20,12 @@ fn resolve_workspace_path(path: &str) -> PathBuf {
         .join(path)
 }
 
-fn init_path(path: &str) -> (TreewalkContext, Text) {
+fn init_path(path: &str) -> (TreewalkContext, Container<Capture>, Text) {
+    let (io, capture) = TestIo::new();
     let source = Source::from_path(resolve_workspace_path(path)).expect("Failed to create Source");
     (
-        TreewalkContext::script(source.path().clone()),
+        TreewalkContext::init(ModuleOrigin::File(source.path().clone()), io),
+        capture,
         source.text().clone(),
     )
 }
@@ -39,33 +44,27 @@ pub fn eval_expect_error(text: &str) -> RaisedException {
 }
 
 pub fn run(text: &str) -> TreewalkContext {
-    let mut context = init();
-    context
-        .eval_inner(Text::new(text))
+    let mut ctx = init();
+    ctx.eval_inner(Text::new(text))
         .expect("Treewalk evaluation failed");
-    context
+    ctx
 }
 
 pub fn run_script(path: &str) -> String {
-    let (mut context, text) = init_path(path);
-    context.enable_capture();
-    context
-        .eval_inner(text)
-        .expect("Treewalk evaluation failed");
-    context.take_output().expect("Output not captured")
+    let (mut ctx, capture, text) = init_path(path);
+    ctx.eval_inner(text).expect("Treewalk evaluation failed");
+    capture.borrow_mut().take_output()
 }
 
 pub fn run_path(path: &str) -> TreewalkContext {
-    let (mut context, text) = init_path(path);
-    context
-        .eval_inner(text)
-        .expect("Treewalk evaluation failed");
-    context
+    let (mut ctx, _, text) = init_path(path);
+    ctx.eval_inner(text).expect("Treewalk evaluation failed");
+    ctx
 }
 
 pub fn run_path_expect_error(path: &str) -> RaisedException {
-    let (mut context, text) = init_path(path);
-    match context.eval_inner(text) {
+    let (mut ctx, _, text) = init_path(path);
+    match ctx.eval_inner(text) {
         Ok(_) => panic!("Expected an error!"),
         Err(e) => e,
     }

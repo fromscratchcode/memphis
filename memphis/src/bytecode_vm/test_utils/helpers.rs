@@ -1,11 +1,14 @@
 use crate::{
+    Capture, Container, ModuleOrigin,
     bytecode_vm::VmContext,
     domain::{MemphisValue, RaisedMemphisError, Source, Text},
+    test_io::TestIo,
 };
 use std::path::{Path, PathBuf};
 
 pub fn init() -> VmContext {
-    VmContext::stdin()
+    let (io, _) = TestIo::new();
+    VmContext::init(ModuleOrigin::Stdin, io)
 }
 
 fn resolve_workspace_path(path: &str) -> PathBuf {
@@ -17,10 +20,12 @@ fn resolve_workspace_path(path: &str) -> PathBuf {
         .join(path)
 }
 
-fn init_path(path: &str) -> (VmContext, Text) {
+fn init_path(path: &str) -> (VmContext, Container<Capture>, Text) {
+    let (io, capture) = TestIo::new();
     let source = Source::from_path(resolve_workspace_path(path)).expect("Failed to create Source");
     (
-        VmContext::script(source.path().clone()),
+        VmContext::init(ModuleOrigin::File(source.path().clone()), io),
+        capture,
         source.text().clone(),
     )
 }
@@ -50,16 +55,15 @@ pub fn run(text: &str) -> VmContext {
 }
 
 pub fn run_script(path: &str) -> String {
-    let (mut context, text) = init_path(path);
-    context.enable_capture();
-    context.eval_inner(text).expect("VM run failed!");
-    context.take_output().expect("Output not captured")
+    let (mut ctx, capture, text) = init_path(path);
+    ctx.eval_inner(text).expect("VM run failed!");
+    capture.borrow_mut().take_output()
 }
 
 pub fn run_path_expect_error(path: &str) -> RaisedMemphisError {
-    let (mut context, text) = init_path(path);
-    match context.eval_inner(text) {
+    let (mut ctx, _, text) = init_path(path);
+    match ctx.eval_inner(text) {
         Ok(_) => panic!("Expected an error!"),
-        Err(e) => e.normalize(context.vm()),
+        Err(e) => e.normalize(ctx.vm()),
     }
 }

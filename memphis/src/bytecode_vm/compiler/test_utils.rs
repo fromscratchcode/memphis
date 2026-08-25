@@ -1,4 +1,5 @@
 use crate::{
+    ModuleOrigin,
     bytecode_vm::{
         CompilerError, VmContext,
         compiler::{Bytecode, CodeObject, Compiler, Constant, Opcode},
@@ -9,6 +10,7 @@ use crate::{
         test_utils::*,
         types::{Statement, ast},
     },
+    test_io::TestIo,
 };
 
 fn init() -> Compiler {
@@ -16,7 +18,8 @@ fn init() -> Compiler {
 }
 
 fn init_ctx() -> VmContext {
-    VmContext::stdin()
+    let (io, _) = TestIo::new();
+    VmContext::init(ModuleOrigin::Stdin, io)
 }
 
 pub fn compile_stmt(stmt: Statement) -> Bytecode {

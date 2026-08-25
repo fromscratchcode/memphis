@@ -118,6 +118,10 @@ impl Exception {
         Self::new_from_str(ExceptionKind::EOFError, msg)
     }
 
+    pub fn io_error(msg: impl Into<String>) -> Self {
+        Self::new_from_str(ExceptionKind::IOError, msg)
+    }
+
     pub fn lookup_error(msg: impl Into<String>) -> Self {
         Self::new_from_str(ExceptionKind::LookupError, msg)
     }

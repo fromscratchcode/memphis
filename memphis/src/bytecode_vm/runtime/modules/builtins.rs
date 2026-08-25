@@ -10,7 +10,7 @@ use crate::{
     },
     core::Container,
     domain::{Dunder, ModuleName, Type},
-    runtime::IoError,
+    runtime::{HostIoError, InputResult},
 };
 
 static BUILTINS: [(&str, BuiltinFn); 11] = [
@@ -272,7 +272,11 @@ fn print(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         .map(|arg| vm.normalize_vm_ref(*arg).to_string())
         .collect::<Vec<_>>()
         .join(" ");
-    vm.state.borrow_mut().io.println(&value);
+    let result = vm.state.borrow_mut().io.writeln(&value);
+    if let Err(HostIoError { message }) = result {
+        let msg = vm.intern_string(&message);
+        return Exception::io_error(msg).raise(vm);
+    }
     Ok(vm.none())
 }
 
@@ -282,20 +286,24 @@ fn input(vm: &mut VirtualMachine, args: Vec<Reference>) -> VmResult<Reference> {
         return Exception::type_error(msg).raise(vm);
     }
 
-    if let Some(prompt) = args.first() {
-        let s = vm.normalize_vm_ref(*prompt).to_string();
-        vm.state.borrow_mut().io.print(&s);
-    }
+    let prompt = args
+        .first()
+        .map(|value| vm.normalize_vm_ref(*value).to_string())
+        .unwrap_or_default();
 
-    let input = vm.state.borrow_mut().io.input();
+    let input = vm.state.borrow_mut().io.input(&prompt);
     match input {
-        Err(IoError::Eof) => {
+        Ok(InputResult::Line(input)) => {
+            let val = vm.intern_string(&input);
+            Ok(val)
+        }
+        Ok(InputResult::Eof) => {
             let msg = vm.intern_string("EOF when reading a line");
             Exception::eof_error(msg).raise(vm)
         }
-        Ok(input) => {
-            let val = vm.intern_string(&input);
-            Ok(val)
+        Err(HostIoError { message }) => {
+            let msg = vm.intern_string(&message);
+            Exception::io_error(msg).raise(vm)
         }
     }
 }

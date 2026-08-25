@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use crate::{
     Engine,
     repl::{ReplOutput, ReplResult, ReplSession, ReplStep},
+    wasm::io::WasmIo,
 };
 
 #[derive(Serialize)]
@@ -72,8 +73,9 @@ impl WasmRepl {
         // We guard this using TypeScript
         let engine = Engine::from_str(engine_str).expect("Invalid engine.");
 
+        let (io, capture) = WasmIo::new();
         WasmRepl {
-            session: ReplSession::new(engine),
+            session: ReplSession::new(engine, io, capture),
         }
     }
 

@@ -1,6 +1,7 @@
 use crate::{
-    Engine, MemphisContext,
+    Engine, MemphisContext, ModuleOrigin,
     domain::{MemphisValue, RaisedMemphisError, Text},
+    test_io::TestIo,
 };
 
 pub struct CrosscheckSession {
@@ -11,8 +12,10 @@ pub struct CrosscheckSession {
 impl CrosscheckSession {
     /// Create a new session from a `Source`.
     pub fn new() -> Self {
-        let treewalk = MemphisContext::stdin(Engine::Treewalk);
-        let vm = MemphisContext::stdin(Engine::BytecodeVm);
+        let (io, _) = TestIo::new();
+        let treewalk = MemphisContext::new(Engine::Treewalk, ModuleOrigin::Stdin, io);
+        let (io, _) = TestIo::new();
+        let vm = MemphisContext::new(Engine::BytecodeVm, ModuleOrigin::Stdin, io);
         Self { treewalk, vm }
     }
 

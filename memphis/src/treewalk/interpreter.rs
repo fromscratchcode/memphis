@@ -1,14 +1,10 @@
 use crate::{
     core::Container,
-    domain::ModuleName,
     parser::types::Ast,
     runtime::MemphisState,
     treewalk::{
         Executor, RaisedException, TreewalkDisruption, TreewalkResult, TreewalkState,
-        TreewalkValue,
-        debugger::TreewalkDebugSession,
-        pausable::Frame,
-        types::{Exception, Module},
+        TreewalkValue, debugger::TreewalkDebugSession, pausable::Frame, types::Exception,
     },
 };
 
@@ -22,17 +18,6 @@ mod runtime;
 pub struct TreewalkInterpreter {
     pub state: Container<TreewalkState>,
     pub memphis_state: Container<MemphisState>,
-}
-
-impl Default for TreewalkInterpreter {
-    fn default() -> Self {
-        let memphis_state = Container::new(MemphisState::new());
-        let state = Container::new(TreewalkState::new());
-        let module = Module::new_empty(ModuleName::main());
-        memphis_state.push_stack_frame(&module);
-        state.push_module(Container::new(module));
-        Self::new(memphis_state, state)
-    }
 }
 
 impl TreewalkInterpreter {
@@ -85,12 +70,16 @@ mod tests {
     use super::*;
 
     use crate::{
+        ModuleOrigin,
         domain::{Text, Type},
         parser::{
             test_utils::stmt_expr,
             types::{Expr, ast},
         },
-        treewalk::{protocols::Callable, test_utils::*, types::Function, utils::Signature},
+        test_io::TestIo,
+        treewalk::{
+            TreewalkContext, protocols::Callable, test_utils::*, types::Function, utils::Signature,
+        },
     };
 
     #[test]
@@ -5367,54 +5356,44 @@ b = 2; c = 3
 
     #[test]
     fn stdin() {
-        let mut context = init();
-        context.set_input(["Name"]);
+        let (io, _) = TestIo::with_input(["Name"]);
+        let mut ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
 
-        let result = context
-            .eval_inner(Text::new("input()"))
-            .expect("Eval failed");
+        let result = ctx.eval_inner(Text::new("input()")).expect("Eval failed");
 
         assert_eq!(result, str!("Name"));
 
-        let mut context = init();
-        context.set_input(["  Name  "]);
+        let (io, _) = TestIo::with_input(["  Name  "]);
+        let mut ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
 
-        let result = context
-            .eval_inner(Text::new("input()"))
-            .expect("Eval failed");
+        let result = ctx.eval_inner(Text::new("input()")).expect("Eval failed");
 
         assert_eq!(result, str!("  Name  "));
 
-        let mut context = init();
-        context.set_input(["  Name  \r\n"]);
+        let (io, _) = TestIo::with_input(["  Name  \r\n"]);
+        let mut ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
 
-        let result = context
-            .eval_inner(Text::new("input()"))
-            .expect("Eval failed");
+        let result = ctx.eval_inner(Text::new("input()")).expect("Eval failed");
 
         assert_eq!(result, str!("  Name  "));
 
-        let mut context = init();
-        context.set_input(["\n"]);
+        let (io, _) = TestIo::with_input(["\n"]);
+        let mut ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
 
-        let result = context
-            .eval_inner(Text::new("input()"))
-            .expect("Eval failed");
+        let result = ctx.eval_inner(Text::new("input()")).expect("Eval failed");
 
         assert_eq!(result, str!(""));
     }
 
     #[test]
     fn stdin_eoferror() {
-        let mut context = init();
-        context.set_input(["Name"]);
+        let (io, _) = TestIo::with_input(["Name"]);
+        let mut ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
 
-        let first = context
-            .eval_inner(Text::new("input()"))
-            .expect("Eval failed");
+        let first = ctx.eval_inner(Text::new("input()")).expect("Eval failed");
         assert_eq!(first, str!("Name"));
 
-        let result = context.eval_inner(Text::new("input()")).unwrap_err();
+        let result = ctx.eval_inner(Text::new("input()")).unwrap_err();
         assert_eof_error!(result.exception, "EOF when reading a line");
     }
 
@@ -5424,14 +5403,12 @@ b = 2; c = 3
 name = input("Enter your name: ")
 print(f"Hello {name}.")
 "#;
-        let mut context = init();
-        context.set_input(["John"]);
-        context.enable_capture();
-
-        let _ = context.eval_inner(Text::new(input)).expect("Eval failed");
+        let (io, capture) = TestIo::with_input(["John"]);
+        let mut ctx = TreewalkContext::init(ModuleOrigin::Stdin, io);
+        let _ = ctx.eval_inner(Text::new(input)).expect("Eval failed");
 
         assert_eq!(
-            context.take_output().unwrap(),
+            capture.borrow_mut().take_output(),
             "Enter your name: Hello John.\n"
         );
     }

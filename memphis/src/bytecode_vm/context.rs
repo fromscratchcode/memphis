@@ -1,6 +1,5 @@
-#[cfg(test)]
-use crate::domain::ScriptPath;
 use crate::{
+    HostIo,
     bytecode_vm::{
         Compiler, CompilerError, Runtime, VirtualMachine, VmResult, VmValue, compiler::CodeObject,
     },
@@ -19,7 +18,8 @@ pub struct VmContext {
 }
 
 impl VmContext {
-    pub fn new(state: Container<MemphisState>, origin: ModuleOrigin) -> Self {
+    pub fn init(origin: ModuleOrigin, io: impl HostIo + 'static) -> Self {
+        let state = Container::new(MemphisState::init(&origin, io));
         let runtime = Container::new(Runtime::new());
         Self::from_state(ModuleName::main(), None, origin, state, runtime)
     }
@@ -70,39 +70,6 @@ impl VmContext {
     #[cfg(test)]
     pub fn set_pkg(&mut self, name: ModuleName) {
         self.package = Some(name);
-    }
-
-    #[cfg(test)]
-    pub fn enable_capture(&mut self) {
-        self.vm.state.borrow_mut().io.enable_capture();
-    }
-
-    #[cfg(test)]
-    pub fn take_output(&mut self) -> Option<String> {
-        self.vm.state.borrow_mut().io.take_output()
-    }
-
-    #[cfg(test)]
-    pub fn set_input<I, S>(&mut self, lines: I)
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        self.vm.state.borrow_mut().io.set_input(lines);
-    }
-
-    #[cfg(any(test, feature = "wasm"))]
-    pub fn stdin() -> Self {
-        // We don't need to initialize the ModuleOrigin here because there's no filepath to record.
-        let state = Container::new(MemphisState::new());
-        Self::new(state, ModuleOrigin::Stdin)
-    }
-
-    #[cfg(test)]
-    pub fn script(path: ScriptPath) -> Self {
-        let origin = ModuleOrigin::File(path);
-        let state = Container::new(MemphisState::init(&origin));
-        Self::new(state, origin)
     }
 }
 

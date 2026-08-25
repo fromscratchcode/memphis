@@ -6,9 +6,10 @@ use crate::{
         DebugCallStack, DebugStackFrame, LoadedModule, ModuleName, ModuleOrigin, ResolvedModule,
         ScriptPath, ToDebugStackFrame, resolve,
     },
+    runtime::HostIo,
 };
 
-use super::{ImportResolver, MemphisIo};
+use super::ImportResolver;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImportError {
@@ -27,25 +28,25 @@ pub struct MemphisState {
     import_resolver: ImportResolver,
     debug_call_stack: DebugCallStack,
     line_number: usize,
-    pub io: MemphisIo,
+    pub io: Box<dyn HostIo>,
 }
 
 impl MemphisState {
-    pub fn new() -> Self {
-        MemphisState {
-            import_resolver: ImportResolver::new(),
-            debug_call_stack: DebugCallStack::new(),
-            line_number: 1,
-            io: MemphisIo::new(),
-        }
-    }
-
-    pub fn init(origin: &ModuleOrigin) -> Self {
-        let mut state = MemphisState::new();
+    pub fn init(origin: &ModuleOrigin, io: impl HostIo + 'static) -> Self {
+        let mut state = MemphisState::new(io);
         if let ModuleOrigin::File(p) = origin {
             state.register_root(p);
         }
         state
+    }
+
+    fn new(io: impl HostIo + 'static) -> Self {
+        MemphisState {
+            import_resolver: ImportResolver::new(),
+            debug_call_stack: DebugCallStack::new(),
+            line_number: 1,
+            io: Box::new(io),
+        }
     }
 
     fn register_root(&mut self, path: &ScriptPath) {
@@ -83,10 +84,9 @@ impl Container<MemphisState> {
 
     pub fn load_source(&self, module_name: &ModuleName) -> Result<LoadedModule, ImportError> {
         let resolved = self.resolve_module(module_name)?;
-        let loaded = resolved
+        resolved
             .load()
-            .map_err(|_| ImportError::new(&format!("No module named {}", module_name)))?;
-        Ok(loaded)
+            .map_err(|_| ImportError::new(&format!("No module named {}", module_name)))
     }
 
     fn resolve_module(&self, module_name: &ModuleName) -> Result<ResolvedModule, ImportError> {

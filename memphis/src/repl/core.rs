@@ -1,5 +1,6 @@
 use crate::{
-    Engine, MemphisContext,
+    Container, Engine, HostIo, MemphisContext, ModuleOrigin,
+    core::Capture,
     domain::Text,
     repl::{
         ReplResult, ReplStep,
@@ -11,15 +12,16 @@ use crate::{
 pub struct ReplCore {
     /// The current statement being constructed.
     input: String,
-
     context: MemphisContext,
+    capture: Container<Capture>,
 }
 
 impl ReplCore {
-    pub fn new(engine: Engine) -> Self {
+    pub fn new(engine: Engine, io: impl HostIo + 'static, capture: Container<Capture>) -> Self {
         Self {
             input: String::new(),
-            context: MemphisContext::stdin(engine),
+            context: MemphisContext::new(engine, ModuleOrigin::Stdin, io),
+            capture,
         }
     }
 
@@ -40,17 +42,12 @@ impl ReplCore {
         match parse_step {
             ParseStep::Incomplete { indent } => ReplStep::Incomplete { indent },
             ParseStep::Complete | ParseStep::Error => {
-                self.context.enable_capture();
-
                 // We still run parser errors through eval because that pipeline will generate the
                 // correct errors, some of which may be heap allocated.
                 let result = self.eval(text);
                 self.input.clear();
 
-                let stdout = self
-                    .context
-                    .take_output()
-                    .expect("Failed to capture stdout");
+                let stdout = self.capture.borrow_mut().take_output();
                 let output = ReplOutput { stdout, result };
                 ReplStep::Complete(output)
             }
@@ -71,11 +68,18 @@ impl ReplCore {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_io::TestIo;
+
     use super::*;
+
+    fn init() -> ReplCore {
+        let (io, capture) = TestIo::new();
+        ReplCore::new(Engine::Treewalk, io, capture)
+    }
 
     #[test]
     fn test_expr() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out = core.input_line("1 + 2\n");
 
@@ -90,7 +94,7 @@ mod tests {
 
     #[test]
     fn test_statement_has_no_output() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out = core.input_line("a = 5\n");
 
@@ -105,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_print_statement_has_no_output_but_has_side_effects() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out = core.input_line("print(123)\n");
 
@@ -120,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_multiline_block() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out1 = core.input_line("def foo():\n");
         match out1 {
@@ -152,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_multiline_list() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out1 = core.input_line("[\n");
         match out1 {
@@ -184,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_multiline_string() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out1 = core.input_line("\"\"\"\n");
         match out1 {
@@ -216,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_reset_clears_incomplete_input() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out1 = core.input_line("if x:\n");
         match out1 {
@@ -238,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_error_does_not_poison_future_input() {
-        let mut core = ReplCore::new(Engine::Treewalk);
+        let mut core = init();
 
         let out1 = core.input_line("undefined_var\n");
         match out1 {

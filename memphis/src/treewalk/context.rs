@@ -1,6 +1,5 @@
-#[cfg(test)]
-use crate::domain::ScriptPath;
 use crate::{
+    HostIo,
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     interpreter::Interpreter,
@@ -17,7 +16,8 @@ pub struct TreewalkContext {
 }
 
 impl TreewalkContext {
-    pub fn new(memphis_state: Container<MemphisState>, origin: ModuleOrigin) -> Self {
+    pub fn init(origin: ModuleOrigin, io: impl HostIo + 'static) -> Self {
+        let memphis_state = Container::new(MemphisState::init(&origin, io));
         let state = Self::init_state(memphis_state.clone(), origin);
         Self::from_state(memphis_state, state)
     }
@@ -61,47 +61,6 @@ impl TreewalkContext {
     /// This is deprecated, but we still depend on it in a lot of the tests.
     pub fn read_inner(&self, name: &str) -> Option<TreewalkValue> {
         self.interpreter.load_var(name).ok()
-    }
-
-    #[cfg(test)]
-    pub fn enable_capture(&mut self) {
-        self.interpreter
-            .memphis_state
-            .borrow_mut()
-            .io
-            .enable_capture();
-    }
-
-    #[cfg(test)]
-    pub fn take_output(&mut self) -> Option<String> {
-        self.interpreter.memphis_state.borrow_mut().io.take_output()
-    }
-
-    #[cfg(test)]
-    pub fn set_input<I, S>(&mut self, lines: I)
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        self.interpreter
-            .memphis_state
-            .borrow_mut()
-            .io
-            .set_input(lines);
-    }
-
-    #[cfg(test)]
-    pub fn stdin() -> Self {
-        // We don't need to initialize the ModuleOrigin here because there's no filepath to record.
-        let state = Container::new(MemphisState::new());
-        Self::new(state, ModuleOrigin::Stdin)
-    }
-
-    #[cfg(test)]
-    pub fn script(path: ScriptPath) -> Self {
-        let origin = ModuleOrigin::File(path);
-        let state = Container::new(MemphisState::init(&origin));
-        Self::new(state, origin)
     }
 }
 

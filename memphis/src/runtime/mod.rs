@@ -3,6 +3,5 @@ mod io;
 mod state;
 
 use imports::ImportResolver;
-pub use io::IoError;
-use io::MemphisIo;
+pub use io::{HostIo, HostIoError, Input, InputResult, Output};
 pub use state::MemphisState;

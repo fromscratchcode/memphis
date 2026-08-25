@@ -1,7 +1,7 @@
 use crate::{
     core::Container,
     domain::{Dunder, MemphisValue, ModuleName},
-    runtime::IoError,
+    runtime::{HostIoError, InputResult},
     treewalk::{
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
         iterator::{collect, count},
@@ -338,7 +338,10 @@ impl Callable for PrintBuiltin {
             .map(|value| MemphisValue::from(value.clone()).to_string())
             .collect::<Vec<_>>()
             .join(" ");
-        interpreter.memphis_state.borrow_mut().io.println(&value);
+        let result = interpreter.memphis_state.borrow_mut().io.writeln(&value);
+        if let Err(HostIoError { message }) = result {
+            return Exception::io_error(message).raise(interpreter);
+        }
         Ok(TreewalkValue::None)
     }
 
@@ -357,15 +360,18 @@ impl Callable for InputBuiltin {
         interpreter: &TreewalkInterpreter,
         args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
-        if let Some(prompt) = args.get_optional("prompt") {
-            let mv = MemphisValue::from(prompt.clone()).to_string();
-            interpreter.memphis_state.borrow_mut().io.print(&mv);
-        }
+        let prompt = args
+            .get_optional("prompt")
+            .map(|value| MemphisValue::from(value.clone()).to_string())
+            .unwrap_or_default();
 
-        let input = interpreter.memphis_state.borrow_mut().io.input();
+        let input = interpreter.memphis_state.borrow_mut().io.input(&prompt);
         match input {
-            Err(IoError::Eof) => Exception::eof_error("EOF when reading a line").raise(interpreter),
-            Ok(input) => Ok(TreewalkValue::Str(Str::new(&input))),
+            Ok(InputResult::Line(input)) => Ok(TreewalkValue::Str(Str::new(&input))),
+            Ok(InputResult::Eof) => {
+                Exception::eof_error("EOF when reading a line").raise(interpreter)
+            }
+            Err(HostIoError { message }) => Exception::io_error(message).raise(interpreter),
         }
     }
 
