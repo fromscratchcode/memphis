@@ -70,8 +70,8 @@ function createInterface() {
     compile(code) {
       return compileRaw(code);
     },
-    run(code) {
-      return runRaw(code);
+    run(code, { onStdout, onStderr }) {
+      return runRaw(code, onStdout, onStderr);
     },
     createRepl(options = {}) {
       return createReplInterface(new WasmRepl(options.engine ?? "treewalk"));

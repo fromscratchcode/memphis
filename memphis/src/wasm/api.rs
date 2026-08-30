@@ -7,7 +7,10 @@ use crate::{
     domain::Text,
     lexer::Lexer,
     parser::Parser,
-    wasm::{io::WasmIo, repr::WasmCodeObject},
+    wasm::{
+        io::{WasmIo, WasmStreamingIo},
+        repr::WasmCodeObject,
+    },
 };
 
 #[wasm_bindgen]
@@ -34,35 +37,17 @@ pub fn parse(text: String) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn run(text: &str) -> String {
+pub fn run(text: &str, on_stdout: &js_sys::Function, on_stderr: &js_sys::Function) {
     set_once();
-    let (io, capture) = WasmIo::new();
+    let io = WasmStreamingIo::new(on_stdout.clone());
     let mut ctx = MemphisContext::new(Engine::Treewalk, ModuleOrigin::Stdin, io);
-    let result = ctx.eval(Text::new(text));
-    let mut output = capture.borrow_mut().take_output();
-    // in Exec mode, we don't really need the Ok result
-    // should we model this better?
-    if let Err(e) = result {
-        output.push_str(&e.to_string());
-    }
-    output
+    let _ = ctx
+        .eval(Text::new(text))
+        .map_err(|e| on_stderr.call1(&JsValue::UNDEFINED, &JsValue::from_str(&e.to_string())));
 }
 
 fn actually_compile(text: &str) -> CompilerResult<CodeObject> {
     let (io, _) = WasmIo::new();
     let ctx = VmContext::init(ModuleOrigin::Stdin, io);
     ctx.compile(&Text::new(text))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn run_works_and_captures_output() {
-        let input = r#"
-print("Hello World")
-"#;
-        assert_eq!(run(input), "Hello World\n");
-    }
 }

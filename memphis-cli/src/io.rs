@@ -10,21 +10,23 @@ use crossterm::{
     terminal::{self, Clear, ClearType},
 };
 
-pub trait TerminalIO {
-    fn read_event(&mut self) -> Result<Event, io::Error>;
+pub trait TerminalDriver {
+    fn read_event(&mut self) -> io::Result<Event>;
     fn write<T: Display>(&mut self, output: T) -> io::Result<()>;
-    fn writeln<T: Display>(&mut self, output: T) -> io::Result<()>;
     fn redraw<T: Display>(&mut self, output: T, col: usize) -> io::Result<()>;
+    fn writeln<T: Display>(&mut self, output: T) -> io::Result<()> {
+        self.write(format!("{output}\n"))
+    }
     fn enter(&mut self) -> io::Result<()> {
         self.writeln("")
     }
 }
 
-pub struct CrosstermIO;
+pub struct CrosstermDriver;
 
-impl TerminalIO for CrosstermIO {
+impl TerminalDriver for CrosstermDriver {
     /// Use `crossterm` to read events
-    fn read_event(&mut self) -> Result<Event, io::Error> {
+    fn read_event(&mut self) -> io::Result<Event> {
         event::read()
     }
 
@@ -32,11 +34,6 @@ impl TerminalIO for CrosstermIO {
     fn write<T: Display>(&mut self, output: T) -> io::Result<()> {
         print!("{}", normalize(output));
         io::stdout().flush()
-    }
-
-    /// Same as `write_output` but with a `\n` char at the end.
-    fn writeln<T: Display>(&mut self, output: T) -> io::Result<()> {
-        self.write(format!("{output}\n"))
     }
 
     fn redraw<T: Display>(&mut self, output: T, col: usize) -> io::Result<()> {

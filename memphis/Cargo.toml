@@ -24,6 +24,7 @@ wasm-bindgen = { version = "0.2", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
+js-sys = { version = "0.3", optional = true }
 
 [features]
 interactive = []
@@ -33,4 +34,5 @@ wasm = [
   "serde-wasm-bindgen",
   "wasm-bindgen",
   "console_error_panic_hook",
+  "js-sys",
 ]

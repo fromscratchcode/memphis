@@ -6,6 +6,7 @@
     "access": "public"
   },
   "scripts": {
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md,css}\"",
     "prepack": "./scripts/prepack.sh"
   },
   "type": "module",
@@ -21,5 +22,8 @@
   "files": [
     "src",
     "pkg"
-  ]
+  ],
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
 }

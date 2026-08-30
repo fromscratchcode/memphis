@@ -15,11 +15,18 @@ import { getMemphis } from "@fromscratchcode/memphis-js";
 
 const memphis = await getMemphis();
 
+// Script-style interface
+memphis.run("print('hi')", {
+  onStdout: (chunk) => console.log(chunk),
+  onStderr: (chunk) => console.error(chunk),
+});
+
+// Inspection APIs
 memphis.lex("x = 1");
 memphis.parse("x = 1");
 memphis.compile("x = 1");
-memphis.run("print('hi')");
 
+// REPL-style interface
 const repl = memphis.createRepl({ engine: "treewalk" });
 repl.insertText("1 + 1");
 const step = repl.submit();

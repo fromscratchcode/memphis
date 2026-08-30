@@ -16,8 +16,7 @@ pub trait Input {
 pub trait Output {
     fn write(&mut self, text: &str) -> Result<(), HostIoError>;
     fn writeln(&mut self, text: &str) -> Result<(), HostIoError> {
-        self.write(text)?;
-        self.write("\n")
+        self.write(&format!("{text}\n"))
     }
 }
 

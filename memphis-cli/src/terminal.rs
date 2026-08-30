@@ -11,7 +11,8 @@ use crossterm::{
 
 use crate::{
     Engine,
-    io::{CrosstermIO, TerminalIO},
+    cli::SystemIo,
+    io::{CrosstermDriver, TerminalDriver},
 };
 
 enum ReplControl {
@@ -50,6 +51,7 @@ fn install_custom_panic_hook() {
 
 struct TerminalReplIo {
     output: Container<Capture>,
+    system_io: SystemIo,
 }
 
 impl TerminalReplIo {
@@ -57,14 +59,36 @@ impl TerminalReplIo {
         let capture = Container::new(Capture::new());
         let io = Self {
             output: capture.clone(),
+            system_io: SystemIo,
         };
         (io, capture)
     }
 }
 
 impl Input for TerminalReplIo {
-    fn input(&mut self, _prompt: &str) -> Result<InputResult, HostIoError> {
-        unimplemented!()
+    fn input(&mut self, prompt: &str) -> Result<InputResult, HostIoError> {
+        let raw_mode_needs_disabling =
+            terminal::is_raw_mode_enabled().map_err(|e| HostIoError {
+                message: e.to_string(),
+            })?;
+
+        if raw_mode_needs_disabling {
+            terminal::disable_raw_mode().map_err(|e| HostIoError {
+                message: e.to_string(),
+            })?;
+        }
+
+        // We must re-enable raw mode whether or not we hit an error result, so don't return any
+        // errors immediately.
+        let result = self.system_io.input(prompt);
+
+        if raw_mode_needs_disabling {
+            terminal::enable_raw_mode().map_err(|e| HostIoError {
+                message: e.to_string(),
+            })?;
+        }
+
+        result
     }
 }
 
@@ -93,7 +117,7 @@ impl TerminalRepl {
     /// The primary entrypoint to the REPL, which uses a real terminal in raw mode and will exit
     /// loudly when terminated. For virtual terminals, use `run_inner`.
     pub fn start(&mut self) {
-        let terminal_io = &mut CrosstermIO;
+        let terminal_io = &mut CrosstermDriver;
         let _ = terminal_io.writeln(format!(
             "memphis {} REPL (engine: {})",
             self.session.version(),
@@ -112,7 +136,7 @@ impl TerminalRepl {
         let _ = panic::take_hook();
     }
 
-    fn run_inner<T: TerminalIO>(&mut self, terminal_io: &mut T) {
+    fn run_inner<T: TerminalDriver>(&mut self, terminal_io: &mut T) {
         loop {
             match terminal_io.read_event() {
                 Ok(Event::Key(event)) => match self.handle_key_event(terminal_io, event) {
@@ -126,7 +150,7 @@ impl TerminalRepl {
     }
 
     /// Update the terminal and interpreter state based on the given `KeyEvent`.
-    fn handle_key_event<T: TerminalIO>(
+    fn handle_key_event<T: TerminalDriver>(
         &mut self,
         terminal_io: &mut T,
         event: KeyEvent,
@@ -158,10 +182,12 @@ impl TerminalRepl {
                 self.session.backspace();
             }
             KeyCode::Enter => {
-                let step = self.session.submit();
                 // We must virtually hit Enter before processing the line so any results will be
                 // displayed on the next line.
+                // We also do it before calling session.submit because printing does its prompt
+                // before control is returned to this level.
                 let _ = terminal_io.enter();
+                let step = self.session.submit();
                 Self::handle_step(terminal_io, step);
             }
             KeyCode::Up => {
@@ -184,7 +210,7 @@ impl TerminalRepl {
     }
 
     /// Clear the current input, redraw it, and align the cursor to the proper column.
-    fn redraw<T: TerminalIO>(&self, terminal_io: &mut T) {
+    fn redraw<T: TerminalDriver>(&self, terminal_io: &mut T) {
         let rendered_line = format!("\r{}{}", self.session.prompt(), self.session.current_line());
         // The cursor position depends on where in the current input we are, not its length.
         let cursor_col = self.session.prompt().len() + self.session.cursor_index();
@@ -192,7 +218,7 @@ impl TerminalRepl {
     }
 
     /// Append the provided line to the constructed statement and evaluate it.
-    fn handle_step<T: TerminalIO>(terminal_io: &mut T, step: &ReplStep) {
+    fn handle_step<T: TerminalDriver>(terminal_io: &mut T, step: &ReplStep) {
         if let Some(stdout) = step.stdout() {
             let _ = terminal_io.write(stdout);
         }
@@ -214,7 +240,7 @@ mod tests {
 
     use super::*;
 
-    fn run_inner(engine: Engine, terminal: &mut MockTerminalIO) -> String {
+    fn run_inner(engine: Engine, terminal: &mut MockTerminalDriver) -> String {
         TerminalRepl::new(engine).run_inner(terminal);
         terminal.return_val()
     }
@@ -222,17 +248,17 @@ mod tests {
     /// Run the complete flow, from input code string to return value string. If you need any Ctrl
     /// modifiers, do not use this!
     fn run(input: &str) -> String {
-        let mut terminal = MockTerminalIO::from_str(input);
+        let mut terminal = MockTerminalDriver::from_str(input);
         run_inner(Engine::Treewalk, &mut terminal)
     }
 
     fn run_vm(input: &str) -> String {
-        let mut terminal = MockTerminalIO::from_str(input);
+        let mut terminal = MockTerminalDriver::from_str(input);
         run_inner(Engine::BytecodeVm, &mut terminal)
     }
 
     fn run_events(events: Vec<Event>) -> String {
-        let mut terminal = MockTerminalIO::new(events);
+        let mut terminal = MockTerminalDriver::new(events);
         run_inner(Engine::Treewalk, &mut terminal)
     }
 
@@ -250,7 +276,7 @@ mod tests {
     }
 
     /// A mock for testing that doesn't use `crossterm`.
-    struct MockTerminalIO {
+    struct MockTerminalDriver {
         /// Predefined events for testing
         events: Vec<Event>,
 
@@ -258,7 +284,7 @@ mod tests {
         output: Vec<String>,
     }
 
-    impl MockTerminalIO {
+    impl MockTerminalDriver {
         fn new(events: Vec<Event>) -> Self {
             Self {
                 events,
@@ -290,8 +316,8 @@ mod tests {
         }
     }
 
-    impl TerminalIO for MockTerminalIO {
-        fn read_event(&mut self) -> Result<Event, io::Error> {
+    impl TerminalDriver for MockTerminalDriver {
+        fn read_event(&mut self) -> io::Result<Event> {
             if self.events.is_empty() {
                 Err(io::Error::other("No more events"))
             } else {
@@ -303,10 +329,6 @@ mod tests {
         fn write<T: Display>(&mut self, output: T) -> io::Result<()> {
             self.output.push(format!("{}", output));
             Ok(())
-        }
-
-        fn writeln<T: Display>(&mut self, output: T) -> io::Result<()> {
-            self.write(format!("{}\n", output))
         }
 
         fn redraw<T: Display>(&mut self, output: T, _col: usize) -> io::Result<()> {
