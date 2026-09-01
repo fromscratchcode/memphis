@@ -10,7 +10,7 @@ use crate::{
         test_utils::*,
         types::{Statement, ast},
     },
-    test_io::TestIo,
+    runtime::CompileIo,
 };
 
 fn init() -> Compiler {
@@ -18,8 +18,7 @@ fn init() -> Compiler {
 }
 
 fn init_ctx() -> VmContext {
-    let (io, _) = TestIo::new();
-    VmContext::init(ModuleOrigin::Stdin, io)
+    VmContext::init(ModuleOrigin::Stdin, CompileIo)
 }
 
 pub fn compile_stmt(stmt: Statement) -> Bytecode {

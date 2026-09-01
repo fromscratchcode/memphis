@@ -1,11 +1,9 @@
 use crate::{
-    Container, Engine, HostIo, MemphisContext, ModuleOrigin,
-    core::Capture,
+    Engine, HostIo, MemphisContext, ModuleOrigin,
     domain::Text,
     repl::{
         ReplResult, ReplStep,
         parser::{self, ParseStep},
-        types::ReplOutput,
     },
 };
 
@@ -13,15 +11,13 @@ pub struct ReplCore {
     /// The current statement being constructed.
     input: String,
     context: MemphisContext,
-    capture: Container<Capture>,
 }
 
 impl ReplCore {
-    pub fn new(engine: Engine, io: impl HostIo + 'static, capture: Container<Capture>) -> Self {
+    pub fn new(engine: Engine, io: impl HostIo + 'static) -> Self {
         Self {
             input: String::new(),
             context: MemphisContext::new(engine, ModuleOrigin::Stdin, io),
-            capture,
         }
     }
 
@@ -47,9 +43,7 @@ impl ReplCore {
                 let result = self.eval(text);
                 self.input.clear();
 
-                let stdout = self.capture.borrow_mut().take_output();
-                let output = ReplOutput { stdout, result };
-                ReplStep::Complete(output)
+                ReplStep::Complete(result)
             }
         }
     }
@@ -68,13 +62,13 @@ impl ReplCore {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_io::TestIo;
+    use crate::test_utils::TestIo;
 
     use super::*;
 
     fn init() -> ReplCore {
-        let (io, capture) = TestIo::new();
-        ReplCore::new(Engine::Treewalk, io, capture)
+        let (io, _) = TestIo::new();
+        ReplCore::new(Engine::Treewalk, io)
     }
 
     #[test]
@@ -84,9 +78,8 @@ mod tests {
         let out = core.input_line("1 + 2\n");
 
         match out {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::Ok("3".to_string()));
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("3".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -99,9 +92,8 @@ mod tests {
         let out = core.input_line("a = 5\n");
 
         match out {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::None);
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::None);
             }
             _ => panic!("expected complete"),
         }
@@ -109,14 +101,15 @@ mod tests {
 
     #[test]
     fn test_print_statement_has_no_output_but_has_side_effects() {
-        let mut core = init();
+        let (io, capture) = TestIo::new();
+        let mut core = ReplCore::new(Engine::Treewalk, io);
 
         let out = core.input_line("print(123)\n");
 
         match out {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from("123\n"));
-                assert_eq!(output.result, ReplResult::None);
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::None);
+                assert_eq!(capture.borrow_mut().take_output(), String::from("123\n"));
             }
             _ => panic!("expected complete"),
         }
@@ -146,9 +139,8 @@ mod tests {
 
         let out4 = core.input_line("foo()\n");
         match out4 {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::Ok("10".to_string()));
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("10".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -178,9 +170,8 @@ mod tests {
 
         let out4 = core.input_line("]\n");
         match out4 {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::Ok("[1]".to_string()));
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("[1]".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -210,9 +201,8 @@ mod tests {
 
         let out4 = core.input_line("\"\"\"\n");
         match out4 {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::Ok("\n\n1\n".to_string()));
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("\n\n1\n".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -232,9 +222,8 @@ mod tests {
 
         let out2 = core.input_line("123\n");
         match out2 {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::Ok("123".to_string()));
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("123".to_string()));
             }
             _ => panic!("expected complete"),
         }
@@ -246,18 +235,36 @@ mod tests {
 
         let out1 = core.input_line("undefined_var\n");
         match out1 {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert!(matches!(output.result, ReplResult::Err(_)));
+            ReplStep::Complete(result) => {
+                assert!(matches!(result, ReplResult::Err(_)));
             }
             _ => panic!("expected complete"),
         }
 
         let out2 = core.input_line("1 + 1\n");
         match out2 {
-            ReplStep::Complete(output) => {
-                assert_eq!(output.stdout, String::from(""));
-                assert_eq!(output.result, ReplResult::Ok("2".to_string()));
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("2".to_string()));
+            }
+            _ => panic!("expected complete"),
+        }
+    }
+
+    #[test]
+    fn test_vm_last_returned_val() {
+        // We had a bug here where this would previously return 12.
+        let (io, _) = TestIo::new();
+        let mut core = ReplCore::new(Engine::BytecodeVm, io);
+
+        for line in ["a = 10\n", "b = 12\n", "b\n"] {
+            let _ = core.input_line(line);
+        }
+
+        let out = core.input_line("a\n");
+
+        match out {
+            ReplStep::Complete(result) => {
+                assert_eq!(result, ReplResult::Ok("10".to_string()));
             }
             _ => panic!("expected complete"),
         }

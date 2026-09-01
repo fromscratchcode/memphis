@@ -111,7 +111,7 @@ mod tests {
     use crate::{
         ModuleOrigin,
         domain::ExceptionKind,
-        test_io::TestIo,
+        test_utils::TestIo,
         treewalk::{TreewalkContext, test_utils::*, utils::args},
     };
 

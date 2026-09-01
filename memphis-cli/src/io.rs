@@ -32,7 +32,7 @@ impl TerminalDriver for CrosstermDriver {
 
     /// Emit output to stdout, normalizing for any needed carriage returns
     fn write<T: Display>(&mut self, output: T) -> io::Result<()> {
-        print!("{}", normalize(output));
+        print!("{}", normalize_for_terminal(output));
         io::stdout().flush()
     }
 
@@ -49,7 +49,7 @@ impl TerminalDriver for CrosstermDriver {
 
 /// When the terminal is in raw mode, we must emit a carriage return in addition to a newline,
 /// because that does not happen automatically.
-fn normalize<T: Display>(err: T) -> String {
+pub fn normalize_for_terminal<T: Display>(err: T) -> String {
     let formatted = format!("{err}");
     if terminal::is_raw_mode_enabled().expect("Failed to query terminal raw mode") {
         formatted.replace("\n", "\n\r")

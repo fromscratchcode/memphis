@@ -3,20 +3,18 @@ export type MemphisEngine = "treewalk" | "bytecode_vm";
 export type ReplResult =
   { type: "none" } | { type: "ok" | "err"; value: string };
 
-export type ReplOutput = {
-  stdout: string;
-  result: ReplResult;
-};
-
 export type ReplStep =
-  { type: "complete"; data: ReplOutput } | { type: "incomplete"; data: number };
+  { type: "complete"; data: ReplResult } | { type: "incomplete"; data: number };
 
-export type CreateReplOptions = {
-  engine?: MemphisEngine;
-};
-
-export interface RunOptions {
+export interface StdoutOption {
   onStdout: (chunk: string) => void;
+}
+
+export interface CreateReplOptions extends StdoutOption {
+  engine?: MemphisEngine;
+}
+
+export interface RunOptions extends StdoutOption {
   onStderr: (chunk: string) => void;
 }
 
@@ -43,7 +41,7 @@ export interface Memphis {
   parse(code: string): unknown;
   compile(code: string): unknown;
   run(code: string, options: RunOptions): void;
-  createRepl(options?: CreateReplOptions): MemphisRepl;
+  createRepl(options: CreateReplOptions): MemphisRepl;
 }
 
 export declare function getMemphis(): Promise<Memphis>;

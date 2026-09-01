@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 
-use crate::{Capture, Container, HostIo, HostIoError, Input, InputResult, Output};
+use crate::{
+    HostIo, HostIoError, Input, InputResult, Output, core::Container, test_utils::Capture,
+};
 
 pub struct TestIo {
     input_lines: VecDeque<String>,

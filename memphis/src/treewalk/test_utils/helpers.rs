@@ -1,23 +1,14 @@
 use crate::{
-    Capture, Container, ModuleOrigin,
+    ModuleOrigin,
+    core::Container,
     domain::{Source, Text},
-    test_io::TestIo,
+    test_utils::{Capture, TestIo, resolve_workspace_path},
     treewalk::{RaisedException, TreewalkContext, TreewalkValue},
 };
-use std::path::{Path, PathBuf};
 
 fn init() -> TreewalkContext {
     let (io, _) = TestIo::new();
     TreewalkContext::init(ModuleOrigin::Stdin, io)
-}
-
-fn resolve_workspace_path(path: &str) -> PathBuf {
-    // Test helpers take paths relative to the workspace root, for example
-    // `fixtures/test.py` or `memphis/src/fixtures/imports/regular_import.py`.
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("memphis crate should live under the workspace root")
-        .join(path)
 }
 
 fn init_path(path: &str) -> (TreewalkContext, Container<Capture>, Text) {

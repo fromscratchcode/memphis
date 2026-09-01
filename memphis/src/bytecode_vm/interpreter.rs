@@ -5,7 +5,7 @@ mod tests_vm_interpreter {
         bytecode_vm::{VmContext, test_utils::*},
         domain::{Text, test_utils::*},
         interpreter::Interpreter as _,
-        test_io::TestIo,
+        test_utils::TestIo,
     };
 
     #[test]

@@ -1,6 +1,5 @@
 use crate::{
-    Container, Engine, HostIo,
-    core::Capture,
+    Engine, HostIo,
     repl::{ReplStep, core::ReplCore},
 };
 
@@ -25,9 +24,9 @@ pub struct ReplSession {
 }
 
 impl ReplSession {
-    pub fn new(engine: Engine, io: impl HostIo + 'static, capture: Container<Capture>) -> Self {
+    pub fn new(engine: Engine, io: impl HostIo + 'static) -> Self {
         Self {
-            core: ReplCore::new(engine, io, capture),
+            core: ReplCore::new(engine, io),
             last_step: ReplStep::initial(),
             current_line: String::new(),
             cursor_index: 0,

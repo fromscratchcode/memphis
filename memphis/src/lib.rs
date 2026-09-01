@@ -12,14 +12,12 @@ mod parser;
 mod repl;
 mod runtime;
 #[cfg(test)]
-mod test_io;
+mod test_utils;
 mod treewalk;
 #[cfg(feature = "wasm")]
 mod wasm;
 
 pub use context::MemphisContext;
-// These really shouldn't be exported, but they are needed by ReplSession right now.
-pub use core::{Capture, Container};
 pub use domain::{ModuleOrigin, ScriptPath, Source};
 pub use engine::Engine;
 pub use repl::{ReplResult, ReplSession, ReplStep};

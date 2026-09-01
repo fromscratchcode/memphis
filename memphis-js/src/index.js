@@ -73,8 +73,8 @@ function createInterface() {
     run(code, { onStdout, onStderr }) {
       return runRaw(code, onStdout, onStderr);
     },
-    createRepl(options = {}) {
-      return createReplInterface(new WasmRepl(options.engine ?? "treewalk"));
+    createRepl({ engine = "treewalk", onStdout }) {
+      return createReplInterface(new WasmRepl(engine, onStdout));
     },
   };
 }

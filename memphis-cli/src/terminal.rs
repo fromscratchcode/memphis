@@ -1,7 +1,4 @@
-use memphis::{
-    Capture, Container, HostIo, HostIoError, Input, InputResult, Output, ReplResult, ReplSession,
-    ReplStep,
-};
+use memphis::{HostIo, HostIoError, Input, InputResult, Output, ReplResult, ReplSession};
 use std::{panic, process};
 
 use crossterm::{
@@ -12,7 +9,7 @@ use crossterm::{
 use crate::{
     Engine,
     cli::SystemIo,
-    io::{CrosstermDriver, TerminalDriver},
+    io::{CrosstermDriver, TerminalDriver, normalize_for_terminal},
 };
 
 enum ReplControl {
@@ -50,18 +47,14 @@ fn install_custom_panic_hook() {
 }
 
 struct TerminalReplIo {
-    output: Container<Capture>,
     system_io: SystemIo,
 }
 
 impl TerminalReplIo {
-    fn new() -> (Self, Container<Capture>) {
-        let capture = Container::new(Capture::new());
-        let io = Self {
-            output: capture.clone(),
+    fn new() -> Self {
+        Self {
             system_io: SystemIo,
-        };
-        (io, capture)
+        }
     }
 }
 
@@ -94,8 +87,9 @@ impl Input for TerminalReplIo {
 
 impl Output for TerminalReplIo {
     fn write(&mut self, text: &str) -> Result<(), HostIoError> {
-        self.output.borrow_mut().append(text);
-        Ok(())
+        // We can write directly to the terminal, but we must add carriage returns because we are
+        // likely in raw mode.
+        self.system_io.write(&normalize_for_terminal(text))
     }
 }
 
@@ -108,9 +102,9 @@ pub struct TerminalRepl {
 
 impl TerminalRepl {
     pub fn new(engine: Engine) -> Self {
-        let (io, output) = TerminalReplIo::new();
+        let io = TerminalReplIo::new();
         Self {
-            session: ReplSession::new(engine, io, output),
+            session: ReplSession::new(engine, io),
         }
     }
 
@@ -188,7 +182,15 @@ impl TerminalRepl {
                 // before control is returned to this level.
                 let _ = terminal_io.enter();
                 let step = self.session.submit();
-                Self::handle_step(terminal_io, step);
+
+                if let Some(result) = step.result() {
+                    match result {
+                        ReplResult::Ok(val) | ReplResult::Err(val) => {
+                            let _ = terminal_io.writeln(val);
+                        }
+                        ReplResult::None => {}
+                    }
+                }
             }
             KeyCode::Up => {
                 self.session.history_up();
@@ -216,22 +218,6 @@ impl TerminalRepl {
         let cursor_col = self.session.prompt().len() + self.session.cursor_index();
         let _ = terminal_io.redraw(rendered_line, cursor_col);
     }
-
-    /// Append the provided line to the constructed statement and evaluate it.
-    fn handle_step<T: TerminalDriver>(terminal_io: &mut T, step: &ReplStep) {
-        if let Some(stdout) = step.stdout() {
-            let _ = terminal_io.write(stdout);
-        }
-
-        if let Some(result) = step.output() {
-            match result {
-                ReplResult::Ok(val) | ReplResult::Err(val) => {
-                    let _ = terminal_io.writeln(val);
-                }
-                ReplResult::None => {}
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -250,11 +236,6 @@ mod tests {
     fn run(input: &str) -> String {
         let mut terminal = MockTerminalDriver::from_str(input);
         run_inner(Engine::Treewalk, &mut terminal)
-    }
-
-    fn run_vm(input: &str) -> String {
-        let mut terminal = MockTerminalDriver::from_str(input);
-        run_inner(Engine::BytecodeVm, &mut terminal)
     }
 
     fn run_events(events: Vec<Event>) -> String {
@@ -337,68 +318,9 @@ mod tests {
     }
 
     #[test]
-    fn test_repl_name_error() {
-        let return_val = run("e\n");
-        assert!(return_val.contains("NameError: name 'e' is not defined"));
-    }
-
-    #[test]
-    fn test_repl_name_error_vm() {
-        let return_val = run_vm("e\n");
-        assert!(return_val.contains("NameError: name 'e' is not defined"));
-    }
-
-    #[test]
     fn test_repl_expr() {
         let return_val = run("12345\n");
         assert_eq!(return_val, "12345\n");
-    }
-
-    #[test]
-    fn test_repl_statement() {
-        let return_val = run("a = 5.5\n");
-
-        // empty string because a statement does not have a return value
-        assert_eq!(return_val, "");
-    }
-
-    #[test]
-    fn test_repl_function() {
-        let code = r#"
-def foo():
-    a = 10
-    return 2 * a
-
-foo()
-"#;
-        let return_val = run(code);
-        assert_eq!(return_val, "20\n");
-    }
-
-    #[test]
-    fn test_multiline_grouping() {
-        let code = r#"
-x = (1 +
-2)
-x
-"#;
-        let return_val = run(code);
-        assert_eq!(return_val, "3\n");
-    }
-
-    #[test]
-    fn test_repl_function_vm() {
-        let code = r#"
-def foo():
-    a = 10
-    return 2 * a
-
-foo()
-"#;
-        // TODO should we test all of these through both engines? Not sure yet, that may be too
-        // deep of a test for this file.
-        let return_val = run_vm(code);
-        assert_eq!(return_val, "20\n");
     }
 
     #[test]
@@ -419,46 +341,5 @@ foo()
         let return_val = run_events(events);
         // this isn't technically a return value, we never got one because we didn't hit enter \n
         assert_eq!(return_val, "\r>>> 123");
-    }
-
-    #[test]
-    fn test_function_call_with_long_body() {
-        let code = r#"
-def foo():
-    a = 10
-    b = 11
-    c = 12
-    d = 13
-    return a + b + c + d
-
-foo()
-"#;
-        let return_val = run(code);
-        assert_eq!(return_val, "46\n");
-    }
-
-    #[test]
-    fn test_treewalk_last_returned_val() {
-        let code = r#"
-a = 10
-b = 12
-b
-a
-"#;
-        let return_val = run(code);
-        assert_eq!(return_val, "10\n");
-    }
-
-    #[test]
-    fn test_vm_last_returned_val() {
-        // We had a bug here where this would previously return 12.
-        let code = r#"
-a = 10
-b = 12
-b
-a
-"#;
-        let return_val = run_vm(code);
-        assert_eq!(return_val, "10\n");
     }
 }

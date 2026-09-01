@@ -1,7 +1,7 @@
 use crate::{
     Engine, MemphisContext, ModuleOrigin,
     domain::{MemphisValue, RaisedMemphisError, Text},
-    test_io::TestIo,
+    test_utils::TestIo,
 };
 
 pub struct CrosscheckSession {

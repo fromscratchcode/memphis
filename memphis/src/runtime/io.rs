@@ -21,3 +21,28 @@ pub trait Output {
 }
 
 pub trait HostIo: Input + Output {}
+
+/// A host adapter for compiler-only contexts, which must not interact with external I/O.
+#[cfg(any(test, feature = "wasm"))]
+pub(crate) struct CompileIo;
+
+#[cfg(any(test, feature = "wasm"))]
+impl Input for CompileIo {
+    fn input(&mut self, _prompt: &str) -> Result<InputResult, HostIoError> {
+        Err(HostIoError {
+            message: "input unavailable during compiler-only mode".to_string(),
+        })
+    }
+}
+
+#[cfg(any(test, feature = "wasm"))]
+impl Output for CompileIo {
+    fn write(&mut self, _text: &str) -> Result<(), HostIoError> {
+        Err(HostIoError {
+            message: "output unavailable during compiler-only mode".to_string(),
+        })
+    }
+}
+
+#[cfg(any(test, feature = "wasm"))]
+impl HostIo for CompileIo {}

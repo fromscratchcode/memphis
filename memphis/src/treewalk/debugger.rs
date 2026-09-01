@@ -188,7 +188,7 @@ mod tests {
         ModuleOrigin,
         domain::Text,
         parser::Parser,
-        test_io::TestIo,
+        test_utils::TestIo,
         treewalk::{
             TreewalkContext, TreewalkDisruption, TreewalkResult, debugger::TreewalkDebugSession,
             test_utils::*,

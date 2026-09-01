@@ -27,7 +27,10 @@ memphis.parse("x = 1");
 memphis.compile("x = 1");
 
 // REPL-style interface
-const repl = memphis.createRepl({ engine: "treewalk" });
+const repl = memphis.createRepl({
+  engine: "treewalk",
+  onStdout: (chunk) => console.log(chunk),
+});
 repl.insertText("1 + 1");
 const step = repl.submit();
 repl.free();

@@ -7,10 +7,8 @@ use crate::{
     domain::Text,
     lexer::Lexer,
     parser::Parser,
-    wasm::{
-        io::{WasmIo, WasmStreamingIo},
-        repr::WasmCodeObject,
-    },
+    runtime::CompileIo,
+    wasm::{io::WasmStreamingIo, repr::WasmCodeObject},
 };
 
 #[wasm_bindgen]
@@ -47,7 +45,6 @@ pub fn run(text: &str, on_stdout: &js_sys::Function, on_stderr: &js_sys::Functio
 }
 
 fn actually_compile(text: &str) -> CompilerResult<CodeObject> {
-    let (io, _) = WasmIo::new();
-    let ctx = VmContext::init(ModuleOrigin::Stdin, io);
+    let ctx = VmContext::init(ModuleOrigin::Stdin, CompileIo);
     ctx.compile(&Text::new(text))
 }

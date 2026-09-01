@@ -5,23 +5,14 @@ pub enum ReplResult {
     Err(String),
 }
 
-pub struct ReplOutput {
-    pub stdout: String,
-    pub result: ReplResult,
-}
-
 pub enum ReplStep {
-    Complete(ReplOutput),
+    Complete(ReplResult),
     Incomplete { indent: usize },
 }
 
 impl ReplStep {
     pub fn initial() -> Self {
-        let output = ReplOutput {
-            stdout: String::from(""),
-            result: ReplResult::None,
-        };
-        Self::Complete(output)
+        Self::Complete(ReplResult::None)
     }
 
     pub fn indent_level(&self) -> usize {
@@ -35,16 +26,9 @@ impl ReplStep {
         matches!(self, ReplStep::Complete { .. })
     }
 
-    pub fn output(&self) -> Option<&ReplResult> {
+    pub fn result(&self) -> Option<&ReplResult> {
         match self {
-            ReplStep::Complete(output) => Some(&output.result),
-            ReplStep::Incomplete { .. } => None,
-        }
-    }
-
-    pub fn stdout(&self) -> Option<&str> {
-        match self {
-            ReplStep::Complete(output) => Some(&output.stdout),
+            ReplStep::Complete(result) => Some(result),
             ReplStep::Incomplete { .. } => None,
         }
     }

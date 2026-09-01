@@ -5,8 +5,8 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     Engine,
-    repl::{ReplOutput, ReplResult, ReplSession, ReplStep},
-    wasm::io::WasmIo,
+    repl::{ReplResult, ReplSession, ReplStep},
+    wasm::io::WasmStreamingIo,
 };
 
 #[derive(Serialize)]
@@ -28,33 +28,18 @@ impl From<ReplResult> for WasmReplResult {
 }
 
 #[derive(Serialize)]
-pub struct WasmReplOutput {
-    pub stdout: String,
-    pub result: WasmReplResult,
-}
-
-impl From<&ReplOutput> for WasmReplOutput {
-    fn from(result: &ReplOutput) -> Self {
-        WasmReplOutput {
-            stdout: result.stdout.clone(),
-            result: WasmReplResult::from(result.result.clone()),
-        }
-    }
-}
-
-#[derive(Serialize)]
 #[serde(tag = "type", content = "data", rename_all = "lowercase")]
 pub enum WasmReplStep {
-    Complete(WasmReplOutput),
+    Complete(WasmReplResult),
     Incomplete(usize),
 }
 
 impl From<&ReplStep> for WasmReplStep {
     fn from(value: &ReplStep) -> Self {
         match value {
-            ReplStep::Complete(output) => {
-                let wasm_output = WasmReplOutput::from(output);
-                WasmReplStep::Complete(wasm_output)
+            ReplStep::Complete(result) => {
+                let wasm_result = WasmReplResult::from(result.clone());
+                WasmReplStep::Complete(wasm_result)
             }
             ReplStep::Incomplete { indent } => WasmReplStep::Incomplete(*indent),
         }
@@ -69,13 +54,13 @@ pub struct WasmRepl {
 #[wasm_bindgen]
 impl WasmRepl {
     #[wasm_bindgen(constructor)]
-    pub fn new(engine_str: &str) -> WasmRepl {
+    pub fn new(engine_str: &str, on_stdout: &js_sys::Function) -> WasmRepl {
         // We guard this using TypeScript
         let engine = Engine::from_str(engine_str).expect("Invalid engine.");
 
-        let (io, capture) = WasmIo::new();
+        let io = WasmStreamingIo::new(on_stdout.clone());
         WasmRepl {
-            session: ReplSession::new(engine, io, capture),
+            session: ReplSession::new(engine, io),
         }
     }
 

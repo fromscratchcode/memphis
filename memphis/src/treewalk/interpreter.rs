@@ -76,7 +76,7 @@ mod tests {
             test_utils::stmt_expr,
             types::{Expr, ast},
         },
-        test_io::TestIo,
+        test_utils::TestIo,
         treewalk::{
             TreewalkContext, protocols::Callable, test_utils::*, types::Function, utils::Signature,
         },

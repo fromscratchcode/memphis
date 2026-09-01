@@ -1,23 +1,14 @@
 use crate::{
-    Capture, Container, ModuleOrigin,
+    ModuleOrigin,
     bytecode_vm::VmContext,
+    core::Container,
     domain::{MemphisValue, RaisedMemphisError, Source, Text},
-    test_io::TestIo,
+    test_utils::{Capture, TestIo, resolve_workspace_path},
 };
-use std::path::{Path, PathBuf};
 
 pub fn init() -> VmContext {
     let (io, _) = TestIo::new();
     VmContext::init(ModuleOrigin::Stdin, io)
-}
-
-fn resolve_workspace_path(path: &str) -> PathBuf {
-    // Test helpers take paths relative to the workspace root, for example
-    // `fixtures/test.py` or `memphis/src/fixtures/imports/regular_import.py`.
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("memphis crate should live under the workspace root")
-        .join(path)
 }
 
 fn init_path(path: &str) -> (VmContext, Container<Capture>, Text) {
