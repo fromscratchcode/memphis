@@ -19,6 +19,7 @@ const memphis = await getMemphis();
 memphis.run("print('hi')", {
   onStdout: (chunk) => console.log(chunk),
   onStderr: (chunk) => console.error(chunk),
+  onInput: (prompt) => window.prompt(prompt),
 });
 
 // Inspection APIs
@@ -30,6 +31,7 @@ memphis.compile("x = 1");
 const repl = memphis.createRepl({
   engine: "treewalk",
   onStdout: (chunk) => console.log(chunk),
+  onInput: (prompt) => window.prompt(prompt),
 });
 repl.insertText("1 + 1");
 const step = repl.submit();

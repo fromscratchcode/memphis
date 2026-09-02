@@ -70,11 +70,11 @@ function createInterface() {
     compile(code) {
       return compileRaw(code);
     },
-    run(code, { onStdout, onStderr }) {
-      return runRaw(code, onStdout, onStderr);
+    run(code, { onStdout, onStderr, onInput }) {
+      return runRaw(code, onStdout, onStderr, onInput);
     },
-    createRepl({ engine = "treewalk", onStdout }) {
-      return createReplInterface(new WasmRepl(engine, onStdout));
+    createRepl({ engine = "treewalk", onStdout, onInput }) {
+      return createReplInterface(new WasmRepl(engine, onStdout, onInput));
     },
   };
 }

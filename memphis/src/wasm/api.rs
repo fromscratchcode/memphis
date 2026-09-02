@@ -1,4 +1,5 @@
 use console_error_panic_hook::set_once;
+use js_sys::Function;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -35,9 +36,9 @@ pub fn parse(text: String) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn run(text: &str, on_stdout: &js_sys::Function, on_stderr: &js_sys::Function) {
+pub fn run(text: &str, on_stdout: &Function, on_stderr: &Function, on_input: &Function) {
     set_once();
-    let io = WasmStreamingIo::new(on_stdout.clone());
+    let io = WasmStreamingIo::new(on_stdout.clone(), on_input.clone());
     let mut ctx = MemphisContext::new(Engine::Treewalk, ModuleOrigin::Stdin, io);
     let _ = ctx
         .eval(Text::new(text))

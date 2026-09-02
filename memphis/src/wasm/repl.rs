@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use js_sys::Function;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -54,11 +55,11 @@ pub struct WasmRepl {
 #[wasm_bindgen]
 impl WasmRepl {
     #[wasm_bindgen(constructor)]
-    pub fn new(engine_str: &str, on_stdout: &js_sys::Function) -> WasmRepl {
+    pub fn new(engine_str: &str, on_stdout: &Function, on_input: &Function) -> WasmRepl {
         // We guard this using TypeScript
         let engine = Engine::from_str(engine_str).expect("Invalid engine.");
 
-        let io = WasmStreamingIo::new(on_stdout.clone());
+        let io = WasmStreamingIo::new(on_stdout.clone(), on_input.clone());
         WasmRepl {
             session: ReplSession::new(engine, io),
         }

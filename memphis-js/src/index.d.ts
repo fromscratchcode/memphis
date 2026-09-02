@@ -6,15 +6,19 @@ export type ReplResult =
 export type ReplStep =
   { type: "complete"; data: ReplResult } | { type: "incomplete"; data: number };
 
-export interface StdoutOption {
+interface StdoutOptions {
   onStdout: (chunk: string) => void;
 }
 
-export interface CreateReplOptions extends StdoutOption {
+interface InputOptions {
+  onInput: (prompt: string) => string | null;
+}
+
+export interface CreateReplOptions extends StdoutOptions, InputOptions {
   engine?: MemphisEngine;
 }
 
-export interface RunOptions extends StdoutOption {
+export interface RunOptions extends StdoutOptions, InputOptions {
   onStderr: (chunk: string) => void;
 }
 
