@@ -614,16 +614,7 @@ impl Parser<'_> {
         self.consume(&Token::Lambda)?;
         let args = self.parse_function_def_args(Token::Colon)?;
         self.consume(&Token::Colon)?;
-
-        let expr = if self.current_token() == &Token::LParen {
-            self.consume(&Token::LParen)?;
-            let expr = self.parse_simple_expr()?;
-            self.consume(&Token::RParen)?;
-            expr
-        } else {
-            self.parse_simple_expr()?
-        };
-
+        let expr = self.parse_simple_expr()?;
         Ok(Expr::Lambda {
             args,
             expr: Box::new(expr),
@@ -1229,6 +1220,22 @@ deprecated("collections.abc.ByteString",
     fn lambda() {
         let input = "lambda: 4";
         let expected_ast = lambda!(params![], int!(4));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda: (x)";
+        let expected_ast = lambda!(params![], var!("x"));
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda: (x,)";
+        let expected_ast = lambda!(params![], tuple![var!("x")]);
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda: x,";
+        let expected_ast = tuple![lambda!(params![], var!("x"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "lambda: (x, y)";
+        let expected_ast = lambda!(params![], tuple![var!("x"), var!("y")]);
         assert_expr_eq!(input, expected_ast);
 
         let input = "lambda index: 4";
