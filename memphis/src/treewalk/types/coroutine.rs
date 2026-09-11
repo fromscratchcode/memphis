@@ -14,7 +14,7 @@ use crate::{
         },
         protocols::Callable,
         types::Function,
-        utils::{BoundArgs, Signature},
+        utils::{BoundArgs, EnvironmentFrame, Signature},
     },
 };
 
@@ -23,6 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub struct Coroutine {
     scope: Container<Scope>,
+    captured_env: Container<EnvironmentFrame>,
     context: PausableStack,
     wait_on: Option<Container<Coroutine>>,
     wake_at: Option<Instant>,
@@ -34,10 +35,11 @@ impl_method_provider!(Coroutine, [CloseBuiltin]);
 
 impl Coroutine {
     pub fn new(scope: Container<Scope>, function: Container<Function>) -> Self {
-        let frame = Frame::new(function.borrow().clone().body);
+        let frame = Frame::new(function.borrow().body.clone());
 
         Self {
             scope,
+            captured_env: function.borrow().captured_env.clone(),
             context: PausableStack::new(frame),
             wait_on: None,
             wake_at: None,
@@ -102,6 +104,10 @@ impl Pausable for Coroutine {
 
     fn scope(&self) -> Container<Scope> {
         self.scope.clone()
+    }
+
+    fn captured_env(&self) -> Container<EnvironmentFrame> {
+        self.captured_env.clone()
     }
 
     fn execute_statement(

@@ -1755,6 +1755,37 @@ c = list(g())
     }
 
     #[test]
+    fn generator_captures_enclosing_scope() {
+        let input = r#"
+def make_gen():
+    x = 42
+    return (x for unused in [None])
+
+gen = make_gen()
+next(gen)
+"#;
+        assert_eval_eq!(input, int!(42));
+    }
+
+    #[test]
+    fn coroutine_captures_enclosing_scope() {
+        let input = r#"
+import asyncio
+
+def make_coroutine():
+    x = 42
+
+    async def read_x():
+        return x
+
+    return read_x()
+
+asyncio.run(make_coroutine())
+"#;
+        assert_eval_eq!(input, int!(42));
+    }
+
+    #[test]
     fn basic_inheritance() {
         let input = r#"
 class Parent:

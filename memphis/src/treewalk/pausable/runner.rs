@@ -168,6 +168,7 @@ impl PausableRunner {
     /// The default behavior required to perform the necessary context switching when entering a
     /// pausable function.
     fn on_entry<P: Pausable>(pausable: &P, interpreter: &TreewalkInterpreter) {
+        interpreter.state.push_captured_env(pausable.captured_env());
         interpreter.state.push_local(pausable.scope());
     }
 
@@ -175,5 +176,6 @@ impl PausableRunner {
     /// pausable function.
     fn on_exit(interpreter: &TreewalkInterpreter) {
         interpreter.state.pop_local();
+        interpreter.state.pop_captured_env();
     }
 }
