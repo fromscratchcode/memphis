@@ -365,7 +365,7 @@ impl TreewalkInterpreter {
         // each function defined inside it.
         let class = self.build_class(name.as_str(), parent_classes, metaclass)?;
 
-        let frame = self.state.get_environment_frame();
+        let frame = self.state.get_lexical_parent_environment();
         self.state.push_captured_env(frame);
 
         // We must use the class symbol table here in case it received any initialization from its

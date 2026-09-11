@@ -88,8 +88,13 @@ impl Container<TreewalkState> {
         self.borrow_mut().scope_manager.push_class_namespace(scope);
     }
 
-    pub fn in_class_body(&self) -> bool {
-        self.borrow().scope_manager.in_class_body()
+    pub fn get_lexical_parent_environment(&self) -> Container<EnvironmentFrame> {
+        if self.borrow().scope_manager.in_class_body() {
+            self.read_captured_env()
+                .expect("A class body must have an enclosing environment")
+        } else {
+            self.create_environment_frame()
+        }
     }
 
     pub fn pop_local(&self) -> Option<Container<Scope>> {
@@ -214,7 +219,7 @@ impl Container<TreewalkState> {
         self.borrow().type_registry.type_class(type_)
     }
 
-    pub fn get_environment_frame(&self) -> Container<EnvironmentFrame> {
+    fn create_environment_frame(&self) -> Container<EnvironmentFrame> {
         Container::new(EnvironmentFrame::new(
             self.borrow().scope_manager.read_local(),
             self.borrow().scope_manager.read_captured_env(),

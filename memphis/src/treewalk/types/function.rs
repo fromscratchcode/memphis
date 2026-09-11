@@ -70,13 +70,7 @@ impl Function {
     ) -> Self {
         let module = state.current_module();
         let class_context = state.current_class();
-        let captured_env = if state.in_class_body() {
-            state
-                .read_captured_env()
-                .expect("A class body must have an enclosing environment")
-        } else {
-            state.get_environment_frame()
-        };
+        let captured_env = state.get_lexical_parent_environment();
 
         let function_type = if is_async {
             FunctionType::Async

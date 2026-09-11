@@ -3990,6 +3990,19 @@ make_class()().read()
     }
 
     #[test]
+    fn class_is_not_an_enclosing_scope_for_inner_class() {
+        let input = r#"
+class Outer:
+    x = 1
+
+    class Inner:
+        value = x
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "x");
+    }
+
+    #[test]
     fn static_method() {
         let input = r#"
 class Foo:
@@ -5592,6 +5605,29 @@ y
 "#;
         let e = eval_expect_error(input);
         assert_name_error!(e.exception, "y");
+    }
+
+    #[test]
+    fn list_comprehension_inside_class_cannot_see_class_namespace() {
+        let input = r#"
+class Example:
+    x = [1,2]
+    values = [x for unused in [None]]
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "x");
+    }
+
+    #[test]
+    fn list_comprehension_inside_class_can_get_iterable_from_class_namespace() {
+        let input = r#"
+class Example:
+    x = [1,2]
+    values = [y for y in x]
+
+Example.values
+"#;
+        assert_eval_eq!(input, list![int!(1), int!(2)]);
     }
 
     #[test]

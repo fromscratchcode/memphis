@@ -425,7 +425,7 @@ impl TreewalkInterpreter {
             // once, later nested clauses use this same scope. It also must have access to
             // the lexical context.
             if layer == ComprehensionScope::Create {
-                let frame = self.state.get_environment_frame();
+                let frame = self.state.get_lexical_parent_environment();
                 self.state.push_captured_env(frame);
                 self.state.push_local(Container::new(Scope::default()));
             }
