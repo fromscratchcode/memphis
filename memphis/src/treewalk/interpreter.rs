@@ -3942,6 +3942,42 @@ b = Foo().make()
     }
 
     #[test]
+    #[ignore]
+    fn class_method_skips_class_namespace() {
+        let input = r#"
+class Example:
+    x = "class"
+
+    def read(self):
+        return x
+
+Example().read()
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "x");
+    }
+
+    #[test]
+    #[ignore]
+    fn class_method_skips_class_namespace_enclosing_environment() {
+        let input = r#"
+def make_class():
+    x = "outer"
+
+    class Example:
+        x = "class"
+
+        def read(self):
+            return x
+
+    return Example
+
+make_class()().read()
+"#;
+        assert_eval_eq!(input, str!("outer"));
+    }
+
+    #[test]
     fn static_method() {
         let input = r#"
 class Foo:
