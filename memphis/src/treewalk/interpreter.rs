@@ -3942,7 +3942,20 @@ b = Foo().make()
     }
 
     #[test]
-    #[ignore]
+    fn class_captures_enclosing_environment() {
+        let input = r#"
+def make_class():
+    x = 42
+    class Example:
+        value = x
+    return Example
+
+make_class().value
+"#;
+        assert_eval_eq!(input, int!(42));
+    }
+
+    #[test]
     fn class_method_skips_class_namespace() {
         let input = r#"
 class Example:
@@ -3958,7 +3971,6 @@ Example().read()
     }
 
     #[test]
-    #[ignore]
     fn class_method_skips_class_namespace_enclosing_environment() {
         let input = r#"
 def make_class():

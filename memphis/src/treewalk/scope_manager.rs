@@ -1,8 +1,14 @@
 use crate::{
     core::Container,
-    domain::Context,
     treewalk::{Scope, TreewalkValue, types::Module, utils::EnvironmentFrame},
 };
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Context {
+    Global,
+    Local,
+    ClassBody,
+}
 
 /// This struct implements Python's scoping rules by storing data to power the
 /// `read`/`write`/`delete` interface available to the interpreter.
@@ -49,6 +55,13 @@ impl ScopeManager {
     pub fn push_local(&mut self, scope: Container<Scope>) {
         self.local_scope_stack.push(scope);
         self.context_stack.push(Context::Local);
+    }
+
+    // A class body behaves like a local scope, but we must remember we are in a class body so that
+    // methods do not consider the class an enclosing scope.
+    pub fn push_class_namespace(&mut self, scope: Container<Scope>) {
+        self.local_scope_stack.push(scope);
+        self.context_stack.push(Context::ClassBody);
     }
 
     pub fn pop_local(&mut self) -> Option<Container<Scope>> {
@@ -129,7 +142,7 @@ impl ScopeManager {
             }
         } else {
             match self.read_context() {
-                Context::Local => {
+                Context::Local | Context::ClassBody => {
                     self.read_local().borrow_mut().insert(name, value);
                 }
                 Context::Global => {
@@ -137,6 +150,10 @@ impl ScopeManager {
                 }
             }
         }
+    }
+
+    pub fn in_class_body(&self) -> bool {
+        self.read_context() == &Context::ClassBody
     }
 
     /// This assumes we always have a local scope stack.

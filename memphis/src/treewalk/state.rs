@@ -84,6 +84,14 @@ impl Container<TreewalkState> {
         self.borrow_mut().scope_manager.push_local(scope);
     }
 
+    pub fn push_class_namespace(&self, scope: Container<Scope>) {
+        self.borrow_mut().scope_manager.push_class_namespace(scope);
+    }
+
+    pub fn in_class_body(&self) -> bool {
+        self.borrow().scope_manager.in_class_body()
+    }
+
     pub fn pop_local(&self) -> Option<Container<Scope>> {
         self.borrow_mut().scope_manager.pop_local()
     }
