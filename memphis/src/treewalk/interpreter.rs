@@ -5634,7 +5634,7 @@ fourth = functions[3]()
     }
 
     #[test]
-    #[ignore = "requires lexical scope fix for generators and then single comprehension scope"]
+    #[ignore = "requires single comprehension scope"]
     fn list_comprehension_multiple_clauses_share_one_generator_scope() {
         let input = r#"
 generators = [
