@@ -176,7 +176,7 @@ impl Container<TreewalkState> {
             .clear_current_exception();
     }
 
-    pub fn read_captured_env(&self) -> Option<Box<Container<EnvironmentFrame>>> {
+    pub fn read_captured_env(&self) -> Option<Container<EnvironmentFrame>> {
         self.borrow().scope_manager.read_captured_env()
     }
 

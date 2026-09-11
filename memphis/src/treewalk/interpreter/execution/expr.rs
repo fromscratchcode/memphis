@@ -6,7 +6,8 @@ use crate::{
         ForClause, FormatOption, LogicalOp, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
-        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue,
         iterator::for_each_mut,
         result::Raise,
         types::{
@@ -400,7 +401,12 @@ impl TreewalkInterpreter {
             } = clause;
 
             let iter = self.evaluate_expr(iterable)?.as_iterator().raise(self)?;
-            for_each_mut(iter, &mut |i| {
+
+            let frame = self.state.get_environment_frame();
+            self.state.push_captured_env(frame);
+            self.state.push_local(Container::new(Scope::default()));
+
+            let result = for_each_mut(iter, &mut |i| {
                 // Bind variables
                 self.execute_loop_index_assignment(index, i)?;
 
@@ -414,9 +420,13 @@ impl TreewalkInterpreter {
                 // Recurse
                 self.evaluate_comprehension(remaining, emit)?;
                 Ok(())
-            })?;
+            });
 
-            Ok(())
+            // We must pop the local scope before returning an error
+            self.state.pop_local();
+            self.state.pop_captured_env();
+
+            result
         } else {
             // Base case: emit one value
             emit()

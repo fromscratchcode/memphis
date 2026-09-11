@@ -147,8 +147,8 @@ impl ScopeManager {
             .clone()
     }
 
-    pub fn read_captured_env(&self) -> Option<Box<Container<EnvironmentFrame>>> {
-        self.captured_env_stack.last().cloned().map(Box::new)
+    pub fn read_captured_env(&self) -> Option<Container<EnvironmentFrame>> {
+        self.captured_env_stack.last().cloned()
     }
 
     /// This assumes we always have a module stack.
