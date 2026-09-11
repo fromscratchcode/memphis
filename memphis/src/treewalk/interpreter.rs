@@ -5542,4 +5542,50 @@ result = [(x, y) for x in [1, 2] for y in [x, x + 1] if y > x]
         assert_read_eq!(ctx, "x", str!("outer x"));
         assert_read_eq!(ctx, "y", str!("outer y"));
     }
+
+    #[test]
+    #[ignore = "requires parser fix and then single comprehension scope"]
+    fn list_comprehension_multiple_clauses_share_one_closure_scope() {
+        let input = r#"
+functions = [
+    lambda: (x, y)
+    for x in [1, 2]
+    for y in [x, x + 1]
+]
+
+first = functions[0]()
+second = functions[1]()
+third = functions[2]()
+fourth = functions[3]()
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "first", tuple![int!(2), int!(3)]);
+        assert_read_eq!(ctx, "second", tuple![int!(2), int!(3)]);
+        assert_read_eq!(ctx, "third", tuple![int!(2), int!(3)]);
+        assert_read_eq!(ctx, "fourth", tuple![int!(2), int!(3)]);
+    }
+
+    #[test]
+    #[ignore = "requires lexical scope fix for generators and then single comprehension scope"]
+    fn list_comprehension_multiple_clauses_share_one_generator_scope() {
+        let input = r#"
+generators = [
+    (x * 10 + y for unused in [None])
+    for x in [1, 2]
+    for y in [x, x + 1]
+]
+
+first = next(generators[0])
+second = next(generators[1])
+third = next(generators[2])
+fourth = next(generators[3])
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "first", int!(23));
+        assert_read_eq!(ctx, "second", int!(23));
+        assert_read_eq!(ctx, "third", int!(23));
+        assert_read_eq!(ctx, "fourth", int!(23));
+    }
 }
