@@ -5493,4 +5493,53 @@ f(a=2)
             "f() missing 1 required positional argument: 'a'"
         );
     }
+
+    #[test]
+    fn list_comprehension_preserves_existing_loop_variable() {
+        let input = r#"
+x = "outside"
+result = [x for x in [1, 2]]
+"#;
+        let ctx = run(input);
+        assert_read_eq!(ctx, "result", list![int!(1), int!(2)]);
+        assert_read_eq!(ctx, "x", str!("outside"));
+    }
+
+    #[test]
+    fn list_comprehension_does_not_introduce_loop_variable() {
+        let input = r#"
+result = [y for y in [1]]
+y
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "y");
+    }
+
+    #[test]
+    fn list_comprehension_evaluates_first_iterable_in_outer_scope() {
+        let input = r#"
+x = [1, 2]
+result = [x for x in x]
+"#;
+        let ctx = run(input);
+        assert_read_eq!(ctx, "result", list![int!(1), int!(2)]);
+        assert_read_eq!(ctx, "x", list![int!(1), int!(2)]);
+    }
+
+    #[test]
+    fn list_comprehension_nested_clauses_and_filters_are_isolated() {
+        let input = r#"
+x = "outer x"
+y = "outer y"
+result = [(x, y) for x in [1, 2] for y in [x, x + 1] if y > x]
+"#;
+        let ctx = run(input);
+        assert_read_eq!(
+            ctx,
+            "result",
+            list![tuple![int!(1), int!(2)], tuple![int!(2), int!(3)]]
+        );
+        assert_read_eq!(ctx, "x", str!("outer x"));
+        assert_read_eq!(ctx, "y", str!("outer y"));
+    }
 }
