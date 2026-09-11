@@ -5611,7 +5611,6 @@ result = [(x, y) for x in [1, 2] for y in [x, x + 1] if y > x]
     }
 
     #[test]
-    #[ignore = "requires single comprehension scope"]
     fn list_comprehension_multiple_clauses_share_one_closure_scope() {
         let input = r#"
 functions = [
@@ -5634,7 +5633,6 @@ fourth = functions[3]()
     }
 
     #[test]
-    #[ignore = "requires single comprehension scope"]
     fn list_comprehension_multiple_clauses_share_one_generator_scope() {
         let input = r#"
 generators = [
