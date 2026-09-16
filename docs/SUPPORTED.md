@@ -29,7 +29,7 @@ For builtin functions, builtin types, and per-type method/operator inventory, se
 |List comprehension|✅||
 |Sets|✅||
 |Set comprehension|✅||
-|Dictionaries|✅||
+|Dictionaries|✅|✅|
 |Dict comprehension|✅||
 |Iterables|✅|✅|
 |Tuples|✅|✅|
@@ -42,7 +42,7 @@ For builtin functions, builtin types, and per-type method/operator inventory, se
 |Operator overloading|✅||
 |Object creation and metaclasses|✅||
 |async/await|✅|✅|
-|Try-except blocks|✅||
+|Try-except blocks|✅|✅|
 |Args and kwargs|✅||
 |Closures|✅|✅|
 |Decorators|✅|✅|
