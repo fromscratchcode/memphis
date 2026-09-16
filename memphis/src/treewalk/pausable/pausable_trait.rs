@@ -1,7 +1,7 @@
 use crate::{
     core::Container,
     parser::types::Statement,
-    treewalk::{Scope, TreewalkInterpreter, TreewalkResult},
+    treewalk::{Scope, TreewalkInterpreter, TreewalkResult, utils::EnvironmentFrame},
 };
 
 use super::{PausableStack, StepResult};
@@ -15,6 +15,8 @@ pub trait Pausable {
 
     /// A getter for the [`Scope`] of a pausable function.
     fn scope(&self) -> Container<Scope>;
+
+    fn captured_env(&self) -> Container<EnvironmentFrame>;
 
     /// A handle to invoke the discrete operation of evaluating an individual statement and
     /// producing a [`PausableStepResult`] based on the control flow instructions and or the

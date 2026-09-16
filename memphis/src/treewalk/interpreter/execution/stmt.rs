@@ -148,7 +148,7 @@ impl TreewalkInterpreter {
     /// TODO This should be moved to the semantic analysis
     fn validate_nonlocal_context(&self, name: &Identifier) -> TreewalkResult<()> {
         // We could not find the variable `name` in an enclosing context.
-        if let Some(env) = self.state.read_captured_env()
+        if let Some(env) = self.state.current_captured_environment()
             && env.borrow().read(name.as_str()).is_none()
         {
             return Exception::syntax_error(format!(
@@ -160,7 +160,7 @@ impl TreewalkInterpreter {
 
         // `nonlocal` cannot be used at the module-level (outside of a function,
         // i.e. captured environment).
-        if self.state.read_captured_env().is_none() {
+        if self.state.current_captured_environment().is_none() {
             return Exception::syntax_error("'nonlocal' cannot be used at module level")
                 .raise(self);
         }
@@ -365,13 +365,16 @@ impl TreewalkInterpreter {
         // each function defined inside it.
         let class = self.build_class(name.as_str(), parent_classes, metaclass)?;
 
+        let frame = self.state.get_or_create_lexical_parent_environment();
+        self.state.push_captured_env(frame);
+
         // We must use the class symbol table here in case it received any initialization from its
         // metaclass `Dunder::New` method.
         let initial_symbols = class.borrow().symbol_table().clone();
         self.state
-            .push_local(Container::new(Scope::new(initial_symbols)));
+            .push_class_namespace(Container::new(Scope::new(initial_symbols)));
         self.state.push_class(class.clone());
-        self.execute_ast(body)?;
+        let result = self.execute_ast(body);
         self.state.pop_class();
         let symbol_table = self
             .state
@@ -381,8 +384,12 @@ impl TreewalkInterpreter {
             .borrow()
             .symbol_table()
             .clone();
-        class.borrow_mut().set_symbol_table(symbol_table);
+        self.state.pop_captured_env();
 
+        // Make sure we do our pops before returning an error
+        result?;
+
+        class.borrow_mut().set_symbol_table(symbol_table);
         self.store_var(name.as_str(), TreewalkValue::Class(class));
 
         Ok(())

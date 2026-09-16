@@ -12,6 +12,7 @@ use crate::{
         result::Raise,
         type_system::CloneableIterable,
         types::Function,
+        utils::EnvironmentFrame,
     },
 };
 
@@ -28,16 +29,18 @@ impl GeneratorSuspend {
 
 pub struct Generator {
     scope: Container<Scope>,
+    captured_env: Container<EnvironmentFrame>,
     context: PausableStack,
     suspend: GeneratorSuspend,
 }
 
 impl Generator {
     pub fn new(scope: Container<Scope>, function: Container<Function>) -> Self {
-        let frame = Frame::new(function.borrow().clone().body);
+        let frame = Frame::new(function.borrow().body.clone());
 
         Self {
             scope,
+            captured_env: function.borrow().captured_env.clone(),
             context: PausableStack::new(frame),
             suspend: GeneratorSuspend::None,
         }
@@ -147,6 +150,10 @@ impl Pausable for Generator {
 
     fn scope(&self) -> Container<Scope> {
         self.scope.clone()
+    }
+
+    fn captured_env(&self) -> Container<EnvironmentFrame> {
+        self.captured_env.clone()
     }
 
     /// Only yield statements will cause a value to be returned.

@@ -6,7 +6,8 @@ use crate::{
         ForClause, FormatOption, LogicalOp, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
-        TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal, TreewalkValue,
+        Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
+        TreewalkValue,
         iterator::for_each_mut,
         result::Raise,
         types::{
@@ -16,6 +17,12 @@ use crate::{
         value::RuntimeCallable,
     },
 };
+
+#[derive(PartialEq)]
+enum ComprehensionScope {
+    Create,
+    Reuse,
+}
 
 impl TreewalkInterpreter {
     pub fn evaluate_expr(&self, expr: &Expr) -> TreewalkResult<TreewalkValue> {
@@ -392,6 +399,18 @@ impl TreewalkInterpreter {
     where
         F: FnMut() -> TreewalkResult<()>,
     {
+        self.evaluate_comprehension_inner(clauses, emit, ComprehensionScope::Create)
+    }
+
+    fn evaluate_comprehension_inner<F>(
+        &self,
+        clauses: &[ForClause],
+        emit: &mut F,
+        layer: ComprehensionScope,
+    ) -> TreewalkResult<()>
+    where
+        F: FnMut() -> TreewalkResult<()>,
+    {
         if let Some((clause, remaining)) = clauses.split_first() {
             let ForClause {
                 index,
@@ -399,8 +418,19 @@ impl TreewalkInterpreter {
                 condition,
             } = clause;
 
+            // This must be evaluated in the outer scope
             let iter = self.evaluate_expr(iterable)?.as_iterator().raise(self)?;
-            for_each_mut(iter, &mut |i| {
+
+            // We create a comprehension scope to not clobber the outer environment, but only do so
+            // once, later nested clauses use this same scope. It also must have access to
+            // the lexical context.
+            if layer == ComprehensionScope::Create {
+                let frame = self.state.get_or_create_lexical_parent_environment();
+                self.state.push_captured_env(frame);
+                self.state.push_local(Container::new(Scope::default()));
+            }
+
+            let result = for_each_mut(iter, &mut |i| {
                 // Bind variables
                 self.execute_loop_index_assignment(index, i)?;
 
@@ -412,11 +442,17 @@ impl TreewalkInterpreter {
                 }
 
                 // Recurse
-                self.evaluate_comprehension(remaining, emit)?;
+                self.evaluate_comprehension_inner(remaining, emit, ComprehensionScope::Reuse)?;
                 Ok(())
-            })?;
+            });
 
-            Ok(())
+            if layer == ComprehensionScope::Create {
+                // We must pop the local scope before returning an error
+                self.state.pop_local();
+                self.state.pop_captured_env();
+            }
+
+            result
         } else {
             // Base case: emit one value
             emit()

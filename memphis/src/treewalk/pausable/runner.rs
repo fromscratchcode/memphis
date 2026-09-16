@@ -20,60 +20,65 @@ impl PausableRunner {
     ) -> TreewalkResult<FrameExit> {
         Self::on_entry(pausable, interpreter);
 
-        loop {
-            match pausable.context().state() {
-                PausableState::Created => {
-                    pausable.context_mut().start();
-                    continue;
-                }
-                PausableState::Running => {
-                    if pausable.context().frame().is_finished() {
-                        Self::on_exit(interpreter);
-                        return Ok(FrameExit::Completed(Completion::Finished));
-                    }
-                }
-                PausableState::InForLoop { index, iterable } => {
-                    if pausable.context().frame().is_finished() {
-                        let item = iterable
-                            .clone()
-                            .as_iterator_strict()
-                            .raise(interpreter)?
-                            .try_next()?;
-                        if let NextResult::Yielded(item) = item {
-                            interpreter.execute_loop_index_assignment(index, item)?;
-                            pausable.context_mut().frame_mut().restart();
-                        } else {
-                            pausable.context_mut().pop();
-                            continue;
-                        }
-                    }
-                }
-                PausableState::InBlock => {
-                    if pausable.context().frame().is_finished() {
-                        pausable.context_mut().pop();
+        // We wrap the loop in a closure so we can still use Result propagation, while handling
+        // cleanup via on_exit afterwards.
+        let result = (|| {
+            loop {
+                match pausable.context().state() {
+                    PausableState::Created => {
+                        pausable.context_mut().start();
                         continue;
                     }
-                }
-                PausableState::InWhileLoop(condition) => {
-                    if pausable.context().frame().is_finished() {
-                        if interpreter.evaluate_expr(condition)?.coerce_to_bool() {
-                            pausable.context_mut().frame_mut().restart();
-                        } else {
+                    PausableState::Running => {
+                        if pausable.context().frame().is_finished() {
+                            return Ok(FrameExit::Completed(Completion::Finished));
+                        }
+                    }
+                    PausableState::InForLoop { index, iterable } => {
+                        if pausable.context().frame().is_finished() {
+                            let item = iterable
+                                .clone()
+                                .as_iterator_strict()
+                                .raise(interpreter)?
+                                .try_next()?;
+                            if let NextResult::Yielded(item) = item {
+                                interpreter.execute_loop_index_assignment(index, item)?;
+                                pausable.context_mut().frame_mut().restart();
+                            } else {
+                                pausable.context_mut().pop();
+                                continue;
+                            }
+                        }
+                    }
+                    PausableState::InBlock => {
+                        if pausable.context().frame().is_finished() {
                             pausable.context_mut().pop();
                             continue;
                         }
                     }
+                    PausableState::InWhileLoop(condition) => {
+                        if pausable.context().frame().is_finished() {
+                            if interpreter.evaluate_expr(condition)?.coerce_to_bool() {
+                                pausable.context_mut().frame_mut().restart();
+                            } else {
+                                pausable.context_mut().pop();
+                                continue;
+                            }
+                        }
+                    }
                 }
-            }
 
-            match Self::step(pausable, interpreter)? {
-                StepResult::Continue => {}
-                StepResult::Exit(exit) => {
-                    Self::on_exit(interpreter);
-                    return Ok(exit);
+                match Self::step(pausable, interpreter)? {
+                    StepResult::Continue => {}
+                    StepResult::Exit(exit) => {
+                        return Ok(exit);
+                    }
                 }
             }
-        }
+        })();
+
+        Self::on_exit(interpreter);
+        result
     }
 
     /// The default behavior which selects the next [`Statement`] and manually evaluates any
@@ -168,6 +173,7 @@ impl PausableRunner {
     /// The default behavior required to perform the necessary context switching when entering a
     /// pausable function.
     fn on_entry<P: Pausable>(pausable: &P, interpreter: &TreewalkInterpreter) {
+        interpreter.state.push_captured_env(pausable.captured_env());
         interpreter.state.push_local(pausable.scope());
     }
 
@@ -175,5 +181,6 @@ impl PausableRunner {
     /// pausable function.
     fn on_exit(interpreter: &TreewalkInterpreter) {
         interpreter.state.pop_local();
+        interpreter.state.pop_captured_env();
     }
 }

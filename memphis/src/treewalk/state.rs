@@ -84,6 +84,19 @@ impl Container<TreewalkState> {
         self.borrow_mut().scope_manager.push_local(scope);
     }
 
+    pub fn push_class_namespace(&self, scope: Container<Scope>) {
+        self.borrow_mut().scope_manager.push_class_namespace(scope);
+    }
+
+    pub fn get_or_create_lexical_parent_environment(&self) -> Container<EnvironmentFrame> {
+        if self.borrow().scope_manager.in_class_body() {
+            self.current_captured_environment()
+                .expect("A class body must have an enclosing environment")
+        } else {
+            Container::new(self.create_environment_frame())
+        }
+    }
+
     pub fn pop_local(&self) -> Option<Container<Scope>> {
         self.borrow_mut().scope_manager.pop_local()
     }
@@ -176,8 +189,8 @@ impl Container<TreewalkState> {
             .clear_current_exception();
     }
 
-    pub fn read_captured_env(&self) -> Option<Box<Container<EnvironmentFrame>>> {
-        self.borrow().scope_manager.read_captured_env()
+    pub fn current_captured_environment(&self) -> Option<Container<EnvironmentFrame>> {
+        self.borrow().scope_manager.current_captured_environment()
     }
 
     pub fn read_globals(&self) -> Dict {
@@ -204,13 +217,6 @@ impl Container<TreewalkState> {
     /// Return a singleton `Class` for builtin types such as list, set, tuple, dict, etc.
     pub fn class_of_type(&self, type_: &Type) -> Container<Class> {
         self.borrow().type_registry.type_class(type_)
-    }
-
-    pub fn get_environment_frame(&self) -> Container<EnvironmentFrame> {
-        Container::new(EnvironmentFrame::new(
-            self.borrow().scope_manager.read_local(),
-            self.borrow().scope_manager.read_captured_env(),
-        ))
     }
 
     pub fn resolve_import_path(&self, import_path: &FromImportPath) -> DomainResult<ModuleName> {
@@ -264,5 +270,12 @@ impl Container<TreewalkState> {
         let globals = self.read_globals().to_symbol_table()?;
         let locals = self.read_locals().borrow().symbol_table().clone();
         Ok(DebugSnapshot { globals, locals })
+    }
+
+    fn create_environment_frame(&self) -> EnvironmentFrame {
+        EnvironmentFrame::new(
+            self.borrow().scope_manager.read_local(),
+            self.borrow().scope_manager.current_captured_environment(),
+        )
     }
 }

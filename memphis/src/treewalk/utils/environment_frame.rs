@@ -7,11 +7,11 @@ use crate::{
 #[derive(Debug)]
 pub struct EnvironmentFrame {
     scope: Container<Scope>,
-    parent: Option<Box<Container<EnvironmentFrame>>>,
+    parent: Option<Container<EnvironmentFrame>>,
 }
 
 impl EnvironmentFrame {
-    pub fn new(scope: Container<Scope>, parent: Option<Box<Container<EnvironmentFrame>>>) -> Self {
+    pub fn new(scope: Container<Scope>, parent: Option<Container<EnvironmentFrame>>) -> Self {
         Self { scope, parent }
     }
 

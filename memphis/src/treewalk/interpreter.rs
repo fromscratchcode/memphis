@@ -1755,6 +1755,60 @@ c = list(g())
     }
 
     #[test]
+    fn generator_error_does_not_leak_its_scope() {
+        let input = r#"
+def broken():
+    leaked = "generator-local"
+    yield 1 / 0
+
+generator = broken()
+
+try:
+    next(generator)
+except ZeroDivisionError:
+    pass
+
+leaked
+"#;
+
+        // This previously did not throw an error because we failed to clean up and let an error
+        // result take priority
+        let error = eval_expect_error(input);
+        assert_name_error!(error.exception, "leaked");
+    }
+
+    #[test]
+    fn generator_captures_enclosing_scope() {
+        let input = r#"
+def make_gen():
+    x = 42
+    return (x for unused in [None])
+
+gen = make_gen()
+next(gen)
+"#;
+        assert_eval_eq!(input, int!(42));
+    }
+
+    #[test]
+    fn coroutine_captures_enclosing_scope() {
+        let input = r#"
+import asyncio
+
+def make_coroutine():
+    x = 42
+
+    async def read_x():
+        return x
+
+    return read_x()
+
+asyncio.run(make_coroutine())
+"#;
+        assert_eval_eq!(input, int!(42));
+    }
+
+    #[test]
     fn basic_inheritance() {
         let input = r#"
 class Parent:
@@ -3911,6 +3965,67 @@ b = Foo().make()
     }
 
     #[test]
+    fn class_captures_enclosing_environment() {
+        let input = r#"
+def make_class():
+    x = 42
+    class Example:
+        value = x
+    return Example
+
+make_class().value
+"#;
+        assert_eval_eq!(input, int!(42));
+    }
+
+    #[test]
+    fn class_method_skips_class_namespace() {
+        let input = r#"
+class Example:
+    x = "class"
+
+    def read(self):
+        return x
+
+Example().read()
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "x");
+    }
+
+    #[test]
+    fn class_method_skips_class_namespace_enclosing_environment() {
+        let input = r#"
+def make_class():
+    x = "outer"
+
+    class Example:
+        x = "class"
+
+        def read(self):
+            return x
+
+    return Example
+
+make_class()().read()
+"#;
+        assert_eval_eq!(input, str!("outer"));
+    }
+
+    #[test]
+    fn class_is_not_an_enclosing_scope_for_inner_class() {
+        let input = r#"
+class Outer:
+    x = 1
+
+    class Inner:
+        value = x
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "x");
+    }
+
+    #[test]
     fn static_method() {
         let input = r#"
 class Foo:
@@ -5492,5 +5607,121 @@ f(a=2)
             e.exception,
             "f() missing 1 required positional argument: 'a'"
         );
+    }
+
+    #[test]
+    fn list_comprehension_preserves_existing_loop_variable() {
+        let input = r#"
+x = "outside"
+result = [x for x in [1, 2]]
+"#;
+        let ctx = run(input);
+        assert_read_eq!(ctx, "result", list![int!(1), int!(2)]);
+        assert_read_eq!(ctx, "x", str!("outside"));
+    }
+
+    #[test]
+    fn list_comprehension_does_not_introduce_loop_variable() {
+        let input = r#"
+result = [y for y in [1]]
+y
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "y");
+    }
+
+    #[test]
+    fn list_comprehension_inside_class_cannot_see_class_namespace() {
+        let input = r#"
+class Example:
+    x = [1,2]
+    values = [x for unused in [None]]
+"#;
+        let e = eval_expect_error(input);
+        assert_name_error!(e.exception, "x");
+    }
+
+    #[test]
+    fn list_comprehension_inside_class_can_get_iterable_from_class_namespace() {
+        let input = r#"
+class Example:
+    x = [1,2]
+    values = [y for y in x]
+
+Example.values
+"#;
+        assert_eval_eq!(input, list![int!(1), int!(2)]);
+    }
+
+    #[test]
+    fn list_comprehension_evaluates_first_iterable_in_outer_scope() {
+        let input = r#"
+x = [1, 2]
+result = [x for x in x]
+"#;
+        let ctx = run(input);
+        assert_read_eq!(ctx, "result", list![int!(1), int!(2)]);
+        assert_read_eq!(ctx, "x", list![int!(1), int!(2)]);
+    }
+
+    #[test]
+    fn list_comprehension_nested_clauses_and_filters_are_isolated() {
+        let input = r#"
+x = "outer x"
+y = "outer y"
+result = [(x, y) for x in [1, 2] for y in [x, x + 1] if y > x]
+"#;
+        let ctx = run(input);
+        assert_read_eq!(
+            ctx,
+            "result",
+            list![tuple![int!(1), int!(2)], tuple![int!(2), int!(3)]]
+        );
+        assert_read_eq!(ctx, "x", str!("outer x"));
+        assert_read_eq!(ctx, "y", str!("outer y"));
+    }
+
+    #[test]
+    fn list_comprehension_multiple_clauses_share_one_closure_scope() {
+        let input = r#"
+functions = [
+    lambda: (x, y)
+    for x in [1, 2]
+    for y in [x, x + 1]
+]
+
+first = functions[0]()
+second = functions[1]()
+third = functions[2]()
+fourth = functions[3]()
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "first", tuple![int!(2), int!(3)]);
+        assert_read_eq!(ctx, "second", tuple![int!(2), int!(3)]);
+        assert_read_eq!(ctx, "third", tuple![int!(2), int!(3)]);
+        assert_read_eq!(ctx, "fourth", tuple![int!(2), int!(3)]);
+    }
+
+    #[test]
+    fn list_comprehension_multiple_clauses_share_one_generator_scope() {
+        let input = r#"
+generators = [
+    (x * 10 + y for unused in [None])
+    for x in [1, 2]
+    for y in [x, x + 1]
+]
+
+first = next(generators[0])
+second = next(generators[1])
+third = next(generators[2])
+fourth = next(generators[3])
+"#;
+        let ctx = run(input);
+
+        assert_read_eq!(ctx, "first", int!(23));
+        assert_read_eq!(ctx, "second", int!(23));
+        assert_read_eq!(ctx, "third", int!(23));
+        assert_read_eq!(ctx, "fourth", int!(23));
     }
 }

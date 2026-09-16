@@ -1,13 +1,5 @@
-use memphis::{
-    Engine, HostIo, HostIoError, Input, InputResult, MemphisContext, ModuleOrigin, Output, Source,
-};
-use std::{
-    io::{self, Write},
-    path::Path,
-    process,
-};
-
-use crate::terminal::TerminalRepl;
+use memphis::{HostIo, HostIoError, Input, InputResult, Output};
+use std::io::{self, Write};
 
 pub struct SystemIo;
 
@@ -45,24 +37,4 @@ impl Input for SystemIo {
         }
         Ok(InputResult::Line(input))
     }
-}
-
-pub fn script(filepath: impl AsRef<Path>, engine: Engine) {
-    let source = Source::from_path(filepath)
-        .map_err(|err| {
-            eprintln!("{err}");
-            process::exit(1);
-        })
-        .unwrap();
-    let origin = ModuleOrigin::File(source.path().clone());
-    let _ = MemphisContext::new(engine, origin, SystemIo)
-        .eval(source.text().clone())
-        .map_err(|err| {
-            eprintln!("{err}");
-            process::exit(1);
-        });
-}
-
-pub fn repl(engine: Engine) {
-    TerminalRepl::new(engine).start();
 }

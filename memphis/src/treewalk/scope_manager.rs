@@ -1,8 +1,14 @@
 use crate::{
     core::Container,
-    domain::Context,
     treewalk::{Scope, TreewalkValue, types::Module, utils::EnvironmentFrame},
 };
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Context {
+    Global,
+    Local,
+    ClassBody,
+}
 
 /// This struct implements Python's scoping rules by storing data to power the
 /// `read`/`write`/`delete` interface available to the interpreter.
@@ -49,6 +55,13 @@ impl ScopeManager {
     pub fn push_local(&mut self, scope: Container<Scope>) {
         self.local_scope_stack.push(scope);
         self.context_stack.push(Context::Local);
+    }
+
+    // A class body behaves like a local scope, but we must remember we are in a class body so that
+    // methods do not consider the class an enclosing scope.
+    pub fn push_class_namespace(&mut self, scope: Container<Scope>) {
+        self.local_scope_stack.push(scope);
+        self.context_stack.push(Context::ClassBody);
     }
 
     pub fn pop_local(&mut self) -> Option<Container<Scope>> {
@@ -103,7 +116,7 @@ impl ScopeManager {
         // TODO I'm not sure we should be searching the entire captured environment here. I think
         // only the closure free vars should be available, but I don't yet know of a good way to
         // connect those here.
-        if let Some(env) = self.read_captured_env()
+        if let Some(env) = self.current_captured_environment()
             && let Some(value) = env.borrow().read(name)
         {
             return Some(value);
@@ -124,12 +137,12 @@ impl ScopeManager {
         if local_scope.has_global(name) {
             self.read_module().borrow_mut().insert(name, value);
         } else if local_scope.has_nonlocal(name) {
-            if let Some(env) = self.read_captured_env() {
+            if let Some(env) = self.current_captured_environment() {
                 env.borrow_mut().write(name, value);
             }
         } else {
             match self.read_context() {
-                Context::Local => {
+                Context::Local | Context::ClassBody => {
                     self.read_local().borrow_mut().insert(name, value);
                 }
                 Context::Global => {
@@ -137,6 +150,10 @@ impl ScopeManager {
                 }
             }
         }
+    }
+
+    pub fn in_class_body(&self) -> bool {
+        self.read_context() == &Context::ClassBody
     }
 
     /// This assumes we always have a local scope stack.
@@ -147,8 +164,8 @@ impl ScopeManager {
             .clone()
     }
 
-    pub fn read_captured_env(&self) -> Option<Box<Container<EnvironmentFrame>>> {
-        self.captured_env_stack.last().cloned().map(Box::new)
+    pub fn current_captured_environment(&self) -> Option<Container<EnvironmentFrame>> {
+        self.captured_env_stack.last().cloned()
     }
 
     /// This assumes we always have a module stack.

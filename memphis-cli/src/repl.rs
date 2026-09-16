@@ -1,4 +1,4 @@
-use memphis::{HostIo, HostIoError, Input, InputResult, Output, ReplResult, ReplSession};
+use memphis::{Engine, ReplResult, ReplSession};
 use std::{panic, process};
 
 use crossterm::{
@@ -6,11 +6,17 @@ use crossterm::{
     terminal,
 };
 
-use crate::{
-    Engine,
-    cli::SystemIo,
-    io::{CrosstermDriver, TerminalDriver, normalize_for_terminal},
+mod driver;
+mod io;
+
+use crate::repl::{
+    driver::{CrosstermDriver, TerminalDriver},
+    io::TerminalReplIo,
 };
+
+pub fn run(engine: Engine) {
+    TerminalRepl::new(engine).start();
+}
 
 enum ReplControl {
     Continue,
@@ -46,62 +52,13 @@ fn install_custom_panic_hook() {
     }));
 }
 
-struct TerminalReplIo {
-    system_io: SystemIo,
-}
-
-impl TerminalReplIo {
-    fn new() -> Self {
-        Self {
-            system_io: SystemIo,
-        }
-    }
-}
-
-impl Input for TerminalReplIo {
-    fn input(&mut self, prompt: &str) -> Result<InputResult, HostIoError> {
-        let raw_mode_needs_disabling =
-            terminal::is_raw_mode_enabled().map_err(|e| HostIoError {
-                message: e.to_string(),
-            })?;
-
-        if raw_mode_needs_disabling {
-            terminal::disable_raw_mode().map_err(|e| HostIoError {
-                message: e.to_string(),
-            })?;
-        }
-
-        // We must re-enable raw mode whether or not we hit an error result, so don't return any
-        // errors immediately.
-        let result = self.system_io.input(prompt);
-
-        if raw_mode_needs_disabling {
-            terminal::enable_raw_mode().map_err(|e| HostIoError {
-                message: e.to_string(),
-            })?;
-        }
-
-        result
-    }
-}
-
-impl Output for TerminalReplIo {
-    fn write(&mut self, text: &str) -> Result<(), HostIoError> {
-        // We can write directly to the terminal, but we must add carriage returns because we are
-        // likely in raw mode.
-        self.system_io.write(&normalize_for_terminal(text))
-    }
-}
-
-impl HostIo for TerminalReplIo {}
-
 /// The Memphis Read-Evaluate-Print-Loop (REPL).
-pub struct TerminalRepl {
+struct TerminalRepl {
     session: ReplSession,
 }
 
 impl TerminalRepl {
-    pub fn new(engine: Engine) -> Self {
+    fn new(engine: Engine) -> Self {
         let io = TerminalReplIo::new();
         Self {
             session: ReplSession::new(engine, io),
@@ -110,7 +67,7 @@ impl TerminalRepl {
 
     /// The primary entrypoint to the REPL, which uses a real terminal in raw mode and will exit
     /// loudly when terminated. For virtual terminals, use `run_inner`.
-    pub fn start(&mut self) {
+    fn start(&mut self) {
         let terminal_io = &mut CrosstermDriver;
         let _ = terminal_io.writeln(format!(
             "memphis {} REPL (engine: {})",

@@ -3,8 +3,12 @@ use std::path::PathBuf;
 
 use memphis::Engine;
 
+mod repl;
+mod script;
+mod system_io;
+
 #[derive(Parser)]
-struct Cli {
+struct MemphisCli {
     #[arg(long)]
     engine: Option<Engine>,
 
@@ -12,16 +16,12 @@ struct Cli {
     script: Option<PathBuf>,
 }
 
-mod cli;
-mod io;
-mod terminal;
-
 fn main() {
-    let cli = Cli::parse();
+    let cli = MemphisCli::parse();
     let engine = cli.engine.unwrap_or(Engine::default());
 
     match cli.script {
-        None => cli::repl(engine),
-        Some(path) => cli::script(path, engine),
+        None => repl::run(engine),
+        Some(path) => script::run(path, engine),
     }
 }

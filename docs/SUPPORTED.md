@@ -105,7 +105,7 @@ For builtin modules, builtin types, and method-level API details, see [API.md](.
 |`help`|||
 |`hex`|||
 |`id`|||
-|`input` (but not yet via WASM)|✅|✅|
+|`input`|✅|✅|
 |`int`|✅|✅|
 |`isinstance`|✅||
 |`issubclass`|✅||

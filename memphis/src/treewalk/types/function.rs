@@ -70,7 +70,7 @@ impl Function {
     ) -> Self {
         let module = state.current_module();
         let class_context = state.current_class();
-        let captured_env = state.get_environment_frame();
+        let captured_env = state.get_or_create_lexical_parent_environment();
 
         let function_type = if is_async {
             FunctionType::Async
