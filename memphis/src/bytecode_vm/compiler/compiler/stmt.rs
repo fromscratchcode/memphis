@@ -532,7 +532,7 @@ impl Compiler {
 
     /// Load a CodeObject and turn it into a function or closure.
     fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
-        let free_vars = code.freevars.clone();
+        let free_vars = code.free_names.clone();
         self.compile_code(code);
 
         if free_vars.is_empty() {

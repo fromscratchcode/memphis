@@ -76,7 +76,7 @@ impl Frame {
     }
 
     pub fn namespace(&self) -> Namespace {
-        let varnames = &self.function.code_object.varnames;
+        let varnames = &self.function.code_object.local_names;
         let mut namespace = HashMap::new();
         for (index, varname) in varnames.iter().enumerate() {
             namespace.insert(varname.to_owned(), self.locals[index]);

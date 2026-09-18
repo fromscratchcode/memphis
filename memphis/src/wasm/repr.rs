@@ -51,9 +51,9 @@ impl WasmCodeObject {
                 .iter()
                 .map(|op| op.display_annotated(&code))
                 .collect(),
-            varnames: code.varnames,
-            freevars: code.freevars,
-            names: code.names,
+            varnames: code.local_names,
+            freevars: code.free_names,
+            names: code.nonlocal_names,
             constants: code.constants.iter().map(|c| c.to_owned().into()).collect(),
         }
     }

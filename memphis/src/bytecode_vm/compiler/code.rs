@@ -31,14 +31,13 @@ pub struct CodeObject {
     pub filename: String,
     pub bytecode: Bytecode,
     pub arg_count: usize,
-    /// Local variable names
-    pub varnames: Vec<String>,
+    /// Local variable names (paramters + compiler-discovered locals)
+    pub local_names: Vec<String>,
     /// Free variable names
-    pub freevars: Vec<String>,
-    /// Non-local identifiers
-    pub names: Vec<String>,
+    pub free_names: Vec<String>,
+    /// Names addressed by nonlocal opcodes, not `nonlocal` declared names
+    pub nonlocal_names: Vec<String>,
     pub constants: Vec<Constant>,
-
     pub line_map: Vec<(usize, usize)>,
     pub function_type: FunctionType,
     pub exception_table: Vec<ExceptionRange>,
@@ -68,9 +67,9 @@ impl CodeObject {
             filename: filename.to_string(),
             bytecode: vec![],
             arg_count: varnames.len(),
-            varnames: varnames.to_vec(),
-            freevars: vec![],
-            names: vec![],
+            local_names: varnames.to_vec(),
+            free_names: vec![],
+            nonlocal_names: vec![],
             constants: vec![],
             line_map: vec![],
             function_type,
@@ -125,7 +124,7 @@ impl Debug for CodeObject {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         writeln!(f, "CodeObject: {}", self.dbg_context())?;
         writeln!(f, "names:")?;
-        for (index, name) in self.names.iter().enumerate() {
+        for (index, name) in self.nonlocal_names.iter().enumerate() {
             writeln!(f, "[{index:?}]: {name}")?;
         }
 

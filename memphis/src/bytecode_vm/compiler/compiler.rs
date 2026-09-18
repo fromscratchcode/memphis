@@ -140,8 +140,8 @@ impl Compiler {
             index
         } else {
             let code = self.frame_mut().code_mut();
-            let new_index = code.varnames.len();
-            code.varnames.push(name.to_string());
+            let new_index = code.local_names.len();
+            code.local_names.push(name.to_string());
             Index::new(new_index)
         }
     }
@@ -153,11 +153,11 @@ impl Compiler {
 
     fn get_or_set_free_var(&mut self, name: &Identifier) -> FreeIndex {
         let code = self.frame_mut().code_mut();
-        let index = if let Some(index) = find_index(&code.freevars, name.as_str()) {
+        let index = if let Some(index) = find_index(&code.free_names, name.as_str()) {
             index
         } else {
-            let new_index = code.freevars.len();
-            code.freevars.push(name.to_string());
+            let new_index = code.free_names.len();
+            code.free_names.push(name.to_string());
             new_index
         };
         Index::new(index)
@@ -168,7 +168,7 @@ impl Compiler {
         name: &Identifier,
         code: &CodeObject,
     ) -> Option<LocalIndex> {
-        find_index(&code.varnames, name.as_str()).map(Index::new)
+        find_index(&code.local_names, name.as_str()).map(Index::new)
     }
 
     // We didn't convert this one to use Identifier yet because of how it interacts with
@@ -178,11 +178,11 @@ impl Compiler {
             format!("Looking for '{name}' in globals")
         });
         let code = self.frame_mut().code_mut();
-        let index = if let Some(index) = find_index(&code.names, name) {
+        let index = if let Some(index) = find_index(&code.nonlocal_names, name) {
             index
         } else {
-            let new_index = code.names.len();
-            code.names.push(name.to_string());
+            let new_index = code.nonlocal_names.len();
+            code.nonlocal_names.push(name.to_string());
             new_index
         };
         Index::new(index)
@@ -287,7 +287,7 @@ def foo():
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            names: vec!["decorate".into(), "foo".into()],
+            nonlocal_names: vec!["decorate".into(), "foo".into()],
             constants: vec![Constant::Code(fn_foo)],
             ..test_code("<module>", &[])
         };
@@ -314,7 +314,7 @@ def foo():
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(2)),
             ],
-            names: vec!["inner".into(), "outer".into(), "foo".into()],
+            nonlocal_names: vec!["inner".into(), "outer".into(), "foo".into()],
             constants: vec![Constant::Code(fn_foo)],
             ..test_code("<module>", &[])
         };
@@ -407,7 +407,7 @@ def foo(a, b):
                 Opcode::Add,
                 Opcode::ReturnValue,
             ],
-            varnames: vec!["a".into(), "b".into(), "inner".into()],
+            local_names: vec!["a".into(), "b".into(), "inner".into()],
             constants: vec![Constant::Code(fn_inner)],
             ..test_code("foo", &["a", "b"])
         };
@@ -436,7 +436,7 @@ def foo():
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::StoreFast(Index::new(2)),
             ],
-            varnames: vec!["c".into(), "d".into(), "e".into()],
+            local_names: vec!["c".into(), "d".into(), "e".into()],
             constants: vec![Constant::Int(10), Constant::Float(11.1)],
             ..test_code("foo", &[])
         };
@@ -461,7 +461,7 @@ def foo():
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ReturnValue,
             ],
-            varnames: vec!["c".into()],
+            local_names: vec!["c".into()],
             constants: vec![Constant::Int(10)],
             ..test_code("foo", &[])
         };
@@ -491,7 +491,7 @@ world()
                 Opcode::Call(1),
                 Opcode::PopTop,
             ],
-            names: vec!["print".into()],
+            nonlocal_names: vec!["print".into()],
             constants: vec![Constant::String("Hello".into())],
             ..test_code("hello", &[])
         };
@@ -503,7 +503,7 @@ world()
                 Opcode::Call(1),
                 Opcode::PopTop,
             ],
-            names: vec!["print".into()],
+            nonlocal_names: vec!["print".into()],
             constants: vec![Constant::String("World".into())],
             ..test_code("world", &[])
         };
@@ -523,7 +523,7 @@ world()
                 Opcode::Call(0),
                 Opcode::ReturnValue,
             ],
-            names: vec!["hello".into(), "world".into()],
+            nonlocal_names: vec!["hello".into(), "world".into()],
             constants: vec![Constant::Code(fn_hello), Constant::Code(fn_world)],
             ..test_code("<module>", &[])
         };
@@ -548,7 +548,7 @@ def make_adder(x):
                 Opcode::Add,
                 Opcode::ReturnValue,
             ],
-            freevars: vec!["x".into()],
+            free_names: vec!["x".into()],
             ..test_code("inner_adder", &["y"])
         };
 
@@ -561,7 +561,7 @@ def make_adder(x):
                 Opcode::LoadFast(Index::new(1)),
                 Opcode::ReturnValue,
             ],
-            varnames: vec!["x".into(), "inner_adder".into()],
+            local_names: vec!["x".into(), "inner_adder".into()],
             constants: vec![Constant::Code(fn_inner_adder)],
             ..test_code("make_adder", &["x"])
         };
@@ -591,7 +591,7 @@ class Foo:
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(0)),
             ],
-            varnames: vec!["bar".into()],
+            local_names: vec!["bar".into()],
             constants: vec![Constant::Code(fn_bar)],
             ..test_code("Foo", &[])
         };
@@ -615,7 +615,7 @@ class Foo:
                 Opcode::LoadAttr(Index::new(0)),
                 Opcode::ReturnValue,
             ],
-            names: vec!["val".into()],
+            nonlocal_names: vec!["val".into()],
             ..test_code("bar", &["self"])
         };
 
@@ -625,7 +625,7 @@ class Foo:
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(0)),
             ],
-            varnames: vec!["bar".into()],
+            local_names: vec!["bar".into()],
             constants: vec![Constant::Code(fn_bar)],
             ..test_code("Foo", &[])
         };
@@ -647,7 +647,7 @@ f = Foo()
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            names: vec!["Foo".into(), "f".into()],
+            nonlocal_names: vec!["Foo".into(), "f".into()],
             ..test_code("<module>", &[])
         };
 
@@ -668,7 +668,7 @@ b = f.bar()
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(2)),
             ],
-            names: vec!["f".into(), "bar".into(), "b".into()],
+            nonlocal_names: vec!["f".into(), "bar".into(), "b".into()],
             ..test_code("<module>", &[])
         };
 
@@ -687,7 +687,7 @@ import a.b.c
                 Opcode::ImportName(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            names: vec!["a.b.c".into(), "a".into()],
+            nonlocal_names: vec!["a.b.c".into(), "a".into()],
             ..test_code("<module>", &[])
         };
 
@@ -706,7 +706,7 @@ import a.b.c as foo
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            names: vec!["a.b.c".into(), "foo".into()],
+            nonlocal_names: vec!["a.b.c".into(), "foo".into()],
             ..test_code("<module>", &[])
         };
 
@@ -745,7 +745,7 @@ from .outer import foo
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            names: vec!["pkg.outer".into(), "foo".into()],
+            nonlocal_names: vec!["pkg.outer".into(), "foo".into()],
             ..test_code("<module>", &[])
         };
 
@@ -768,7 +768,7 @@ from .outer.inner import foo
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            names: vec!["pkg.outer.inner".into(), "foo".into()],
+            nonlocal_names: vec!["pkg.outer.inner".into(), "foo".into()],
             ..test_code("<module>", &[])
         };
 

@@ -86,7 +86,7 @@ pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
             Opcode::MakeFunction,
             Opcode::StoreGlobal(Index::new(0)),
         ],
-        names: vec![func.name().into()],
+        nonlocal_names: vec![func.name().into()],
         constants: vec![Constant::Code(func)],
         ..test_code("<module>", &[])
     }
@@ -100,7 +100,7 @@ pub fn wrap_top_level_class(cls: CodeObject) -> CodeObject {
             Opcode::Call(1),
             Opcode::StoreGlobal(Index::new(0)),
         ],
-        names: vec![cls.name().into()],
+        nonlocal_names: vec![cls.name().into()],
         constants: vec![Constant::Code(cls)],
         ..test_code("<module>", &[])
     }
@@ -133,15 +133,15 @@ pub fn _assert_code_eq(actual: &CodeObject, expected: &CodeObject) {
         "Code object arg_count does not match"
     );
     assert_eq!(
-        actual.varnames, expected.varnames,
+        actual.local_names, expected.local_names,
         "Code object varnames do not match"
     );
     assert_eq!(
-        actual.freevars, expected.freevars,
+        actual.free_names, expected.free_names,
         "Code object freevars do not match"
     );
     assert_eq!(
-        actual.names, expected.names,
+        actual.nonlocal_names, expected.nonlocal_names,
         "Code object names do not match"
     );
     assert_eq!(
