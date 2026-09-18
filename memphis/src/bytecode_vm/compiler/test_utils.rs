@@ -81,44 +81,28 @@ pub fn test_code(name: &str, params: &[&str]) -> CodeObject {
 
 pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
     CodeObject {
-        module_name: ModuleName::main(),
-        name: "<module>".into(),
-        filename: "<stdin>".into(),
         bytecode: vec![
             Opcode::LoadConst(Index::new(0)),
             Opcode::MakeFunction,
             Opcode::StoreGlobal(Index::new(0)),
         ],
-        arg_count: 0,
-        varnames: vec![],
-        freevars: vec![],
         names: vec![func.name().into()],
         constants: vec![Constant::Code(func)],
-        line_map: vec![],
-        function_type: FunctionType::Regular,
-        exception_table: vec![],
+        ..test_code("<module>", &[])
     }
 }
 
 pub fn wrap_top_level_class(cls: CodeObject) -> CodeObject {
     CodeObject {
-        module_name: ModuleName::main(),
-        name: "<module>".into(),
-        filename: "<stdin>".into(),
         bytecode: vec![
             Opcode::LoadBuildClass,
             Opcode::LoadConst(Index::new(0)),
             Opcode::Call(1),
             Opcode::StoreGlobal(Index::new(0)),
         ],
-        arg_count: 0,
-        varnames: vec![],
-        freevars: vec![],
         names: vec![cls.name().into()],
         constants: vec![Constant::Code(cls)],
-        line_map: vec![],
-        function_type: FunctionType::Regular,
-        exception_table: vec![],
+        ..test_code("<module>", &[])
     }
 }
 
