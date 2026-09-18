@@ -243,18 +243,9 @@ def foo():
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::None],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("foo", &[])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -270,18 +261,8 @@ def foo(a, b):
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![],
-            arg_count: 2,
-            varnames: vec!["a".into(), "b".into()],
-            freevars: vec![],
-            names: vec![],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("foo", &["a", "b"])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -296,26 +277,9 @@ def foo():
     pass
 "#;
         let code = compile(text);
-
-        let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
-            bytecode: vec![],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
-        };
+        let fn_foo = test_code("foo", &[]);
 
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
@@ -323,14 +287,9 @@ def foo():
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec!["decorate".into(), fn_foo.name().into()],
+            names: vec!["decorate".into(), "foo".into()],
             constants: vec![Constant::Code(fn_foo)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
         assert_code_eq!(code, expected);
     }
@@ -344,26 +303,8 @@ def foo():
     pass
 "#;
         let code = compile(text);
-
-        let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
-            bytecode: vec![],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
-        };
-
+        let fn_foo = test_code("foo", &[]);
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadGlobal(Index::new(1)),
@@ -373,14 +314,9 @@ def foo():
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(2)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec!["inner".into(), "outer".into(), fn_foo.name().into()],
+            names: vec!["inner".into(), "outer".into(), "foo".into()],
             constants: vec![Constant::Code(fn_foo)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
         assert_code_eq!(code, expected);
     }
@@ -394,18 +330,10 @@ def foo():
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::YieldValue],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Int(1)],
-            line_map: vec![],
             function_type: FunctionType::Generator,
-            exception_table: vec![],
+            ..test_code("foo", &[])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -421,23 +349,15 @@ def foo():
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::BuildList(2),
                 Opcode::YieldFrom,
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Int(1), Constant::Int(2)],
-            line_map: vec![],
             function_type: FunctionType::Generator,
-            exception_table: vec![],
+            ..test_code("foo", &[])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -453,18 +373,8 @@ async def foo():
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
-            bytecode: vec![],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
-            constants: vec![],
-            line_map: vec![],
             function_type: FunctionType::Async,
-            exception_table: vec![],
+            ..test_code("foo", &[])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -482,24 +392,12 @@ def foo(a, b):
         let code = compile(text);
 
         let fn_inner = CodeObject {
-            module_name: ModuleName::main(),
-            name: "inner".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Int(10)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("inner", &[])
         };
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
@@ -509,14 +407,9 @@ def foo(a, b):
                 Opcode::Add,
                 Opcode::ReturnValue,
             ],
-            arg_count: 2,
             varnames: vec!["a".into(), "b".into(), "inner".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Code(fn_inner)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("foo", &["a", "b"])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -534,9 +427,6 @@ def foo():
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::StoreFast(Index::new(0)),
@@ -546,14 +436,9 @@ def foo():
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::StoreFast(Index::new(2)),
             ],
-            arg_count: 0,
             varnames: vec!["c".into(), "d".into(), "e".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Int(10), Constant::Float(11.1)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("foo", &[])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -570,23 +455,15 @@ def foo():
         let code = compile(text);
 
         let fn_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::StoreFast(Index::new(0)),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ReturnValue,
             ],
-            arg_count: 0,
             varnames: vec!["c".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Int(10)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("foo", &[])
         };
 
         let expected = wrap_top_level_function(fn_foo);
@@ -608,49 +485,30 @@ world()
         let code = compile(text);
 
         let fn_hello = CodeObject {
-            module_name: ModuleName::main(),
-            name: "hello".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::Call(1),
                 Opcode::PopTop,
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["print".into()],
             constants: vec![Constant::String("Hello".into())],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("hello", &[])
         };
 
         let fn_world = CodeObject {
-            module_name: ModuleName::main(),
-            name: "world".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::Call(1),
                 Opcode::PopTop,
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["print".into()],
             constants: vec![Constant::String("World".into())],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("world", &[])
         };
 
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
@@ -665,14 +523,9 @@ world()
                 Opcode::Call(0),
                 Opcode::ReturnValue,
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["hello".into(), "world".into()],
             constants: vec![Constant::Code(fn_hello), Constant::Code(fn_world)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);
@@ -689,29 +542,17 @@ def make_adder(x):
         let code = compile(text);
 
         let fn_inner_adder = CodeObject {
-            module_name: ModuleName::main(),
-            name: "inner_adder".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadFree(Index::new(0)),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::Add,
                 Opcode::ReturnValue,
             ],
-            arg_count: 1,
-            varnames: vec!["y".into()],
             freevars: vec!["x".into()],
-            names: vec![],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("inner_adder", &["y"])
         };
 
         let fn_make_adder = CodeObject {
-            module_name: ModuleName::main(),
-            name: "make_adder".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadFast(Index::new(0)),
@@ -720,14 +561,9 @@ def make_adder(x):
                 Opcode::LoadFast(Index::new(1)),
                 Opcode::ReturnValue,
             ],
-            arg_count: 1,
             varnames: vec!["x".into(), "inner_adder".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Code(fn_inner_adder)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("make_adder", &["x"])
         };
 
         let expected = wrap_top_level_function(fn_make_adder);
@@ -744,40 +580,23 @@ class Foo:
         let code = compile(text);
 
         let fn_bar = CodeObject {
-            module_name: ModuleName::main(),
-            name: "bar".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            arg_count: 1,
-            varnames: vec!["self".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Int(99)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("bar", &["self"])
         };
 
         let cls_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "Foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(0)),
             ],
-            arg_count: 0,
             varnames: vec!["bar".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Code(fn_bar)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("Foo", &[])
         };
 
-        let expected = wrap_top_level_class("Foo", cls_foo);
+        let expected = wrap_top_level_class(cls_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -791,44 +610,27 @@ class Foo:
         let code = compile(text);
 
         let fn_bar = CodeObject {
-            module_name: ModuleName::main(),
-            name: "bar".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::LoadAttr(Index::new(0)),
                 Opcode::ReturnValue,
             ],
-            arg_count: 1,
-            varnames: vec!["self".into()],
-            freevars: vec![],
             names: vec!["val".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("bar", &["self"])
         };
 
         let cls_foo = CodeObject {
-            module_name: ModuleName::main(),
-            name: "Foo".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(0)),
             ],
-            arg_count: 0,
             varnames: vec!["bar".into()],
-            freevars: vec![],
-            names: vec![],
             constants: vec![Constant::Code(fn_bar)],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("Foo", &[])
         };
 
-        let expected = wrap_top_level_class("Foo", cls_foo);
+        let expected = wrap_top_level_class(cls_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -840,22 +642,13 @@ f = Foo()
         let code = compile(text);
 
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["Foo".into(), "f".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);
@@ -869,23 +662,14 @@ b = f.bar()
         let code = compile(text);
 
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(2)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["f".into(), "bar".into(), "b".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);
@@ -899,21 +683,12 @@ import a.b.c
         let code = compile(text);
 
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::ImportName(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["a.b.c".into(), "a".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);
@@ -927,21 +702,12 @@ import a.b.c as foo
         let code = compile(text);
 
         let expected = CodeObject {
-            module_name: ModuleName::main(),
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["a.b.c".into(), "foo".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);
@@ -974,21 +740,13 @@ from .outer import foo
 
         let expected = CodeObject {
             module_name,
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["pkg.outer".into(), "foo".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);
@@ -1005,21 +763,13 @@ from .outer.inner import foo
 
         let expected = CodeObject {
             module_name,
-            name: "<module>".into(),
-            filename: "<stdin>".into(),
             bytecode: vec![
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
             ],
-            arg_count: 0,
-            varnames: vec![],
-            freevars: vec![],
             names: vec!["pkg.outer.inner".into(), "foo".into()],
-            constants: vec![],
-            line_map: vec![],
-            function_type: FunctionType::Regular,
-            exception_table: vec![],
+            ..test_code("<module>", &[])
         };
 
         assert_code_eq!(code, expected);

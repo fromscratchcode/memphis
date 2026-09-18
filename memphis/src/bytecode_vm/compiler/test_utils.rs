@@ -69,6 +69,16 @@ pub fn compile_err_at_pkg(text: &str, module: ModuleName, pkg: ModuleName) -> Co
     }
 }
 
+pub fn test_code(name: &str, params: &[&str]) -> CodeObject {
+    CodeObject::new(
+        name,
+        ModuleName::main(),
+        "<stdin>",
+        &params.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        FunctionType::Regular,
+    )
+}
+
 pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
     CodeObject {
         module_name: ModuleName::main(),
@@ -90,7 +100,7 @@ pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
     }
 }
 
-pub fn wrap_top_level_class(name: &str, cls: CodeObject) -> CodeObject {
+pub fn wrap_top_level_class(cls: CodeObject) -> CodeObject {
     CodeObject {
         module_name: ModuleName::main(),
         name: "<module>".into(),
@@ -104,7 +114,7 @@ pub fn wrap_top_level_class(name: &str, cls: CodeObject) -> CodeObject {
         arg_count: 0,
         varnames: vec![],
         freevars: vec![],
-        names: vec![name.into()],
+        names: vec![cls.name().into()],
         constants: vec![Constant::Code(cls)],
         line_map: vec![],
         function_type: FunctionType::Regular,

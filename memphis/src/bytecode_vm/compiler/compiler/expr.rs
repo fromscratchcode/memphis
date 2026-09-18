@@ -5,8 +5,8 @@ use crate::{
     },
     domain::Identifier,
     parser::types::{
-        AstInvokeArgs, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart, FormatOption,
-        LogicalOp, UnaryOp,
+        AstInvokeArgs, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart, ForClause,
+        FormatOption, LogicalOp, UnaryOp,
     },
 };
 
@@ -51,6 +51,9 @@ impl Compiler {
             Expr::YieldFrom(value) => self.compile_yield_from(value),
             Expr::Await(expr) => self.compile_await(expr),
             Expr::FString(parts) => self.compile_f_string(parts),
+            Expr::ListComprehension { clauses, body } => {
+                self.compile_list_comprehension(clauses, body)
+            }
             _ => Err(CompilerError::Unsupported(format!(
                 "Expression type: {expr:?}"
             ))),
@@ -296,6 +299,14 @@ impl Compiler {
 
         self.emit(Opcode::BuildString(parts.len()));
         Ok(())
+    }
+
+    fn compile_list_comprehension(
+        &mut self,
+        _clauses: &[ForClause],
+        _body: &Expr,
+    ) -> CompilerResult<()> {
+        todo!();
     }
 
     fn compile_expr_slice(&mut self, items: &[Expr]) -> CompilerResult<()> {
@@ -732,6 +743,32 @@ mod tests_bytecode_expr {
             f_str_str!(" world "),
             f_str_expr!(var!("y")),
         ];
+        let bytecode = compile_expr(expr);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::Format,
+                Opcode::LoadConst(Index::new(1)),
+                Opcode::LoadGlobal(Index::new(1)),
+                Opcode::Format,
+                Opcode::BuildString(4),
+            ]
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn list_comprehension() {
+        let expr = Expr::ListComprehension {
+            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
+            clauses: vec![ForClause {
+                index: loop_index!["i"],
+                iterable: var!("a"),
+                condition: None,
+            }],
+        };
         let bytecode = compile_expr(expr);
         assert_eq!(
             bytecode,
