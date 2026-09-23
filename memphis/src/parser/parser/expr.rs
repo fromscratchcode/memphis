@@ -1551,33 +1551,6 @@ tuple((1,
     }
 
     #[test]
-    fn dict_comprehension() {
-        let input = "{ key: val * 2 for key, val in d }";
-        let expected_ast = Expr::DictComprehension {
-            clauses: vec![ForClause {
-                index: loop_index!["key", "val"],
-                iterable: var!("d"),
-                condition: None,
-            }],
-            key_body: Box::new(var!("key")),
-            value_body: Box::new(bin_op!(var!("val"), Mul, int!(2))),
-        };
-        assert_expr_eq!(input, expected_ast);
-
-        let input = "{ key: val * 2 for (key, val) in d }";
-        let expected_ast = Expr::DictComprehension {
-            clauses: vec![ForClause {
-                index: loop_index!["key", "val"],
-                iterable: var!("d"),
-                condition: None,
-            }],
-            key_body: Box::new(var!("key")),
-            value_body: Box::new(bin_op!(var!("val"), Mul, int!(2))),
-        };
-        assert_expr_eq!(input, expected_ast);
-    }
-
-    #[test]
     fn index_access() {
         let input = "a[0]";
         let expected_ast = index_access!(var!("a"), int!(0));
@@ -1589,100 +1562,145 @@ tuple((1,
     }
 
     #[test]
-    fn more_tokens() {
+    fn ellipsis() {
         let input = "Ellipsis";
-        let expected_ast = Expr::Ellipsis;
+        let expected_ast = ellipsis!();
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "...";
+        let expected_ast = ellipsis!();
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn not_implemented() {
+        let input = "NotImplemented";
+        let expected_ast = not_implemented!();
         assert_expr_eq!(input, expected_ast);
     }
 
     #[test]
     fn list_comprehension() {
         let input = "[ i * 2 for i in a ]";
-        let expected_ast = Expr::ListComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
-            clauses: vec![ForClause {
-                index: loop_index!["i"],
-                iterable: var!("a"),
-                condition: None,
-            }],
-        };
+        let expected_ast = list_comp!(
+            bin_op!(var!("i"), Mul, int!(2));
+            for_clause!(loop_index!["i"], var!("a"))
+        );
         assert_expr_eq!(input, expected_ast);
     }
 
     #[test]
     fn list_comprehension_conditional() {
         let input = "[i*2 for i in a if True]";
-        let expected_ast = Expr::ListComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
-            clauses: vec![ForClause {
-                index: loop_index!["i"],
-                iterable: var!("a"),
-                condition: Some(bool!(true)),
-            }],
-        };
+        let expected_ast = list_comp!(
+            bin_op!(var!("i"), Mul, int!(2));
+            for_clause!(loop_index!["i"], var!("a"), bool!(true))
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn list_comprehension_nested() {
+        let input = "[i*2 for i in a if True for j in b]";
+        let expected_ast = list_comp!(
+            bin_op!(var!("i"), Mul, int!(2));
+            for_clause!(loop_index!["i"], var!("a"), bool!(true)),
+            for_clause!(loop_index!["j"], var!("b"))
+        );
         assert_expr_eq!(input, expected_ast);
     }
 
     #[test]
     fn list_comprehension_parentheses() {
         let input = "[ i * 2 for (i) in a ]";
-        let expected_ast = Expr::ListComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
-            clauses: vec![ForClause {
-                index: loop_index!["i"],
-                iterable: var!("a"),
-                condition: None,
-            }],
-        };
+        let expected_ast = list_comp!(
+                bin_op!(var!("i"), Mul, int!(2));
+                for_clause!(loop_index!["i"], var!("a"))
+        );
         assert_expr_eq!(input, expected_ast);
 
         let input = "[ i * j for (i, j) in a ]";
-        let expected_ast = Expr::ListComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, var!("j"))),
-            clauses: vec![ForClause {
-                index: loop_index!["i", "j"],
-                iterable: var!("a"),
-                condition: None,
-            }],
-        };
+        let expected_ast = list_comp!(
+            bin_op!(var!("i"), Mul, var!("j"));
+            for_clause!(loop_index!["i", "j"], var!("a"))
+        );
         assert_expr_eq!(input, expected_ast);
 
         let input = "[ i * j for i, j in a ]";
-        let expected_ast = Expr::ListComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, var!("j"))),
-            clauses: vec![ForClause {
-                index: loop_index!["i", "j"],
-                iterable: var!("a"),
-                condition: None,
-            }],
-        };
+        let expected_ast = list_comp!(
+            bin_op!(var!("i"), Mul, var!("j"));
+            for_clause!(loop_index!["i", "j"], var!("a"))
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn set_comprehension() {
+        let input = "{ i * 2 for i in a }";
+        let expected_ast = set_comp!(
+            bin_op!(var!("i"), Mul, int!(2));
+            for_clause!(loop_index!["i"], var!("a"))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ i * j for i in a for j in b }";
+        let expected_ast = set_comp!(
+            bin_op!(var!("i"), Mul, var!("j"));
+            for_clause!(loop_index!["i"], var!("a")),
+            for_clause!(loop_index!["j"], var!("b"))
+        );
         assert_expr_eq!(input, expected_ast);
     }
 
     #[test]
     fn generator_comprehension() {
-        let input = "(i * 2 for i in b)";
-        let expected_ast = Expr::GeneratorComprehension {
-            body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
-            clauses: vec![ForClause {
-                index: loop_index!["i"],
-                iterable: var!("b"),
-                condition: None,
-            }],
-        };
+        let input = "(i * 2 for i in a)";
+        let expected_ast = gen_comp!(
+            bin_op!(var!("i"), Mul, int!(2));
+            for_clause!(loop_index!["i"], var!("a"))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(i * j for i in a for j in b)";
+        let expected_ast = gen_comp!(
+            bin_op!(var!("i"), Mul, var!("j"));
+            for_clause!(loop_index!["i"], var!("a")),
+            for_clause!(loop_index!["j"], var!("b"))
+        );
         assert_expr_eq!(input, expected_ast);
 
         let input = "foo(i * 2 for i in b)";
         let expected_ast = func_call!(
             "foo",
-            call_args![Expr::GeneratorComprehension {
-                body: Box::new(bin_op!(var!("i"), Mul, int!(2))),
-                clauses: vec![ForClause {
-                    index: loop_index!["i"],
-                    iterable: var!("b"),
-                    condition: None,
-                }],
-            }]
+            call_args![gen_comp!(
+                bin_op!(var!("i"), Mul, int!(2));
+                for_clause!(loop_index!["i"], var!("b"))
+            )]
+        );
+        assert_expr_eq!(input, expected_ast);
+    }
+
+    #[test]
+    fn dict_comprehension() {
+        let input = "{ key: val * 2 for key, val in d }";
+        let expected_ast = dict_comp!(
+            var!("key") => bin_op!(var!("val"), Mul, int!(2));
+            for_clause!(loop_index!["key", "val"], var!("d"))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ key: val * 2 for key in d for val in e }";
+        let expected_ast = dict_comp!(
+            var!("key") => bin_op!(var!("val"), Mul, int!(2));
+            for_clause!(loop_index!["key"], var!("d")),
+            for_clause!(loop_index!["val"], var!("e"))
+        );
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{ key: val * 2 for (key, val) in d }";
+        let expected_ast = dict_comp!(
+            var!("key") => bin_op!(var!("val"), Mul, int!(2));
+            for_clause!(loop_index!["key", "val"], var!("d"))
         );
         assert_expr_eq!(input, expected_ast);
     }
@@ -1890,7 +1908,7 @@ tuple((1,
     #[test]
     fn byte_string() {
         let input = "b'hello'";
-        let expected_ast = Expr::BytesLiteral("hello".into());
+        let expected_ast = bytes!("hello");
         assert_expr_eq!(input, expected_ast);
     }
 

@@ -209,8 +209,8 @@ mod tests {
         code.constants.push(Constant::Int(-1));
 
         // Globals
-        code.names.push("i".to_string());
-        code.names.push("a".to_string());
+        code.nonlocal_names.push("i".to_string());
+        code.nonlocal_names.push("a".to_string());
 
         let mut frame = CodeGenFrame::new(code);
 

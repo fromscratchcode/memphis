@@ -189,15 +189,15 @@ pub enum Opcode {
 impl Opcode {
     pub fn display_annotated(&self, code: &CodeObject) -> String {
         match self {
-            Opcode::StoreFast(i) => format!("STORE_FAST {} ({})", i, code.varnames[**i]),
-            Opcode::LoadFast(i) => format!("LOAD_FAST {} ({})", i, code.varnames[**i]),
-            Opcode::StoreGlobal(i) => format!("STORE_GLOBAL {} ({})", i, code.names[**i]),
-            Opcode::LoadGlobal(i) => format!("LOAD_GLOBAL {} ({})", i, code.names[**i]),
-            Opcode::LoadAttr(i) => format!("LOAD_ATTR {} ({})", i, code.names[**i]),
-            Opcode::SetAttr(i) => format!("SET_ATTR {} ({})", i, code.names[**i]),
-            Opcode::ImportName(i) => format!("IMPORT_NAME {} ({})", i, code.names[**i]),
-            Opcode::ImportFrom(i) => format!("IMPORT_FROM {} ({})", i, code.names[**i]),
-            Opcode::LoadFree(i) => format!("LOAD_FREE {} ({})", i, code.freevars[**i]),
+            Opcode::StoreFast(i) => format!("STORE_FAST {} ({})", i, code.local_names[**i]),
+            Opcode::LoadFast(i) => format!("LOAD_FAST {} ({})", i, code.local_names[**i]),
+            Opcode::StoreGlobal(i) => format!("STORE_GLOBAL {} ({})", i, code.nonlocal_names[**i]),
+            Opcode::LoadGlobal(i) => format!("LOAD_GLOBAL {} ({})", i, code.nonlocal_names[**i]),
+            Opcode::LoadAttr(i) => format!("LOAD_ATTR {} ({})", i, code.nonlocal_names[**i]),
+            Opcode::SetAttr(i) => format!("SET_ATTR {} ({})", i, code.nonlocal_names[**i]),
+            Opcode::ImportName(i) => format!("IMPORT_NAME {} ({})", i, code.nonlocal_names[**i]),
+            Opcode::ImportFrom(i) => format!("IMPORT_FROM {} ({})", i, code.nonlocal_names[**i]),
+            Opcode::LoadFree(i) => format!("LOAD_FREE {} ({})", i, code.free_names[**i]),
             Opcode::LoadConst(i) => format!("LOAD_CONST {} ({})", i, code.constants[**i]),
             _ => self.to_string(), // fallback to Display
         }

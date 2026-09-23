@@ -241,7 +241,7 @@ impl VirtualMachine {
     }
 
     fn resolve_name(&self, index: NonlocalIndex) -> &str {
-        &self.current_frame().function.code_object.names[*index]
+        &self.current_frame().function.code_object.nonlocal_names[*index]
     }
 
     fn peek(&mut self) -> Reference {

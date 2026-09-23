@@ -69,46 +69,40 @@ pub fn compile_err_at_pkg(text: &str, module: ModuleName, pkg: ModuleName) -> Co
     }
 }
 
+pub fn test_code(name: &str, params: &[&str]) -> CodeObject {
+    CodeObject::new(
+        name,
+        ModuleName::main(),
+        "<stdin>",
+        &params.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        FunctionType::Regular,
+    )
+}
+
 pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
     CodeObject {
-        module_name: ModuleName::main(),
-        name: "<module>".into(),
-        filename: "<stdin>".into(),
         bytecode: vec![
             Opcode::LoadConst(Index::new(0)),
             Opcode::MakeFunction,
             Opcode::StoreGlobal(Index::new(0)),
         ],
-        arg_count: 0,
-        varnames: vec![],
-        freevars: vec![],
-        names: vec![func.name().into()],
+        nonlocal_names: vec![func.name().into()],
         constants: vec![Constant::Code(func)],
-        line_map: vec![],
-        function_type: FunctionType::Regular,
-        exception_table: vec![],
+        ..test_code("<module>", &[])
     }
 }
 
-pub fn wrap_top_level_class(name: &str, cls: CodeObject) -> CodeObject {
+pub fn wrap_top_level_class(cls: CodeObject) -> CodeObject {
     CodeObject {
-        module_name: ModuleName::main(),
-        name: "<module>".into(),
-        filename: "<stdin>".into(),
         bytecode: vec![
             Opcode::LoadBuildClass,
             Opcode::LoadConst(Index::new(0)),
             Opcode::Call(1),
             Opcode::StoreGlobal(Index::new(0)),
         ],
-        arg_count: 0,
-        varnames: vec![],
-        freevars: vec![],
-        names: vec![name.into()],
+        nonlocal_names: vec![cls.name().into()],
         constants: vec![Constant::Code(cls)],
-        line_map: vec![],
-        function_type: FunctionType::Regular,
-        exception_table: vec![],
+        ..test_code("<module>", &[])
     }
 }
 
@@ -139,15 +133,15 @@ pub fn _assert_code_eq(actual: &CodeObject, expected: &CodeObject) {
         "Code object arg_count does not match"
     );
     assert_eq!(
-        actual.varnames, expected.varnames,
+        actual.local_names, expected.local_names,
         "Code object varnames do not match"
     );
     assert_eq!(
-        actual.freevars, expected.freevars,
+        actual.free_names, expected.free_names,
         "Code object freevars do not match"
     );
     assert_eq!(
-        actual.names, expected.names,
+        actual.nonlocal_names, expected.nonlocal_names,
         "Code object names do not match"
     );
     assert_eq!(

@@ -16,9 +16,27 @@ macro_rules! str {
     };
 }
 
+macro_rules! bytes {
+    ($bytes:expr) => {
+        $crate::parser::types::Expr::BytesLiteral($bytes.into())
+    };
+}
+
 macro_rules! none {
     () => {
         $crate::parser::types::Expr::None
+    };
+}
+
+macro_rules! ellipsis {
+    () => {
+        $crate::parser::types::Expr::Ellipsis
+    };
+}
+
+macro_rules! not_implemented {
+    () => {
+        $crate::parser::types::Expr::NotImplemented
     };
 }
 
@@ -472,38 +490,100 @@ macro_rules! loop_index {
     };
 }
 
+macro_rules! for_clause {
+    ($index:expr, $iterable:expr) => {
+        $crate::parser::types::ForClause {
+            index: $index,
+            iterable: $iterable,
+            condition: None,
+        }
+    };
+    ($index:expr, $iterable:expr, $condition:expr) => {
+        $crate::parser::types::ForClause {
+            index: $index,
+            iterable: $iterable,
+            condition: Some($condition),
+        }
+    };
+}
+
+macro_rules! list_comp {
+    ($body:expr; $($clause:expr),+ $(,)?) => {
+        $crate::parser::types::Expr::ListComprehension {
+            body: Box::new($body),
+            clauses: vec![$($clause),+],
+        }
+    }
+}
+
+macro_rules! set_comp {
+    ($body:expr; $($clause:expr),+ $(,)?) => {
+        $crate::parser::types::Expr::SetComprehension {
+            body: Box::new($body),
+            clauses: vec![$($clause),+],
+        }
+    }
+}
+
+macro_rules! gen_comp {
+    ($body:expr; $($clause:expr),+ $(,)?) => {
+        $crate::parser::types::Expr::GeneratorComprehension {
+            body: Box::new($body),
+            clauses: vec![$($clause),+],
+        }
+    }
+}
+
+macro_rules! dict_comp {
+    ($key:expr => $value:expr; $($clause:expr),+ $(,)?) => {
+        $crate::parser::types::Expr::DictComprehension {
+            key_body: Box::new($key),
+            value_body: Box::new($value),
+            clauses: vec![$($clause),+],
+        }
+    }
+}
+
 pub(crate) use await_expr;
 pub(crate) use bin_op;
 pub(crate) use bool;
+pub(crate) use bytes;
 pub(crate) use call_args;
 pub(crate) use cmp_chain;
 pub(crate) use cmp_op;
 pub(crate) use dict;
+pub(crate) use dict_comp;
 pub(crate) use dict_pair;
 pub(crate) use dict_unpack;
+pub(crate) use ellipsis;
 pub(crate) use f_str_expr;
 pub(crate) use f_str_list;
 pub(crate) use f_str_str;
 pub(crate) use float;
+pub(crate) use for_clause;
 pub(crate) use from_import_all;
 pub(crate) use from_import_item;
 pub(crate) use from_import_list;
 pub(crate) use func_call;
 pub(crate) use func_call_callee;
+pub(crate) use gen_comp;
 pub(crate) use ident;
 pub(crate) use import;
 pub(crate) use index_access;
 pub(crate) use int;
 pub(crate) use lambda;
 pub(crate) use list;
+pub(crate) use list_comp;
 pub(crate) use logic_op;
 pub(crate) use loop_index;
 pub(crate) use member_access;
 pub(crate) use method_call;
 pub(crate) use none;
+pub(crate) use not_implemented;
 pub(crate) use param;
 pub(crate) use params;
 pub(crate) use set;
+pub(crate) use set_comp;
 pub(crate) use slice;
 pub(crate) use slice_op;
 pub(crate) use stmt;
