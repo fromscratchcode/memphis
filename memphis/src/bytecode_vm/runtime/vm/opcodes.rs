@@ -295,6 +295,22 @@ impl VirtualMachine {
                 let dict_ref = self.new_object(type_, VmValue::Dict(Dict::new(items)));
                 self.push(dict_ref);
             }
+            Opcode::ListAppend(n) => {
+                let item_ref = self.pop();
+
+                let frame = self.current_frame_mut();
+                let list_ref = *frame
+                    .stack
+                    .iter()
+                    .rev()
+                    // We need n - 1 because `nth` is zero-based, while n here counts down from the
+                    // top of the stack beginning at 1.
+                    .nth(n - 1)
+                    .expect("Stack underflow in LIST_APPEND");
+                let binding = self.deref(list_ref);
+                let list = binding.as_list().expect("Expected list");
+                list.borrow_mut().append(item_ref);
+            }
             Opcode::GetIter => {
                 let obj_ref = self.pop();
                 let iterator_ref = step_raised!(iter_internal(self, obj_ref));

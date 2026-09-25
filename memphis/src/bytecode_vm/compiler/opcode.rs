@@ -109,6 +109,12 @@ pub enum Opcode {
     /// Pop the specified number of keys, then values, off the stack and build a dict object. This
     /// will result in 2 * n pops.
     BuildMap(usize),
+    /// Used to append to a list during list comprehension.
+    /// Pops `item` and appends it to `STACK[-n]`.
+    /// For a stack of shape [list, iter, item], LIST_APPEND(2) will pop `item` and append to
+    /// `list` two spots up the stack.
+    /// With two active iterators, the operand of 2 would become 3.
+    ListAppend(usize),
     /// Pops the top value off the stack, constructs an iterator from it by `iter()`, and
     /// pushes the iterator onto the stack.
     GetIter,
@@ -267,6 +273,7 @@ impl Display for Opcode {
             Opcode::BuildList(i) => write!(f, "BUILD_LIST {i}"),
             Opcode::BuildTuple(i) => write!(f, "BUILD_TUPLE {i}"),
             Opcode::BuildMap(i) => write!(f, "BUILD_MAP {i}"),
+            Opcode::ListAppend(i) => write!(f, "LIST_APPEND {i}"),
             Opcode::GetIter => write!(f, "GET_ITER"),
             Opcode::ForIter(i) => write!(f, "FOR_ITER {i}"),
             Opcode::Jump(i) => write!(f, "JUMP {i}"),

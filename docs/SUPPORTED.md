@@ -26,7 +26,7 @@ For builtin functions, builtin types, and per-type method/operator inventory, se
 |Negative numbers|✅|✅|
 |Stack traces|✅|✅|
 |Lists|✅|✅|
-|List comprehension|✅||
+|List comprehension|✅|✅|
 |Sets|✅||
 |Set comprehension|✅||
 |Dictionaries|✅|✅|
@@ -35,6 +35,7 @@ For builtin functions, builtin types, and per-type method/operator inventory, se
 |Tuples|✅|✅|
 |Ranges|✅|✅|
 |Generator functions|✅|✅|
+|Generator comprehension|✅||
 |`yield from`|✅|✅|
 |Index access|✅|✅|
 |Slices|✅||

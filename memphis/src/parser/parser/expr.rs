@@ -942,6 +942,11 @@ impl Parser<'_> {
         while self.current_token() == &Token::For {
             clauses.push(self.parse_comprehension_clause()?);
         }
+        // TODO in theory we could use a NonEmptyVec for something like this
+        assert!(
+            !clauses.is_empty(),
+            "Internal parser error: Comprehension clauses non-empty"
+        );
         Ok(clauses)
     }
 

@@ -181,6 +181,18 @@ i, s
     }
 
     #[test]
+    fn for_in_loop_unpacking() {
+        let text = r#"
+s = 0
+for x, y in [(2,9),(3,6),(0,11)]:
+    s = s + x * y
+
+s
+"#;
+        assert_eval_eq!(text, int!(36));
+    }
+
+    #[test]
     fn next_builtin_list() {
         let text = r#"
 it = iter([1, 2, 3])

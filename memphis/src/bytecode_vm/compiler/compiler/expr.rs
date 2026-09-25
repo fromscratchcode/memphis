@@ -1,9 +1,9 @@
 use crate::{
     bytecode_vm::{
         Compiler, CompilerError, CompilerResult,
-        compiler::{Constant, JumpKind, Opcode},
+        compiler::{CodeGenFrame, CodeObject, Constant, JumpKind, Opcode},
     },
-    domain::Identifier,
+    domain::{FunctionType, Identifier},
     parser::types::{
         AstInvokeArgs, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart, ForClause,
         FormatOption, LogicalOp, UnaryOp,
@@ -34,7 +34,7 @@ impl Compiler {
                 Ok(())
             }
             Expr::Variable(name) => {
-                self.compile_load(name);
+                self.compile_load(name.as_str());
                 Ok(())
             }
             Expr::List(items) => self.compile_list(items),
@@ -245,7 +245,7 @@ impl Compiler {
     ) -> CompilerResult<()> {
         match callee {
             Callee::Expr(callee) => self.compile_expr(callee)?,
-            Callee::Symbol(name) => self.compile_load(name),
+            Callee::Symbol(name) => self.compile_load(name.as_str()),
         };
 
         // We push the args onto the stack in reverse call order so that we will pop
@@ -301,12 +301,90 @@ impl Compiler {
         Ok(())
     }
 
+    fn compile_comprehension_clauses(
+        &mut self,
+        clauses: &[ForClause],
+        body: &Expr,
+        num_iterators: usize,
+    ) -> CompilerResult<()> {
+        let (clause, remaining) = clauses
+            .split_first()
+            .expect("Comprehension must have at least one clause");
+
+        let (loop_start, loop_end) = {
+            let frame = self.frame_mut();
+            (frame.new_label(), frame.new_label())
+        };
+
+        self.frame_mut().bind_label(loop_start);
+        self.frame_mut().emit_jump_to(loop_end, JumpKind::ForIter);
+
+        self.compile_loop_index(&clause.index);
+
+        // condition
+        if let Some(condition) = &clause.condition {
+            self.compile_expr(condition)?;
+            self.frame_mut()
+                .emit_jump_to(loop_start, JumpKind::PopJumpIfFalse);
+        }
+
+        if remaining.is_empty() {
+            self.compile_expr(body)?;
+
+            // n of 2 here is beacuse the stack looks like [result, iterator, item],
+            // we want to append to result
+            self.emit(Opcode::ListAppend(num_iterators + 1));
+        } else {
+            let next_clause = &remaining[0];
+            self.compile_expr(&next_clause.iterable)?;
+            self.emit(Opcode::GetIter);
+
+            self.compile_comprehension_clauses(remaining, body, num_iterators + 1)?;
+        }
+
+        self.frame_mut().emit_jump_to(loop_start, JumpKind::Jump);
+        self.frame_mut().bind_label(loop_end);
+        Ok(())
+    }
+
+    // not a valid identifier so it cannot clash with user code
+    const LISTCOMP_ITER: &str = ".iter0";
+
     fn compile_list_comprehension(
         &mut self,
-        _clauses: &[ForClause],
-        _body: &Expr,
+        clauses: &[ForClause],
+        body: &Expr,
     ) -> CompilerResult<()> {
-        todo!();
+        let code = CodeObject::new(
+            "listcomp",
+            self.module_name.clone(),
+            &self.filename,
+            &[Self::LISTCOMP_ITER],
+            FunctionType::Regular,
+        );
+        self.code_stack.push(CodeGenFrame::new(code));
+        // create an empty list we'll later append to
+        self.emit(Opcode::BuildList(0));
+        self.compile_load(Self::LISTCOMP_ITER);
+
+        self.compile_comprehension_clauses(clauses, body, 1)?;
+
+        self.emit(Opcode::ReturnValue);
+
+        let code_gen_frame = self.code_stack.pop().expect("Code stack underflow!");
+        let listcomp = code_gen_frame.finalize();
+
+        self.compile_function(listcomp)?;
+
+        let iterable = &clauses
+            .first()
+            .expect("Comprehension must have at least one clause")
+            .iterable;
+        self.compile_expr(iterable)?;
+        self.emit(Opcode::GetIter);
+        self.emit(Opcode::Call(1));
+
+        Ok(())
     }
 
     fn compile_expr_slice(&mut self, items: &[Expr]) -> CompilerResult<()> {
@@ -757,26 +835,186 @@ mod tests_bytecode_expr {
             ]
         );
     }
+}
+
+#[cfg(test)]
+mod tests_expr_that_create_code_objects {
+    use super::*;
+
+    use crate::bytecode_vm::{
+        compiler::{CodeObject, test_utils::*},
+        indices::Index,
+    };
 
     #[test]
-    #[ignore]
-    fn list_comprehension() {
-        let expr = list_comp!(
-            bin_op!(var!("i"), Mul, int!(2));
-            for_clause!(loop_index!["i"], var!("a"))
-        );
-        let bytecode = compile_expr(expr);
-        assert_eq!(
-            bytecode,
-            &[
+    fn list_comprehension_basic() {
+        let text = r#"[ i * 2 for i in x ]"#;
+        let code = compile(text);
+
+        let listcomp = CodeObject {
+            bytecode: vec![
+                Opcode::BuildList(0),
+                Opcode::LoadFast(Index::new(0)),
+                Opcode::ForIter(6),
+                Opcode::StoreFast(Index::new(1)),
+                Opcode::LoadFast(Index::new(1)),
                 Opcode::LoadConst(Index::new(0)),
+                Opcode::Mul,
+                Opcode::ListAppend(2),
+                Opcode::Jump(-7),
+                Opcode::ReturnValue,
+            ],
+            local_names: vec![".iter0".into(), "i".into()],
+            constants: vec![Constant::Int(2)],
+            ..test_code("listcomp", &[".iter0"])
+        };
+
+        let expected = CodeObject {
+            bytecode: vec![
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::MakeFunction,
                 Opcode::LoadGlobal(Index::new(0)),
-                Opcode::Format,
+                Opcode::GetIter,
+                Opcode::Call(1),
+                Opcode::ReturnValue,
+            ],
+            nonlocal_names: vec!["x".into()],
+            constants: vec![Constant::Code(listcomp)],
+            ..test_module()
+        };
+
+        assert_code_eq!(code, expected);
+    }
+
+    #[test]
+    fn list_comprehension_conditional() {
+        let text = r#"[ i * 2 for i in x if i > 11 ]"#;
+        let code = compile(text);
+
+        let listcomp = CodeObject {
+            bytecode: vec![
+                Opcode::BuildList(0),
+                Opcode::LoadFast(Index::new(0)),
+                Opcode::ForIter(10),
+                Opcode::StoreFast(Index::new(1)),
+                // conditional
+                Opcode::LoadFast(Index::new(1)),
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::GreaterThan,
+                Opcode::PopJumpIfFalse(-6),
+                // body
+                Opcode::LoadFast(Index::new(1)),
                 Opcode::LoadConst(Index::new(1)),
-                Opcode::LoadGlobal(Index::new(1)),
-                Opcode::Format,
-                Opcode::BuildString(4),
-            ]
-        );
+                Opcode::Mul,
+                Opcode::ListAppend(2),
+                Opcode::Jump(-11),
+                Opcode::ReturnValue,
+            ],
+            local_names: vec![".iter0".into(), "i".into()],
+            constants: vec![Constant::Int(11), Constant::Int(2)],
+            ..test_code("listcomp", &[".iter0"])
+        };
+
+        let expected = CodeObject {
+            bytecode: vec![
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::MakeFunction,
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::GetIter,
+                Opcode::Call(1),
+                Opcode::ReturnValue,
+            ],
+            nonlocal_names: vec!["x".into()],
+            constants: vec![Constant::Code(listcomp)],
+            ..test_module()
+        };
+
+        assert_code_eq!(code, expected);
+    }
+
+    #[test]
+    fn list_comprehension_unpacking() {
+        let text = r#"[ i * j for i, j in x ]"#;
+        let code = compile(text);
+
+        let listcomp = CodeObject {
+            bytecode: vec![
+                Opcode::BuildList(0),
+                Opcode::LoadFast(Index::new(0)),
+                Opcode::ForIter(8),
+                Opcode::UnpackSequence(2),
+                Opcode::StoreFast(Index::new(1)),
+                Opcode::StoreFast(Index::new(2)),
+                Opcode::LoadFast(Index::new(2)),
+                Opcode::LoadFast(Index::new(1)),
+                Opcode::Mul,
+                Opcode::ListAppend(2),
+                Opcode::Jump(-9),
+                Opcode::ReturnValue,
+            ],
+            local_names: vec![".iter0".into(), "j".into(), "i".into()],
+            ..test_code("listcomp", &[".iter0"])
+        };
+
+        let expected = CodeObject {
+            bytecode: vec![
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::MakeFunction,
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::GetIter,
+                Opcode::Call(1),
+                Opcode::ReturnValue,
+            ],
+            nonlocal_names: vec!["x".into()],
+            constants: vec![Constant::Code(listcomp)],
+            ..test_module()
+        };
+
+        assert_code_eq!(code, expected);
+    }
+
+    #[test]
+    fn list_comprehension_nested() {
+        let text = r#"[ i * j for i in x for j in y ]"#;
+        let code = compile(text);
+
+        let listcomp = CodeObject {
+            bytecode: vec![
+                Opcode::BuildList(0),
+                Opcode::LoadFast(Index::new(0)),
+                Opcode::ForIter(11),
+                Opcode::StoreFast(Index::new(1)),
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::GetIter,
+                Opcode::ForIter(6),
+                Opcode::StoreFast(Index::new(2)),
+                Opcode::LoadFast(Index::new(1)),
+                Opcode::LoadFast(Index::new(2)),
+                Opcode::Mul,
+                Opcode::ListAppend(3),
+                Opcode::Jump(-7),
+                Opcode::Jump(-12),
+                Opcode::ReturnValue,
+            ],
+            local_names: vec![".iter0".into(), "i".into(), "j".into()],
+            nonlocal_names: vec!["y".into()],
+            ..test_code("listcomp", &[".iter0"])
+        };
+
+        let expected = CodeObject {
+            bytecode: vec![
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::MakeFunction,
+                Opcode::LoadGlobal(Index::new(0)),
+                Opcode::GetIter,
+                Opcode::Call(1),
+                Opcode::ReturnValue,
+            ],
+            nonlocal_names: vec!["x".into()],
+            constants: vec![Constant::Code(listcomp)],
+            ..test_module()
+        };
+
+        assert_code_eq!(code, expected);
     }
 }

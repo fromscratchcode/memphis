@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
         Compiler, CompilerError, CompilerResult,
-        compiler::{CodeObject, Constant, JumpKind, Opcode},
+        compiler::{CodeObject, JumpKind, Opcode},
     },
     domain::{FromImportPath, FunctionType, Identifier, resolve_import_path},
     parser::types::{
@@ -116,7 +116,7 @@ impl Compiler {
     fn compile_assignment_lhs(&mut self, left: &Expr) -> CompilerResult<()> {
         match left {
             Expr::Variable(name) => {
-                self.compile_store(name);
+                self.compile_store(name.as_str());
             }
             Expr::MemberAccess { object, field } => {
                 self.compile_expr(object)?;
@@ -171,11 +171,7 @@ impl Compiler {
                 "'else' not yet supported for a for loop in bytecode VM.".to_string(),
             ));
         }
-        let LoopIndex::Variable(index) = index else {
-            return Err(CompilerError::Unsupported(
-                "Tuple indicies not yet supported in bytecode VM.".to_string(),
-            ));
-        };
+
         self.compile_expr(iterable)?;
         self.emit(Opcode::GetIter);
 
@@ -187,7 +183,7 @@ impl Compiler {
         self.frame_mut().bind_label(loop_start);
         self.frame_mut().emit_jump_to(loop_end, JumpKind::ForIter);
 
-        self.compile_store(index);
+        self.compile_loop_index(index);
         self.compile_ast(body)?;
 
         self.frame_mut().emit_jump_to(loop_start, JumpKind::Jump);
@@ -289,16 +285,16 @@ impl Compiler {
             FunctionType::Regular
         };
 
-        let varnames = args
+        let local_names = args
             .positional_or_keyword
             .iter()
-            .map(|p| p.arg.to_string())
-            .collect::<Vec<String>>();
+            .map(|p| p.arg.as_str())
+            .collect::<Vec<&str>>();
         let code_object = CodeObject::new(
             name.as_str(),
             self.module_name.clone(),
             &self.filename,
-            &varnames,
+            &local_names,
             function_type,
         );
 
@@ -319,7 +315,7 @@ impl Compiler {
         }
 
         // Bind the final decorated function
-        self.compile_store(name);
+        self.compile_store(name.as_str());
         Ok(())
     }
 
@@ -357,7 +353,7 @@ impl Compiler {
         let num_args = 1;
         self.emit(Opcode::Call(num_args));
 
-        self.compile_store(name);
+        self.compile_store(name.as_str());
         Ok(())
     }
 
@@ -486,7 +482,7 @@ impl Compiler {
                     self.frame_mut()
                         .emit_jump_to(false_target, JumpKind::PopJumpIfFalse);
                     if let Some(alias) = alias {
-                        self.compile_store(alias);
+                        self.compile_store(alias.as_str());
                     }
                 }
             }
@@ -528,29 +524,6 @@ impl Compiler {
 
         self.compile_assignment_lhs(target)?;
         Ok(())
-    }
-
-    /// Load a CodeObject and turn it into a function or closure.
-    fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
-        let free_vars = code.free_names.clone();
-        self.compile_code(code);
-
-        if free_vars.is_empty() {
-            self.emit(Opcode::MakeFunction);
-        } else {
-            // We push the free vars onto the stack in reverse order so that we will pop
-            // them off in order.
-            for free_var in free_vars.iter().rev() {
-                // TODO this is a hack, we should either treat these as identifiers or not!
-                self.compile_load(&Identifier::new(free_var).unwrap());
-            }
-            self.emit(Opcode::MakeClosure(free_vars.len()));
-        }
-        Ok(())
-    }
-
-    fn compile_code(&mut self, code: CodeObject) {
-        self.compile_constant(Constant::Code(code));
     }
 }
 
@@ -662,7 +635,7 @@ mod tests_bytecode_stmt {
     #[test]
     fn for_in_loop() {
         let s = stmt!(StatementKind::ForInLoop {
-            index: LoopIndex::Variable(ident!("i")),
+            index: loop_index!["i"],
             iterable: list![int!(1), int!(2)],
             body: ast![stmt_assign!(var!("a"), int!(-1))],
             else_block: None
@@ -680,6 +653,34 @@ mod tests_bytecode_stmt {
                 Opcode::LoadConst(Index::new(2)),
                 Opcode::StoreGlobal(Index::new(1)),
                 Opcode::Jump(-5),
+            ]
+        );
+    }
+
+    #[test]
+    fn for_in_loop_unpacking() {
+        let s = stmt!(StatementKind::ForInLoop {
+            index: loop_index!["i", "j"],
+            iterable: list![tuple![int!(1), int!(2)]],
+            body: ast![stmt_assign!(var!("a"), int!(-1))],
+            else_block: None
+        });
+        let bytecode = compile_stmt(s);
+        assert_eq!(
+            bytecode,
+            &[
+                Opcode::LoadConst(Index::new(0)),
+                Opcode::LoadConst(Index::new(1)),
+                Opcode::BuildTuple(2),
+                Opcode::BuildList(1),
+                Opcode::GetIter,
+                Opcode::ForIter(6),
+                Opcode::UnpackSequence(2),
+                Opcode::StoreGlobal(Index::new(0)),
+                Opcode::StoreGlobal(Index::new(1)),
+                Opcode::LoadConst(Index::new(2)),
+                Opcode::StoreGlobal(Index::new(2)),
+                Opcode::Jump(-7),
             ]
         );
     }

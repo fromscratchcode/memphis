@@ -1390,44 +1390,6 @@ type(1, unexpected=True)
     }
 
     #[test]
-    fn list_comprehension() {
-        let input = r#"
-[ i * 2 for i in range(1,4) ]
-"#;
-        assert_eval_eq!(input, list![int!(2), int!(4), int!(6),]);
-    }
-
-    #[test]
-    fn list_comprehension_conditional() {
-        let input = r#"
-[ i * 2 for i in range(1,4) if False ]
-"#;
-        assert_eval_eq!(input, list![]);
-
-        let input = r#"
-[ j * 2 for j in range(1,4) if j > 2 ]
-"#;
-        assert_eval_eq!(input, list![int!(6),]);
-    }
-
-    #[test]
-    fn list_comprehension_multiple_clauses() {
-        let input = r#"
-[x * y for x in range(1,3) for y in range(1,3)]
-"#;
-        assert_eval_eq!(input, list![int!(1), int!(2), int!(2), int!(4),]);
-    }
-
-    #[test]
-    fn list_comprehension_tuple_unpacking() {
-        let input = r#"
-[x + y for (x, y) in [(1, 2), (3, 4)]]
-"#;
-
-        assert_eval_eq!(input, list![int!(3), int!(7)]);
-    }
-
-    #[test]
     fn set_comprehension() {
         let input = r#"
 { i * 2 for i in range(1,4) }
@@ -5610,27 +5572,6 @@ f(a=2)
     }
 
     #[test]
-    fn list_comprehension_preserves_existing_loop_variable() {
-        let input = r#"
-x = "outside"
-result = [x for x in [1, 2]]
-"#;
-        let ctx = run(input);
-        assert_read_eq!(ctx, "result", list![int!(1), int!(2)]);
-        assert_read_eq!(ctx, "x", str!("outside"));
-    }
-
-    #[test]
-    fn list_comprehension_does_not_introduce_loop_variable() {
-        let input = r#"
-result = [y for y in [1]]
-y
-"#;
-        let e = eval_expect_error(input);
-        assert_name_error!(e.exception, "y");
-    }
-
-    #[test]
     fn list_comprehension_inside_class_cannot_see_class_namespace() {
         let input = r#"
 class Example:
@@ -5654,34 +5595,6 @@ Example.values
     }
 
     #[test]
-    fn list_comprehension_evaluates_first_iterable_in_outer_scope() {
-        let input = r#"
-x = [1, 2]
-result = [x for x in x]
-"#;
-        let ctx = run(input);
-        assert_read_eq!(ctx, "result", list![int!(1), int!(2)]);
-        assert_read_eq!(ctx, "x", list![int!(1), int!(2)]);
-    }
-
-    #[test]
-    fn list_comprehension_nested_clauses_and_filters_are_isolated() {
-        let input = r#"
-x = "outer x"
-y = "outer y"
-result = [(x, y) for x in [1, 2] for y in [x, x + 1] if y > x]
-"#;
-        let ctx = run(input);
-        assert_read_eq!(
-            ctx,
-            "result",
-            list![tuple![int!(1), int!(2)], tuple![int!(2), int!(3)]]
-        );
-        assert_read_eq!(ctx, "x", str!("outer x"));
-        assert_read_eq!(ctx, "y", str!("outer y"));
-    }
-
-    #[test]
     fn list_comprehension_multiple_clauses_share_one_closure_scope() {
         let input = r#"
 functions = [
@@ -5694,13 +5607,19 @@ first = functions[0]()
 second = functions[1]()
 third = functions[2]()
 fourth = functions[3]()
-"#;
-        let ctx = run(input);
 
-        assert_read_eq!(ctx, "first", tuple![int!(2), int!(3)]);
-        assert_read_eq!(ctx, "second", tuple![int!(2), int!(3)]);
-        assert_read_eq!(ctx, "third", tuple![int!(2), int!(3)]);
-        assert_read_eq!(ctx, "fourth", tuple![int!(2), int!(3)]);
+first, second, third, fourth
+"#;
+
+        assert_eval_eq!(
+            input,
+            tuple![
+                tuple![int!(2), int!(3)],
+                tuple![int!(2), int!(3)],
+                tuple![int!(2), int!(3)],
+                tuple![int!(2), int!(3)],
+            ]
+        );
     }
 
     #[test]
@@ -5716,12 +5635,9 @@ first = next(generators[0])
 second = next(generators[1])
 third = next(generators[2])
 fourth = next(generators[3])
-"#;
-        let ctx = run(input);
 
-        assert_read_eq!(ctx, "first", int!(23));
-        assert_read_eq!(ctx, "second", int!(23));
-        assert_read_eq!(ctx, "third", int!(23));
-        assert_read_eq!(ctx, "fourth", int!(23));
+first, second, third, fourth
+"#;
+        assert_eval_eq!(input, tuple![int!(23), int!(23), int!(23), int!(23),]);
     }
 }

@@ -74,9 +74,13 @@ pub fn test_code(name: &str, params: &[&str]) -> CodeObject {
         name,
         ModuleName::main(),
         "<stdin>",
-        &params.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        params,
         FunctionType::Regular,
     )
+}
+
+pub fn test_module() -> CodeObject {
+    CodeObject::new_root(ModuleName::main(), "<stdin>")
 }
 
 pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
@@ -88,7 +92,7 @@ pub fn wrap_top_level_function(func: CodeObject) -> CodeObject {
         ],
         nonlocal_names: vec![func.name().into()],
         constants: vec![Constant::Code(func)],
-        ..test_code("<module>", &[])
+        ..test_module()
     }
 }
 
@@ -102,7 +106,7 @@ pub fn wrap_top_level_class(cls: CodeObject) -> CodeObject {
         ],
         nonlocal_names: vec![cls.name().into()],
         constants: vec![Constant::Code(cls)],
-        ..test_code("<module>", &[])
+        ..test_module()
     }
 }
 
@@ -134,15 +138,15 @@ pub fn _assert_code_eq(actual: &CodeObject, expected: &CodeObject) {
     );
     assert_eq!(
         actual.local_names, expected.local_names,
-        "Code object varnames do not match"
+        "Code object local names do not match"
     );
     assert_eq!(
         actual.free_names, expected.free_names,
-        "Code object freevars do not match"
+        "Code object free names do not match"
     );
     assert_eq!(
         actual.nonlocal_names, expected.nonlocal_names,
-        "Code object names do not match"
+        "Code object nonlocal names do not match"
     );
     assert_eq!(
         actual.function_type, expected.function_type,

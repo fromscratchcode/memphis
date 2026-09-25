@@ -120,6 +120,13 @@ impl VmValue {
         }
     }
 
+    pub fn as_list(&self) -> Option<&Container<List>> {
+        match self {
+            VmValue::List(i) => Some(i),
+            _ => None,
+        }
+    }
+
     pub fn to_boolean(&self) -> bool {
         match self {
             VmValue::None => false,

@@ -6,8 +6,8 @@ use crate::{
         indices::{ConstantIndex, FreeIndex, Index, LocalIndex, NonlocalIndex},
     },
     core::{LogLevel, log},
-    domain::{Context, Identifier, ModuleName},
-    parser::types::Ast,
+    domain::{Context, ModuleName},
+    parser::types::{Ast, LoopIndex},
 };
 
 use super::opcode::UnsignedOffset;
@@ -79,9 +79,9 @@ impl Compiler {
         code.line_map.push((offset, line_number));
     }
 
-    fn generate_load(&mut self, name: &Identifier) -> Opcode {
+    fn generate_load(&mut self, name: &str) -> Opcode {
         match self.context() {
-            Context::Global => Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name.as_str())),
+            Context::Global => Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name)),
             Context::Local => {
                 // Check locals first (top of the stack)
                 if let Some(index) = self.get_local_index(name) {
@@ -94,10 +94,7 @@ impl Compiler {
                 // (bottom) entry because it's the global scope.
                 let enclosing_scopes = &self.code_stack[1..self.code_stack.len() - 1];
                 for code_gen_frame in enclosing_scopes.iter().rev() {
-                    if self
-                        .resolve_local_index_for_code(name, code_gen_frame.code())
-                        .is_some()
-                    {
+                    if resolve_local_index_for_code(name, code_gen_frame.code()).is_some() {
                         // This would be a local in an enclosing scope, but we need an index
                         // relative to our own code object.
                         return Opcode::LoadFree(self.get_or_set_free_var(name));
@@ -105,16 +102,50 @@ impl Compiler {
                 }
 
                 // If it's not local or free, it's global. Put that quote on the wall.
-                Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name.as_str()))
+                Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name))
             }
         }
     }
 
-    fn generate_store(&mut self, name: &Identifier) -> Opcode {
+    fn generate_store(&mut self, name: &str) -> Opcode {
         match self.context() {
-            Context::Global => Opcode::StoreGlobal(self.get_or_set_nonlocal_index(name.as_str())),
+            Context::Global => Opcode::StoreGlobal(self.get_or_set_nonlocal_index(name)),
             Context::Local => Opcode::StoreFast(self.get_or_set_local_index(name)),
         }
+    }
+
+    /// Load a CodeObject and turn it into a function or closure.
+    fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
+        let free_vars = code.free_names.clone();
+        self.compile_code(code);
+
+        if free_vars.is_empty() {
+            self.emit(Opcode::MakeFunction);
+        } else {
+            // We push the free vars onto the stack in reverse order so that we will pop
+            // them off in order.
+            for free_var in free_vars.iter().rev() {
+                self.compile_load(free_var);
+            }
+            self.emit(Opcode::MakeClosure(free_vars.len()));
+        }
+        Ok(())
+    }
+
+    fn compile_loop_index(&mut self, index: &LoopIndex) {
+        match index {
+            LoopIndex::Variable(var) => self.compile_store(var.as_str()),
+            LoopIndex::Tuple(t) => {
+                self.emit(Opcode::UnpackSequence(t.len()));
+                for var in t.iter().rev() {
+                    self.compile_store(var.as_str());
+                }
+            }
+        };
+    }
+
+    fn compile_code(&mut self, code: CodeObject) {
+        self.compile_constant(Constant::Code(code));
     }
 
     fn compile_constant(&mut self, constant: Constant) {
@@ -122,17 +153,17 @@ impl Compiler {
         self.emit(Opcode::LoadConst(index));
     }
 
-    fn compile_load(&mut self, name: &Identifier) {
+    fn compile_load(&mut self, name: &str) {
         let load = self.generate_load(name);
         self.emit(load);
     }
 
-    fn compile_store(&mut self, name: &Identifier) {
+    fn compile_store(&mut self, name: &str) {
         let store = self.generate_store(name);
         self.emit(store);
     }
 
-    fn get_or_set_local_index(&mut self, name: &Identifier) -> LocalIndex {
+    fn get_or_set_local_index(&mut self, name: &str) -> LocalIndex {
         log(LogLevel::Trace, || {
             format!("Looking for '{name}' in locals")
         });
@@ -146,14 +177,14 @@ impl Compiler {
         }
     }
 
-    fn get_local_index(&self, name: &Identifier) -> Option<LocalIndex> {
+    fn get_local_index(&self, name: &str) -> Option<LocalIndex> {
         let code = self.frame().code();
-        self.resolve_local_index_for_code(name, code)
+        resolve_local_index_for_code(name, code)
     }
 
-    fn get_or_set_free_var(&mut self, name: &Identifier) -> FreeIndex {
+    fn get_or_set_free_var(&mut self, name: &str) -> FreeIndex {
         let code = self.frame_mut().code_mut();
-        let index = if let Some(index) = find_index(&code.free_names, name.as_str()) {
+        let index = if let Some(index) = find_index(&code.free_names, name) {
             index
         } else {
             let new_index = code.free_names.len();
@@ -161,14 +192,6 @@ impl Compiler {
             new_index
         };
         Index::new(index)
-    }
-
-    fn resolve_local_index_for_code(
-        &self,
-        name: &Identifier,
-        code: &CodeObject,
-    ) -> Option<LocalIndex> {
-        find_index(&code.local_names, name.as_str()).map(Index::new)
     }
 
     // We didn't convert this one to use Identifier yet because of how it interacts with
@@ -223,6 +246,10 @@ impl Compiler {
             .last()
             .expect("Compiler invariant violated: no current CodeGenFrame")
     }
+}
+
+fn resolve_local_index_for_code(name: &str, code: &CodeObject) -> Option<LocalIndex> {
+    find_index(&code.local_names, name).map(Index::new)
 }
 
 #[cfg(test)]
@@ -289,7 +316,7 @@ def foo():
             ],
             nonlocal_names: vec!["decorate".into(), "foo".into()],
             constants: vec![Constant::Code(fn_foo)],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
         assert_code_eq!(code, expected);
     }
@@ -316,7 +343,7 @@ def foo():
             ],
             nonlocal_names: vec!["inner".into(), "outer".into(), "foo".into()],
             constants: vec![Constant::Code(fn_foo)],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
         assert_code_eq!(code, expected);
     }
@@ -525,7 +552,7 @@ world()
             ],
             nonlocal_names: vec!["hello".into(), "world".into()],
             constants: vec![Constant::Code(fn_hello), Constant::Code(fn_world)],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);
@@ -648,7 +675,7 @@ f = Foo()
                 Opcode::StoreGlobal(Index::new(1)),
             ],
             nonlocal_names: vec!["Foo".into(), "f".into()],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);
@@ -669,7 +696,7 @@ b = f.bar()
                 Opcode::StoreGlobal(Index::new(2)),
             ],
             nonlocal_names: vec!["f".into(), "bar".into(), "b".into()],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);
@@ -688,7 +715,7 @@ import a.b.c
                 Opcode::StoreGlobal(Index::new(1)),
             ],
             nonlocal_names: vec!["a.b.c".into(), "a".into()],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);
@@ -707,7 +734,7 @@ import a.b.c as foo
                 Opcode::StoreGlobal(Index::new(1)),
             ],
             nonlocal_names: vec!["a.b.c".into(), "foo".into()],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);
@@ -746,7 +773,7 @@ from .outer import foo
                 Opcode::StoreGlobal(Index::new(1)),
             ],
             nonlocal_names: vec!["pkg.outer".into(), "foo".into()],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);
@@ -769,7 +796,7 @@ from .outer.inner import foo
                 Opcode::StoreGlobal(Index::new(1)),
             ],
             nonlocal_names: vec!["pkg.outer.inner".into(), "foo".into()],
-            ..test_code("<module>", &[])
+            ..test_module()
         };
 
         assert_code_eq!(code, expected);

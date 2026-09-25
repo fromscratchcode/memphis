@@ -12,6 +12,7 @@ mod crosscheck_function_call;
 mod crosscheck_generators;
 mod crosscheck_import;
 mod crosscheck_index_access;
+mod crosscheck_list_comprehension;
 mod crosscheck_method_call;
 mod crosscheck_multiple_return;
 mod crosscheck_next_builtin;

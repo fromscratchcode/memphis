@@ -33,6 +33,10 @@ impl List {
         self.items[index] = value;
     }
 
+    pub fn append(&mut self, value: Reference) {
+        self.items.push(value);
+    }
+
     fn get_normalized(&self, index: i64) -> Option<Reference> {
         normalize_index(index, self.len()).map(|idx| self.items[idx])
     }

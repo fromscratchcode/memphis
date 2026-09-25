@@ -30,6 +30,8 @@ pub struct CodeObject {
     pub name: String,
     pub filename: String,
     pub bytecode: Bytecode,
+    /// Can diverge from `local_names` as locals are discovered by the compiler, will initially
+    /// match `local_names.len()`
     pub arg_count: usize,
     /// Local variable names (paramters + compiler-discovered locals)
     pub local_names: Vec<String>,
@@ -58,7 +60,7 @@ impl CodeObject {
         name: &str,
         module_name: ModuleName,
         filename: &str,
-        varnames: &[String],
+        local_names: &[&str],
         function_type: FunctionType,
     ) -> Self {
         Self {
@@ -66,8 +68,8 @@ impl CodeObject {
             name: name.to_string(),
             filename: filename.to_string(),
             bytecode: vec![],
-            arg_count: varnames.len(),
-            local_names: varnames.to_vec(),
+            arg_count: local_names.len(),
+            local_names: local_names.iter().map(|i| i.to_string()).collect(),
             free_names: vec![],
             nonlocal_names: vec![],
             constants: vec![],
