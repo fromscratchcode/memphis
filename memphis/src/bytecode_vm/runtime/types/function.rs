@@ -6,7 +6,7 @@ use crate::{
 /// This encapsulates a [`CodeObject`] along with the execution environment in which the function
 /// was defined (closure/free variables). This is what gets created when you define a function in
 /// Python. This is not bound to any particular instance of a class when defined inside a class.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct FunctionObject {
     pub code_object: CodeObject,
     pub freevars: Vec<Reference>,
@@ -28,7 +28,7 @@ impl FunctionObject {
     }
 
     pub fn function_type(&self) -> &FunctionType {
-        &self.code_object.function_type
+        self.code_object.function_type()
     }
 
     pub fn name(&self) -> &str {

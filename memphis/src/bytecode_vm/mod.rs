@@ -15,5 +15,4 @@ pub use context::VmContext;
 pub use raised_error::RaisedException;
 pub use result::{CompilerResult, DomainResult, VmResult};
 pub use runtime::{Runtime, VirtualMachine};
-pub use utils::find_index;
 pub use value::VmValue;

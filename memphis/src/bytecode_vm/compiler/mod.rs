@@ -8,7 +8,7 @@ mod opcode;
 #[cfg(test)]
 pub mod test_utils;
 
-pub use code::{CodeObject, ExceptionRange};
+pub use code::{CodeObject, CodeSpec, ExceptionRange};
 pub use code_gen_frame::{CodeGenFrame, JumpKind};
 pub use compiler::Compiler;
 pub use constant::Constant;

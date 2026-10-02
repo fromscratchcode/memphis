@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
         Compiler, CompilerError, CompilerResult,
-        compiler::{CodeGenFrame, CodeObject, Constant, JumpKind, Opcode},
+        compiler::{CodeGenFrame, Constant, JumpKind, Opcode, code::CodeSpec},
     },
     domain::{FunctionType, Identifier},
     parser::types::{
@@ -226,7 +226,7 @@ impl Compiler {
 
     fn compile_member_access(&mut self, object: &Expr, field: &Identifier) -> CompilerResult<()> {
         self.compile_expr(object)?;
-        let attr_index = self.get_or_set_nonlocal_index(field.as_str());
+        let attr_index = self.frame_mut().get_or_set_nonlocal_index(field.as_str());
         self.emit(Opcode::LoadAttr(attr_index));
         Ok(())
     }
@@ -355,14 +355,14 @@ impl Compiler {
         clauses: &[ForClause],
         body: &Expr,
     ) -> CompilerResult<()> {
-        let code = CodeObject::new(
+        let spec = CodeSpec::new(
             "listcomp",
             self.module_name.clone(),
             &self.filename,
             &[Self::LISTCOMP_ITER],
             FunctionType::Regular,
         );
-        self.code_stack.push(CodeGenFrame::new(code));
+        self.code_stack.push(CodeGenFrame::new(spec));
         // create an empty list we'll later append to
         self.emit(Opcode::BuildList(0));
         self.compile_load(Self::LISTCOMP_ITER);
@@ -841,18 +841,15 @@ mod tests_bytecode_expr {
 mod tests_expr_that_create_code_objects {
     use super::*;
 
-    use crate::bytecode_vm::{
-        compiler::{CodeObject, test_utils::*},
-        indices::Index,
-    };
+    use crate::bytecode_vm::{compiler::test_utils::*, indices::Index};
 
     #[test]
     fn list_comprehension_basic() {
         let text = r#"[ i * 2 for i in x ]"#;
         let code = compile(text);
 
-        let listcomp = CodeObject {
-            bytecode: vec![
+        let listcomp = test_code("listcomp", &[".iter0"])
+            .with_bytecode([
                 Opcode::BuildList(0),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ForIter(6),
@@ -863,25 +860,23 @@ mod tests_expr_that_create_code_objects {
                 Opcode::ListAppend(2),
                 Opcode::Jump(-7),
                 Opcode::ReturnValue,
-            ],
-            local_names: vec![".iter0".into(), "i".into()],
-            constants: vec![Constant::Int(2)],
-            ..test_code("listcomp", &[".iter0"])
-        };
+            ])
+            .with_local_names([".iter0", "i"])
+            .with_constants([Constant::Int(2)])
+            .build();
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::GetIter,
                 Opcode::Call(1),
                 Opcode::ReturnValue,
-            ],
-            nonlocal_names: vec!["x".into()],
-            constants: vec![Constant::Code(listcomp)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["x"])
+            .with_constants([Constant::Code(listcomp)])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -891,8 +886,8 @@ mod tests_expr_that_create_code_objects {
         let text = r#"[ i * 2 for i in x if i > 11 ]"#;
         let code = compile(text);
 
-        let listcomp = CodeObject {
-            bytecode: vec![
+        let listcomp = test_code("listcomp", &[".iter0"])
+            .with_bytecode([
                 Opcode::BuildList(0),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ForIter(10),
@@ -909,25 +904,23 @@ mod tests_expr_that_create_code_objects {
                 Opcode::ListAppend(2),
                 Opcode::Jump(-11),
                 Opcode::ReturnValue,
-            ],
-            local_names: vec![".iter0".into(), "i".into()],
-            constants: vec![Constant::Int(11), Constant::Int(2)],
-            ..test_code("listcomp", &[".iter0"])
-        };
+            ])
+            .with_local_names([".iter0", "i"])
+            .with_constants([Constant::Int(11), Constant::Int(2)])
+            .build();
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::GetIter,
                 Opcode::Call(1),
                 Opcode::ReturnValue,
-            ],
-            nonlocal_names: vec!["x".into()],
-            constants: vec![Constant::Code(listcomp)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["x"])
+            .with_constants([Constant::Code(listcomp)])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -937,8 +930,8 @@ mod tests_expr_that_create_code_objects {
         let text = r#"[ i * j for i, j in x ]"#;
         let code = compile(text);
 
-        let listcomp = CodeObject {
-            bytecode: vec![
+        let listcomp = test_code("listcomp", &[".iter0"])
+            .with_bytecode([
                 Opcode::BuildList(0),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ForIter(8),
@@ -951,24 +944,22 @@ mod tests_expr_that_create_code_objects {
                 Opcode::ListAppend(2),
                 Opcode::Jump(-9),
                 Opcode::ReturnValue,
-            ],
-            local_names: vec![".iter0".into(), "j".into(), "i".into()],
-            ..test_code("listcomp", &[".iter0"])
-        };
+            ])
+            .with_local_names([".iter0", "j", "i"])
+            .build();
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::GetIter,
                 Opcode::Call(1),
                 Opcode::ReturnValue,
-            ],
-            nonlocal_names: vec!["x".into()],
-            constants: vec![Constant::Code(listcomp)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["x"])
+            .with_constants([Constant::Code(listcomp)])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -978,8 +969,8 @@ mod tests_expr_that_create_code_objects {
         let text = r#"[ i * j for i in x for j in y ]"#;
         let code = compile(text);
 
-        let listcomp = CodeObject {
-            bytecode: vec![
+        let listcomp = test_code("listcomp", &[".iter0"])
+            .with_bytecode([
                 Opcode::BuildList(0),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ForIter(11),
@@ -995,25 +986,23 @@ mod tests_expr_that_create_code_objects {
                 Opcode::Jump(-7),
                 Opcode::Jump(-12),
                 Opcode::ReturnValue,
-            ],
-            local_names: vec![".iter0".into(), "i".into(), "j".into()],
-            nonlocal_names: vec!["y".into()],
-            ..test_code("listcomp", &[".iter0"])
-        };
+            ])
+            .with_local_names([".iter0", "i", "j"])
+            .with_nonlocal_names(["y"])
+            .build();
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::GetIter,
                 Opcode::Call(1),
                 Opcode::ReturnValue,
-            ],
-            nonlocal_names: vec!["x".into()],
-            constants: vec![Constant::Code(listcomp)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["x"])
+            .with_constants([Constant::Code(listcomp)])
+            .build();
 
         assert_code_eq!(code, expected);
     }

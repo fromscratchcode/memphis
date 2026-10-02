@@ -1,7 +1,10 @@
 use std::fmt::{Debug, Display, Error, Formatter};
 
 use crate::{
-    bytecode_vm::compiler::{Bytecode, Constant},
+    bytecode_vm::{
+        compiler::{Bytecode, Constant, Opcode, opcode::OpcodeAnnotations},
+        indices::{ConstantIndex, NonlocalIndex},
+    },
     domain::{FunctionType, ModuleName},
 };
 
@@ -20,32 +23,16 @@ impl ExceptionRange {
     }
 }
 
-/// Represents the bytecode and associated metadata for a block of Python code. It's a compiled
-/// version of the source code, containing instructions that the VM can execute. This is immutable
-/// and does not know about the context in which it is executed, meaning it doesn't hold references
-/// to the global or local variables it operates on.
-#[derive(Clone, PartialEq)]
-pub struct CodeObject {
-    pub module_name: ModuleName,
-    pub name: String,
-    pub filename: String,
-    pub bytecode: Bytecode,
-    /// Can diverge from `local_names` as locals are discovered by the compiler, will initially
-    /// match `local_names.len()`
-    pub arg_count: usize,
-    /// Local variable names (paramters + compiler-discovered locals)
-    pub local_names: Vec<String>,
-    /// Free variable names
-    pub free_names: Vec<String>,
-    /// Names addressed by nonlocal opcodes, not `nonlocal` declared names
-    pub nonlocal_names: Vec<String>,
-    pub constants: Vec<Constant>,
-    pub line_map: Vec<(usize, usize)>,
-    pub function_type: FunctionType,
-    pub exception_table: Vec<ExceptionRange>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct CodeSpec {
+    module_name: ModuleName,
+    name: String,
+    filename: String,
+    parameters: Vec<String>,
+    function_type: FunctionType,
 }
 
-impl CodeObject {
+impl CodeSpec {
     pub fn new_root(module_name: ModuleName, filename: &str) -> Self {
         Self::new(
             "<module>",
@@ -60,36 +47,165 @@ impl CodeObject {
         name: &str,
         module_name: ModuleName,
         filename: &str,
-        local_names: &[&str],
+        parameters: &[&str],
         function_type: FunctionType,
     ) -> Self {
         Self {
             module_name,
             name: name.to_string(),
             filename: filename.to_string(),
-            bytecode: vec![],
-            arg_count: local_names.len(),
-            local_names: local_names.iter().map(|i| i.to_string()).collect(),
-            free_names: vec![],
-            nonlocal_names: vec![],
-            constants: vec![],
-            line_map: vec![],
+            parameters: parameters.iter().map(|i| i.to_string()).collect(),
             function_type,
-            exception_table: vec![],
         }
+    }
+
+    pub fn with_function_type(mut self, function_type: FunctionType) -> Self {
+        self.function_type = function_type;
+        self
     }
 
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    pub fn arg_count(&self) -> usize {
+        self.parameters.len()
+    }
+
+    pub fn parameters(&self) -> &[String] {
+        &self.parameters
+    }
+
     // This is a helper for debug output, this does _not_ have semantic meaning.
     pub fn dbg_context(&self) -> String {
         format!("{}.{}", self.module_name, self.name)
     }
+}
+
+/// Represents the bytecode and associated metadata for a block of Python code. It's a compiled
+/// version of the source code, containing instructions that the VM can execute. This is immutable
+/// and does not know about the context in which it is executed, meaning it doesn't hold references
+/// to the global or local variables it operates on.
+#[derive(Clone, PartialEq)]
+pub struct CodeObject {
+    spec: CodeSpec,
+    bytecode: Bytecode,
+    /// Local variable names (parameters + compiler-discovered locals)
+    local_names: Vec<String>,
+    /// Free variable names
+    free_names: Vec<String>,
+    /// Names addressed by nonlocal opcodes, not `nonlocal` declared names
+    nonlocal_names: Vec<String>,
+    constants: Vec<Constant>,
+    line_map: Vec<(usize, usize)>,
+    exception_table: Vec<ExceptionRange>,
+}
+
+impl CodeObject {
+    pub fn empty_module(spec: CodeSpec) -> Self {
+        Self {
+            spec,
+            bytecode: Vec::new(),
+            free_names: Vec::new(),
+            local_names: Vec::new(),
+            nonlocal_names: Vec::new(),
+            constants: Vec::new(),
+            line_map: Vec::new(),
+            exception_table: Vec::new(),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn from_compiler(
+        spec: CodeSpec,
+        bytecode: Bytecode,
+        local_names: Vec<String>,
+        free_names: Vec<String>,
+        nonlocal_names: Vec<String>,
+        constants: Vec<Constant>,
+        line_map: Vec<(usize, usize)>,
+        exception_table: Vec<ExceptionRange>,
+    ) -> Self {
+        Self {
+            spec,
+            bytecode,
+            local_names,
+            free_names,
+            nonlocal_names,
+            constants,
+            line_map,
+            exception_table,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.spec.name
+    }
+
+    // This is a helper for debug output, this does _not_ have semantic meaning.
+    pub fn dbg_context(&self) -> String {
+        self.spec.dbg_context()
+    }
 
     pub fn path(&self) -> &str {
-        &self.filename
+        &self.spec.filename
+    }
+
+    pub fn module_name(&self) -> &ModuleName {
+        &self.spec.module_name
+    }
+
+    pub fn function_type(&self) -> &FunctionType {
+        &self.spec.function_type
+    }
+
+    pub fn arg_count(&self) -> usize {
+        self.spec.arg_count()
+    }
+
+    pub fn num_inst(&self) -> usize {
+        self.bytecode.len()
+    }
+
+    pub fn inst_at(&self, pc: usize) -> Opcode {
+        self.bytecode[pc]
+    }
+
+    pub fn nonlocal_name(&self, index: NonlocalIndex) -> &str {
+        &self.nonlocal_names[*index]
+    }
+
+    pub fn constant(&self, index: ConstantIndex) -> &Constant {
+        &self.constants[*index]
+    }
+
+    pub fn bytecode(&self) -> &[Opcode] {
+        &self.bytecode
+    }
+
+    pub fn local_names(&self) -> &[String] {
+        &self.local_names
+    }
+
+    pub fn free_names(&self) -> &[String] {
+        &self.free_names
+    }
+
+    pub fn nonlocal_names(&self) -> &[String] {
+        &self.nonlocal_names
+    }
+
+    pub fn constants(&self) -> &[Constant] {
+        &self.constants
+    }
+
+    pub fn opcode_annotations(&self) -> OpcodeAnnotations<'_> {
+        OpcodeAnnotations {
+            local_names: &self.local_names,
+            free_names: &self.free_names,
+            nonlocal_names: &self.nonlocal_names,
+            constants: &self.constants,
+        }
     }
 
     pub fn get_line_number(&self, pc: usize) -> usize {
@@ -139,14 +255,22 @@ impl Debug for CodeObject {
             if let Constant::Code(code) = constant {
                 writeln!(f, "\n{}:", code.name())?;
                 for (index, opcode) in code.bytecode.iter().enumerate() {
-                    writeln!(f, "{index}: {}", opcode.display_annotated(code))?;
+                    writeln!(
+                        f,
+                        "{index}: {}",
+                        opcode.display_annotated(&code.opcode_annotations())
+                    )?;
                 }
             }
         }
 
         writeln!(f, "\n{}:", self.name())?;
         for (index, opcode) in self.bytecode.iter().enumerate() {
-            writeln!(f, "{index}: {}", opcode.display_annotated(self))?;
+            writeln!(
+                f,
+                "{index}: {}",
+                opcode.display_annotated(&self.opcode_annotations())
+            )?;
         }
 
         Ok(())

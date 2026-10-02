@@ -1,9 +1,7 @@
 use crate::{
     bytecode_vm::{
         CompilerResult,
-        compiler::{CodeGenFrame, CodeObject, Constant, Opcode},
-        find_index,
-        indices::{ConstantIndex, FreeIndex, Index, LocalIndex, NonlocalIndex},
+        compiler::{CodeGenFrame, CodeObject, Constant, Opcode, code::CodeSpec},
     },
     core::{LogLevel, log},
     domain::{Context, ModuleName},
@@ -45,12 +43,11 @@ impl Compiler {
         }
     }
 
-    /// Compile the provided `Ast` and return a `CodeObject` which can be executed. This is not
-    /// destructive, meaning multiple calls will build upon the same `CodeObject`.
+    /// Compile the provided `Ast` and return a `CodeObject` which can be executed.
     pub fn compile(&mut self, ast: &Ast) -> CompilerResult<CodeObject> {
         assert!(self.code_stack.is_empty());
-        let code = CodeObject::new_root(self.module_name.clone(), &self.filename);
-        let code = self.compile_ast_with_code(ast, code)?;
+        let spec = CodeSpec::new_root(self.module_name.clone(), &self.filename);
+        let code = self.compile_ast_with_spec(ast, spec)?;
         assert!(self.code_stack.is_empty());
         Ok(code)
     }
@@ -59,8 +56,8 @@ impl Compiler {
         ast.iter().try_fold((), |_, stmt| self.compile_stmt(stmt))
     }
 
-    fn compile_ast_with_code(&mut self, ast: &Ast, code: CodeObject) -> CompilerResult<CodeObject> {
-        self.code_stack.push(CodeGenFrame::new(code));
+    fn compile_ast_with_spec(&mut self, ast: &Ast, spec: CodeSpec) -> CompilerResult<CodeObject> {
+        self.code_stack.push(CodeGenFrame::new(spec));
         self.compile_ast(ast)?;
         let code_gen_frame = self.code_stack.pop().expect("Code stack underflow!");
         log(LogLevel::Debug, || {
@@ -71,20 +68,15 @@ impl Compiler {
 
     fn emit(&mut self, opcode: Opcode) {
         let line_number = self.line_number;
-
-        let code = self.frame_mut().code_mut();
-        let offset = code.bytecode.len();
-
-        code.bytecode.push(opcode);
-        code.line_map.push((offset, line_number));
+        self.frame_mut().emit(opcode, line_number);
     }
 
     fn generate_load(&mut self, name: &str) -> Opcode {
         match self.context() {
-            Context::Global => Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name)),
+            Context::Global => Opcode::LoadGlobal(self.frame_mut().get_or_set_nonlocal_index(name)),
             Context::Local => {
                 // Check locals first (top of the stack)
-                if let Some(index) = self.get_local_index(name) {
+                if let Some(index) = self.frame().local_index(name) {
                     return Opcode::LoadFast(index);
                 }
 
@@ -93,30 +85,32 @@ impl Compiler {
                 // We skip the first (top) entry because it's the current code object and the last
                 // (bottom) entry because it's the global scope.
                 let enclosing_scopes = &self.code_stack[1..self.code_stack.len() - 1];
-                for code_gen_frame in enclosing_scopes.iter().rev() {
-                    if resolve_local_index_for_code(name, code_gen_frame.code()).is_some() {
+                for frame in enclosing_scopes.iter().rev() {
+                    if frame.local_index(name).is_some() {
                         // This would be a local in an enclosing scope, but we need an index
                         // relative to our own code object.
-                        return Opcode::LoadFree(self.get_or_set_free_var(name));
+                        return Opcode::LoadFree(self.frame_mut().get_or_set_free_var(name));
                     }
                 }
 
                 // If it's not local or free, it's global. Put that quote on the wall.
-                Opcode::LoadGlobal(self.get_or_set_nonlocal_index(name))
+                Opcode::LoadGlobal(self.frame_mut().get_or_set_nonlocal_index(name))
             }
         }
     }
 
     fn generate_store(&mut self, name: &str) -> Opcode {
         match self.context() {
-            Context::Global => Opcode::StoreGlobal(self.get_or_set_nonlocal_index(name)),
-            Context::Local => Opcode::StoreFast(self.get_or_set_local_index(name)),
+            Context::Global => {
+                Opcode::StoreGlobal(self.frame_mut().get_or_set_nonlocal_index(name))
+            }
+            Context::Local => Opcode::StoreFast(self.frame_mut().get_or_set_local_index(name)),
         }
     }
 
     /// Load a CodeObject and turn it into a function or closure.
     fn compile_function(&mut self, code: CodeObject) -> CompilerResult<()> {
-        let free_vars = code.free_names.clone();
+        let free_vars = code.free_names().to_vec();
         self.compile_code(code);
 
         if free_vars.is_empty() {
@@ -149,7 +143,7 @@ impl Compiler {
     }
 
     fn compile_constant(&mut self, constant: Constant) {
-        let index = self.get_or_set_constant_index(constant);
+        let index = self.frame_mut().get_or_set_constant_index(constant);
         self.emit(Opcode::LoadConst(index));
     }
 
@@ -161,69 +155,6 @@ impl Compiler {
     fn compile_store(&mut self, name: &str) {
         let store = self.generate_store(name);
         self.emit(store);
-    }
-
-    fn get_or_set_local_index(&mut self, name: &str) -> LocalIndex {
-        log(LogLevel::Trace, || {
-            format!("Looking for '{name}' in locals")
-        });
-        if let Some(index) = self.get_local_index(name) {
-            index
-        } else {
-            let code = self.frame_mut().code_mut();
-            let new_index = code.local_names.len();
-            code.local_names.push(name.to_string());
-            Index::new(new_index)
-        }
-    }
-
-    fn get_local_index(&self, name: &str) -> Option<LocalIndex> {
-        let code = self.frame().code();
-        resolve_local_index_for_code(name, code)
-    }
-
-    fn get_or_set_free_var(&mut self, name: &str) -> FreeIndex {
-        let code = self.frame_mut().code_mut();
-        let index = if let Some(index) = find_index(&code.free_names, name) {
-            index
-        } else {
-            let new_index = code.free_names.len();
-            code.free_names.push(name.to_string());
-            new_index
-        };
-        Index::new(index)
-    }
-
-    // We didn't convert this one to use Identifier yet because of how it interacts with
-    // ModuleName.
-    fn get_or_set_nonlocal_index(&mut self, name: &str) -> NonlocalIndex {
-        log(LogLevel::Trace, || {
-            format!("Looking for '{name}' in globals")
-        });
-        let code = self.frame_mut().code_mut();
-        let index = if let Some(index) = find_index(&code.nonlocal_names, name) {
-            index
-        } else {
-            let new_index = code.nonlocal_names.len();
-            code.nonlocal_names.push(name.to_string());
-            new_index
-        };
-        Index::new(index)
-    }
-
-    fn get_or_set_constant_index(&mut self, value: Constant) -> ConstantIndex {
-        log(LogLevel::Trace, || {
-            format!("Looking for '{value}' in constants")
-        });
-        let code = self.frame_mut().code_mut();
-        let index = if let Some(index) = find_index(&code.constants, &value) {
-            index
-        } else {
-            let next_index = code.constants.len();
-            code.constants.push(value);
-            next_index
-        };
-        Index::new(index)
     }
 
     /// Since an instance of this `Compiler` operates on a single module, we can assume
@@ -248,14 +179,10 @@ impl Compiler {
     }
 }
 
-fn resolve_local_index_for_code(name: &str, code: &CodeObject) -> Option<LocalIndex> {
-    find_index(&code.local_names, name).map(Index::new)
-}
-
 #[cfg(test)]
 mod tests_compiler {
     use crate::{
-        bytecode_vm::{CompilerError, compiler::test_utils::*},
+        bytecode_vm::{CompilerError, compiler::test_utils::*, indices::Index},
         domain::FunctionType,
     };
 
@@ -269,13 +196,12 @@ def foo():
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            constants: vec![Constant::None],
-            ..test_code("foo", &[])
-        };
+        let fn_foo = test_code("foo", &[])
+            .with_bytecode([Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue])
+            .with_constants([Constant::None])
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -287,12 +213,9 @@ def foo(a, b):
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            bytecode: vec![],
-            ..test_code("foo", &["a", "b"])
-        };
+        let fn_foo = test_code("foo", &["a", "b"]).build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -304,20 +227,19 @@ def foo():
     pass
 "#;
         let code = compile(text);
-        let fn_foo = test_code("foo", &[]);
+        let fn_foo = test_code("foo", &[]).build();
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(1)),
-            ],
-            nonlocal_names: vec!["decorate".into(), "foo".into()],
-            constants: vec![Constant::Code(fn_foo)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["decorate", "foo"])
+            .with_constants([Constant::Code(fn_foo)])
+            .build();
         assert_code_eq!(code, expected);
     }
 
@@ -330,9 +252,9 @@ def foo():
     pass
 "#;
         let code = compile(text);
-        let fn_foo = test_code("foo", &[]);
-        let expected = CodeObject {
-            bytecode: vec![
+        let fn_foo = test_code("foo", &[]).build();
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadGlobal(Index::new(1)),
                 Opcode::LoadConst(Index::new(0)),
@@ -340,11 +262,10 @@ def foo():
                 Opcode::Call(1),
                 Opcode::Call(1),
                 Opcode::StoreGlobal(Index::new(2)),
-            ],
-            nonlocal_names: vec!["inner".into(), "outer".into(), "foo".into()],
-            constants: vec![Constant::Code(fn_foo)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["inner", "outer", "foo"])
+            .with_constants([Constant::Code(fn_foo)])
+            .build();
         assert_code_eq!(code, expected);
     }
 
@@ -356,14 +277,13 @@ def foo():
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::YieldValue],
-            constants: vec![Constant::Int(1)],
-            function_type: FunctionType::Generator,
-            ..test_code("foo", &[])
-        };
+        let fn_foo = test_code("foo", &[])
+            .with_bytecode([Opcode::LoadConst(Index::new(0)), Opcode::YieldValue])
+            .with_constants([Constant::Int(1)])
+            .with_function_type(FunctionType::Generator)
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -375,19 +295,18 @@ def foo():
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            bytecode: vec![
+        let fn_foo = test_code("foo", &[])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::BuildList(2),
                 Opcode::YieldFrom,
-            ],
-            constants: vec![Constant::Int(1), Constant::Int(2)],
-            function_type: FunctionType::Generator,
-            ..test_code("foo", &[])
-        };
+            ])
+            .with_constants([Constant::Int(1), Constant::Int(2)])
+            .with_function_type(FunctionType::Generator)
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -399,12 +318,11 @@ async def foo():
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            function_type: FunctionType::Async,
-            ..test_code("foo", &[])
-        };
+        let fn_foo = test_code("foo", &[])
+            .with_function_type(FunctionType::Async)
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -418,14 +336,13 @@ def foo(a, b):
 "#;
         let code = compile(text);
 
-        let fn_inner = CodeObject {
-            bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            constants: vec![Constant::Int(10)],
-            ..test_code("inner", &[])
-        };
+        let fn_inner = test_code("inner", &[])
+            .with_bytecode([Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue])
+            .with_constants([Constant::Int(10)])
+            .build();
 
-        let fn_foo = CodeObject {
-            bytecode: vec![
+        let fn_foo = test_code("foo", &["a", "b"])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(2)),
@@ -433,13 +350,12 @@ def foo(a, b):
                 Opcode::LoadFast(Index::new(1)),
                 Opcode::Add,
                 Opcode::ReturnValue,
-            ],
-            local_names: vec!["a".into(), "b".into(), "inner".into()],
-            constants: vec![Constant::Code(fn_inner)],
-            ..test_code("foo", &["a", "b"])
-        };
+            ])
+            .with_local_names(["a", "b", "inner"])
+            .with_constants([Constant::Code(fn_inner)])
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -453,8 +369,8 @@ def foo():
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            bytecode: vec![
+        let fn_foo = test_code("foo", &[])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::StoreFast(Index::new(0)),
                 Opcode::LoadConst(Index::new(1)),
@@ -462,13 +378,12 @@ def foo():
                 // this should still be index 1 because we should reuse the 11.1
                 Opcode::LoadConst(Index::new(1)),
                 Opcode::StoreFast(Index::new(2)),
-            ],
-            local_names: vec!["c".into(), "d".into(), "e".into()],
-            constants: vec![Constant::Int(10), Constant::Float(11.1)],
-            ..test_code("foo", &[])
-        };
+            ])
+            .with_local_names(["c", "d", "e"])
+            .with_constants([Constant::Int(10), Constant::Float(11.1)])
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -481,19 +396,18 @@ def foo():
 "#;
         let code = compile(text);
 
-        let fn_foo = CodeObject {
-            bytecode: vec![
+        let fn_foo = test_code("foo", &[])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::StoreFast(Index::new(0)),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::ReturnValue,
-            ],
-            local_names: vec!["c".into()],
-            constants: vec![Constant::Int(10)],
-            ..test_code("foo", &[])
-        };
+            ])
+            .with_local_names(["c"])
+            .with_constants([Constant::Int(10)])
+            .build();
 
-        let expected = wrap_top_level_function(fn_foo);
+        let expected = wrap_function(fn_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -511,32 +425,30 @@ world()
 "#;
         let code = compile(text);
 
-        let fn_hello = CodeObject {
-            bytecode: vec![
+        let fn_hello = test_code("hello", &[])
+            .with_bytecode([
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::Call(1),
                 Opcode::PopTop,
-            ],
-            nonlocal_names: vec!["print".into()],
-            constants: vec![Constant::String("Hello".into())],
-            ..test_code("hello", &[])
-        };
+            ])
+            .with_nonlocal_names(["print"])
+            .with_constants([Constant::String("Hello".into())])
+            .build();
 
-        let fn_world = CodeObject {
-            bytecode: vec![
+        let fn_world = test_code("world", &[])
+            .with_bytecode([
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::Call(1),
                 Opcode::PopTop,
-            ],
-            nonlocal_names: vec!["print".into()],
-            constants: vec![Constant::String("World".into())],
-            ..test_code("world", &[])
-        };
+            ])
+            .with_nonlocal_names(["print"])
+            .with_constants([Constant::String("World".into())])
+            .build();
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::StoreGlobal(Index::new(0)),
@@ -549,11 +461,10 @@ world()
                 Opcode::LoadGlobal(Index::new(1)),
                 Opcode::Call(0),
                 Opcode::ReturnValue,
-            ],
-            nonlocal_names: vec!["hello".into(), "world".into()],
-            constants: vec![Constant::Code(fn_hello), Constant::Code(fn_world)],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["hello", "world"])
+            .with_constants([Constant::Code(fn_hello), Constant::Code(fn_world)])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -568,32 +479,30 @@ def make_adder(x):
 "#;
         let code = compile(text);
 
-        let fn_inner_adder = CodeObject {
-            bytecode: vec![
+        let fn_inner_adder = test_code("inner_adder", &["y"])
+            .with_bytecode([
                 Opcode::LoadFree(Index::new(0)),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::Add,
                 Opcode::ReturnValue,
-            ],
-            free_names: vec!["x".into()],
-            ..test_code("inner_adder", &["y"])
-        };
+            ])
+            .with_free_names(["x"])
+            .build();
 
-        let fn_make_adder = CodeObject {
-            bytecode: vec![
+        let fn_make_adder = test_code("make_adder", &["x"])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::MakeClosure(1),
                 Opcode::StoreFast(Index::new(1)),
                 Opcode::LoadFast(Index::new(1)),
                 Opcode::ReturnValue,
-            ],
-            local_names: vec!["x".into(), "inner_adder".into()],
-            constants: vec![Constant::Code(fn_inner_adder)],
-            ..test_code("make_adder", &["x"])
-        };
+            ])
+            .with_local_names(["x", "inner_adder"])
+            .with_constants([Constant::Code(fn_inner_adder)])
+            .build();
 
-        let expected = wrap_top_level_function(fn_make_adder);
+        let expected = wrap_function(fn_make_adder);
         assert_code_eq!(code, expected);
     }
 
@@ -606,24 +515,22 @@ class Foo:
 "#;
         let code = compile(text);
 
-        let fn_bar = CodeObject {
-            bytecode: vec![Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue],
-            constants: vec![Constant::Int(99)],
-            ..test_code("bar", &["self"])
-        };
+        let fn_bar = test_code("bar", &["self"])
+            .with_bytecode([Opcode::LoadConst(Index::new(0)), Opcode::ReturnValue])
+            .with_constants([Constant::Int(99)])
+            .build();
 
-        let cls_foo = CodeObject {
-            bytecode: vec![
+        let cls_foo = test_code("Foo", &[])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(0)),
-            ],
-            local_names: vec!["bar".into()],
-            constants: vec![Constant::Code(fn_bar)],
-            ..test_code("Foo", &[])
-        };
+            ])
+            .with_local_names(["bar"])
+            .with_constants([Constant::Code(fn_bar)])
+            .build();
 
-        let expected = wrap_top_level_class(cls_foo);
+        let expected = wrap_class(cls_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -636,28 +543,26 @@ class Foo:
 "#;
         let code = compile(text);
 
-        let fn_bar = CodeObject {
-            bytecode: vec![
+        let fn_bar = test_code("bar", &["self"])
+            .with_bytecode([
                 Opcode::LoadFast(Index::new(0)),
                 Opcode::LoadAttr(Index::new(0)),
                 Opcode::ReturnValue,
-            ],
-            nonlocal_names: vec!["val".into()],
-            ..test_code("bar", &["self"])
-        };
+            ])
+            .with_nonlocal_names(["val"])
+            .build();
 
-        let cls_foo = CodeObject {
-            bytecode: vec![
+        let cls_foo = test_code("Foo", &[])
+            .with_bytecode([
                 Opcode::LoadConst(Index::new(0)),
                 Opcode::MakeFunction,
                 Opcode::StoreFast(Index::new(0)),
-            ],
-            local_names: vec!["bar".into()],
-            constants: vec![Constant::Code(fn_bar)],
-            ..test_code("Foo", &[])
-        };
+            ])
+            .with_local_names(["bar"])
+            .with_constants([Constant::Code(fn_bar)])
+            .build();
 
-        let expected = wrap_top_level_class(cls_foo);
+        let expected = wrap_class(cls_foo);
         assert_code_eq!(code, expected);
     }
 
@@ -668,15 +573,14 @@ f = Foo()
 "#;
         let code = compile(text);
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(1)),
-            ],
-            nonlocal_names: vec!["Foo".into(), "f".into()],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["Foo", "f"])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -688,16 +592,15 @@ b = f.bar()
 "#;
         let code = compile(text);
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::LoadGlobal(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::Call(0),
                 Opcode::StoreGlobal(Index::new(2)),
-            ],
-            nonlocal_names: vec!["f".into(), "bar".into(), "b".into()],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["f", "bar", "b"])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -709,14 +612,13 @@ import a.b.c
 "#;
         let code = compile(text);
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::ImportName(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
-            ],
-            nonlocal_names: vec!["a.b.c".into(), "a".into()],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["a.b.c", "a"])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -728,14 +630,13 @@ import a.b.c as foo
 "#;
         let code = compile(text);
 
-        let expected = CodeObject {
-            bytecode: vec![
+        let expected = test_module()
+            .with_bytecode([
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::StoreGlobal(Index::new(1)),
-            ],
-            nonlocal_names: vec!["a.b.c".into(), "foo".into()],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["a.b.c", "foo"])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -765,16 +666,14 @@ from .outer import foo
         let pkg = ModuleName::from_segments(&["pkg"]);
         let code = compile_at_pkg(text, module_name.clone(), pkg);
 
-        let expected = CodeObject {
-            module_name,
-            bytecode: vec![
+        let expected = test_module_for(module_name)
+            .with_bytecode([
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
-            ],
-            nonlocal_names: vec!["pkg.outer".into(), "foo".into()],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["pkg.outer", "foo"])
+            .build();
 
         assert_code_eq!(code, expected);
     }
@@ -788,16 +687,14 @@ from .outer.inner import foo
         let pkg = ModuleName::from_segments(&["pkg"]);
         let code = compile_at_pkg(text, module_name.clone(), pkg);
 
-        let expected = CodeObject {
-            module_name,
-            bytecode: vec![
+        let expected = test_module_for(module_name)
+            .with_bytecode([
                 Opcode::ImportFrom(Index::new(0)),
                 Opcode::LoadAttr(Index::new(1)),
                 Opcode::StoreGlobal(Index::new(1)),
-            ],
-            nonlocal_names: vec!["pkg.outer.inner".into(), "foo".into()],
-            ..test_module()
-        };
+            ])
+            .with_nonlocal_names(["pkg.outer.inner", "foo"])
+            .build();
 
         assert_code_eq!(code, expected);
     }

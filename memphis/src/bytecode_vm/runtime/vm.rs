@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
         DomainResult, RaisedException, Runtime, VmContext, VmResult, VmValue,
-        compiler::{CodeObject, Constant, Opcode},
+        compiler::{CodeObject, CodeSpec, Constant, Opcode},
         indices::{ConstantIndex, FreeIndex, LocalIndex, NonlocalIndex},
         result::Raise,
         runtime::{
@@ -59,7 +59,7 @@ impl VirtualMachine {
         module_name: ModuleName,
         path_str: &str,
     ) -> RaisedException {
-        let code = CodeObject::new_root(module_name, path_str);
+        let code = CodeObject::empty_module(CodeSpec::new_root(module_name, path_str));
         let frame = self.frame_for_code(code);
         self.call_stack.push(frame);
         self.raise(exception)
@@ -155,10 +155,8 @@ impl VirtualMachine {
             .current_frame()
             .function
             .code_object
-            .constants
-            .get(*index)
-            .cloned()
-            .expect("Invalid constant index");
+            .constant(index)
+            .clone();
 
         if let Constant::String(ref s) = constant {
             return self.intern_string(s);
@@ -241,7 +239,10 @@ impl VirtualMachine {
     }
 
     fn resolve_name(&self, index: NonlocalIndex) -> &str {
-        &self.current_frame().function.code_object.nonlocal_names[*index]
+        self.current_frame()
+            .function
+            .code_object
+            .nonlocal_name(index)
     }
 
     fn peek(&mut self) -> Reference {
@@ -809,7 +810,7 @@ impl VirtualMachine {
     }
 
     pub fn frame_for_function(&self, function: FunctionObject, args: Vec<Reference>) -> Frame {
-        let module_ref = self.read_module(&function.code_object.module_name);
+        let module_ref = self.read_module(function.code_object.module_name());
         Frame::new(function, args, module_ref)
     }
 
@@ -817,7 +818,7 @@ impl VirtualMachine {
         let mut bound_args = vec![method.receiver];
         bound_args.extend(args);
 
-        let module = self.read_module(&method.function.code_object.module_name);
+        let module = self.read_module(method.function.code_object.module_name());
         Frame::new(method.function, bound_args, module)
     }
 

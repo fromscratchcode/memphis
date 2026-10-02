@@ -47,14 +47,18 @@ impl WasmCodeObject {
         WasmCodeObject {
             name: code.name().to_string(),
             bytecode: code
-                .bytecode
+                .bytecode()
                 .iter()
-                .map(|op| op.display_annotated(&code))
+                .map(|op| op.display_annotated(&code.opcode_annotations()))
                 .collect(),
-            varnames: code.local_names,
-            freevars: code.free_names,
-            names: code.nonlocal_names,
-            constants: code.constants.iter().map(|c| c.to_owned().into()).collect(),
+            varnames: code.local_names().to_vec(),
+            freevars: code.free_names().to_vec(),
+            names: code.nonlocal_names().to_vec(),
+            constants: code
+                .constants()
+                .iter()
+                .map(|c| c.to_owned().into())
+                .collect(),
         }
     }
 }

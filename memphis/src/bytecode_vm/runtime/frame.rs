@@ -61,24 +61,25 @@ impl Frame {
     }
 
     pub fn current_inst(&self) -> Opcode {
-        self.function.code_object.bytecode[self.pc]
+        self.function.code_object.inst_at(self.pc)
     }
 
     pub fn current_inst_annotated(&self) -> String {
         let code = &self.function.code_object;
         let code_name = &code.dbg_context();
-        let op = self.current_inst().display_annotated(code);
+        let op = self
+            .current_inst()
+            .display_annotated(&code.opcode_annotations());
         format!("{code_name}: {op}")
     }
 
     pub fn is_finished(&self) -> bool {
-        self.pc >= self.function.code_object.bytecode.len()
+        self.pc >= self.function.code_object.num_inst()
     }
 
     pub fn namespace(&self) -> Namespace {
-        let varnames = &self.function.code_object.local_names;
         let mut namespace = HashMap::new();
-        for (index, varname) in varnames.iter().enumerate() {
+        for (index, varname) in self.function.code_object.local_names().iter().enumerate() {
             namespace.insert(varname.to_owned(), self.locals[index]);
         }
         namespace
@@ -109,7 +110,7 @@ impl Frame {
 
     pub fn name(&self) -> String {
         let func_name = self.function.name();
-        let arg_count = self.function.code_object.arg_count;
+        let arg_count = self.function.code_object.arg_count();
 
         // Turn the first few locals into strings for display.
         let args_preview: Vec<String> = self

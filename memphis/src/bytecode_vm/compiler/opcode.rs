@@ -2,7 +2,7 @@ use std::fmt::{Display, Error, Formatter};
 
 use crate::{
     bytecode_vm::{
-        compiler::CodeObject,
+        compiler::Constant,
         indices::{ConstantIndex, FreeIndex, LocalIndex, NonlocalIndex},
     },
     parser::types::{BinOp, CompareOp},
@@ -11,6 +11,13 @@ use crate::{
 pub type Bytecode = Vec<Opcode>;
 pub type UnsignedOffset = usize;
 pub type SignedOffset = isize;
+
+pub struct OpcodeAnnotations<'a> {
+    pub local_names: &'a [String],
+    pub free_names: &'a [String],
+    pub nonlocal_names: &'a [String],
+    pub constants: &'a [Constant],
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Opcode {
@@ -193,7 +200,7 @@ pub enum Opcode {
 }
 
 impl Opcode {
-    pub fn display_annotated(&self, code: &CodeObject) -> String {
+    pub fn display_annotated(&self, code: &OpcodeAnnotations) -> String {
         match self {
             Opcode::StoreFast(i) => format!("STORE_FAST {} ({})", i, code.local_names[**i]),
             Opcode::LoadFast(i) => format!("LOAD_FAST {} ({})", i, code.local_names[**i]),

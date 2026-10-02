@@ -1,7 +1,7 @@
 use crate::{
     bytecode_vm::{
         Compiler, CompilerError, CompilerResult,
-        compiler::{CodeObject, JumpKind, Opcode},
+        compiler::{JumpKind, Opcode, code::CodeSpec},
     },
     domain::{FromImportPath, FunctionType, Identifier, resolve_import_path},
     parser::types::{
@@ -120,7 +120,7 @@ impl Compiler {
             }
             Expr::MemberAccess { object, field } => {
                 self.compile_expr(object)?;
-                let attr_index = self.get_or_set_nonlocal_index(field.as_str());
+                let attr_index = self.frame_mut().get_or_set_nonlocal_index(field.as_str());
                 self.emit(Opcode::SetAttr(attr_index));
             }
             Expr::IndexAccess { object, index } => {
@@ -285,20 +285,20 @@ impl Compiler {
             FunctionType::Regular
         };
 
-        let local_names = args
+        let parameters = args
             .positional_or_keyword
             .iter()
             .map(|p| p.arg.as_str())
             .collect::<Vec<&str>>();
-        let code_object = CodeObject::new(
+        let spec = CodeSpec::new(
             name.as_str(),
             self.module_name.clone(),
             &self.filename,
-            &local_names,
+            &parameters,
             function_type,
         );
 
-        let code = self.compile_ast_with_code(body, code_object)?;
+        let code = self.compile_ast_with_spec(body, spec)?;
 
         // Compile decorators in reverse
         for decorator in decorators.iter().rev() {
@@ -337,14 +337,14 @@ impl Compiler {
             ));
         }
 
-        let code_object = CodeObject::new(
+        let spec = CodeSpec::new(
             name.as_str(),
             self.module_name.clone(),
             &self.filename,
             &[],
             FunctionType::Regular,
         );
-        let code = self.compile_ast_with_code(body, code_object)?;
+        let code = self.compile_ast_with_spec(body, spec)?;
 
         self.emit(Opcode::LoadBuildClass);
         self.compile_code(code);
@@ -359,7 +359,9 @@ impl Compiler {
 
     fn compile_regular_import(&mut self, items: &[RegularImport]) -> CompilerResult<()> {
         for item in items {
-            let index = self.get_or_set_nonlocal_index(&item.module_path.as_str());
+            let index = self
+                .frame_mut()
+                .get_or_set_nonlocal_index(&item.module_path.as_str());
 
             if item.alias.is_some() {
                 self.emit(Opcode::ImportFrom(index));
@@ -370,10 +372,10 @@ impl Compiler {
             let symbol_index = item
                 .alias
                 .as_ref()
-                .map(|alias| self.get_or_set_nonlocal_index(alias.as_str()))
+                .map(|alias| self.frame_mut().get_or_set_nonlocal_index(alias.as_str()))
                 .unwrap_or_else(|| {
                     let head = item.module_path.head().expect("No head!");
-                    self.get_or_set_nonlocal_index(head)
+                    self.frame_mut().get_or_set_nonlocal_index(head)
                 });
             self.emit(Opcode::StoreGlobal(symbol_index));
         }
@@ -388,17 +390,23 @@ impl Compiler {
         let module_name = resolve_import_path(import_path, &self.package)
             .map_err(|e| CompilerError::import_error(e.message()))?;
 
-        let index = self.get_or_set_nonlocal_index(&module_name.as_str());
+        let index = self
+            .frame_mut()
+            .get_or_set_nonlocal_index(&module_name.as_str());
         self.emit(Opcode::ImportFrom(index));
 
         match mode {
             FromImportMode::All => self.emit(Opcode::ImportAll),
             FromImportMode::List(items) => {
                 for item in items {
-                    let attr_index = self.get_or_set_nonlocal_index(item.original().as_str());
+                    let attr_index = self
+                        .frame_mut()
+                        .get_or_set_nonlocal_index(item.original().as_str());
                     self.emit(Opcode::LoadAttr(attr_index));
 
-                    let alias_index = self.get_or_set_nonlocal_index(item.imported().as_str());
+                    let alias_index = self
+                        .frame_mut()
+                        .get_or_set_nonlocal_index(item.imported().as_str());
                     self.emit(Opcode::StoreGlobal(alias_index));
                 }
             }

@@ -1,6 +1,6 @@
 use crate::bytecode_vm::runtime::{Reference, types::FunctionObject};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Method {
     pub receiver: Reference,
     pub function: FunctionObject,
