@@ -66,6 +66,10 @@ impl Container<MemphisState> {
         self.borrow_mut().line_number = line_number;
     }
 
+    pub fn line_number(&self) -> usize {
+        self.borrow().line_number
+    }
+
     /// Return the `CallStack` at the current moment in time. This should be used at the time of an
     /// exception or immediately before any other use as it is a snapshot and will not keep updating.
     pub fn debug_call_stack(&self) -> DebugCallStack {

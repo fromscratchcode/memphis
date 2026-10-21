@@ -138,6 +138,40 @@ macro_rules! stmt {
     };
 }
 
+macro_rules! stmt_def {
+    ($name:expr, $args:expr, [$($body:expr),* $(,)?]) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::FunctionDef {
+                name: $crate::parser::test_utils::ident!($name),
+                args: $args,
+                body: $crate::parser::types::Ast::new(vec![$($body),*]),
+                decorators: vec![],
+                is_async: false,
+            }
+        )
+    }
+}
+
+macro_rules! stmt_global {
+    ($($name:expr),* $(,)?) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::Global(vec![
+                $($crate::parser::test_utils::ident!($name)),*
+            ])
+        )
+    };
+}
+
+macro_rules! stmt_nonlocal {
+    ($($name:expr),* $(,)?) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::Nonlocal(vec![
+                $($crate::parser::test_utils::ident!($name)),*
+            ])
+        )
+    };
+}
+
 macro_rules! stmt_assign {
     ($left:expr, $right:expr) => {
         $crate::parser::test_utils::stmt!($crate::parser::types::StatementKind::Assignment {
@@ -151,9 +185,9 @@ macro_rules! stmt_compound_assign {
     ($target:expr, $op:ident, $value:expr) => {
         $crate::parser::test_utils::stmt!(
             $crate::parser::types::StatementKind::CompoundAssignment {
-                target: Box::new($target),
+                target: $target,
                 op: $crate::parser::types::BinOp::$op,
-                value: Box::new($value),
+                value: $value,
             }
         )
     };
@@ -589,8 +623,11 @@ pub(crate) use slice_op;
 pub(crate) use stmt;
 pub(crate) use stmt_assign;
 pub(crate) use stmt_compound_assign;
+pub(crate) use stmt_def;
 pub(crate) use stmt_expr;
 pub(crate) use stmt_from_import;
+pub(crate) use stmt_global;
+pub(crate) use stmt_nonlocal;
 pub(crate) use stmt_pass;
 pub(crate) use stmt_raise;
 pub(crate) use stmt_reg_import;

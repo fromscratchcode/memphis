@@ -124,9 +124,9 @@ impl Parser<'_> {
 
             let value = self.parse_simple_expr()?;
             Ok(StatementKind::CompoundAssignment {
-                target: Box::new(left),
+                target: left,
                 op,
-                value: Box::new(value),
+                value,
             })
         } else {
             Ok(StatementKind::Expression(left))
@@ -580,23 +580,15 @@ mod tests {
 def add(x, y):
     return x + y
 ";
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident!("add"),
-            args: params![param!("x"), param!("y")],
-            body: ast![stmt_return![bin_op!(var!("x"), Add, var!("y"))]],
-            decorators: vec![],
-            is_async: false,
-        });
+        let expected_ast = stmt_def!(
+            "add",
+            params![param!("x"), param!("y")],
+            [stmt_return![bin_op!(var!("x"), Add, var!("y"))]]
+        );
         assert_stmt_eq!(input, expected_ast);
 
         let input = "def _f(): pass";
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident!("_f"),
-            args: params![],
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
+        let expected_ast = stmt_def!("_f", params![], [stmt_pass!()]);
         assert_stmt_eq!(input, expected_ast);
 
         let input = r#"
@@ -605,19 +597,17 @@ def __init__(
 ):
     pass
 "#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident!("__init__"),
-            args: AstParams {
+        let expected_ast = stmt_def!(
+            "__init__",
+            AstParams {
                 positional_only: vec![],
                 positional_or_keyword: vec![param!("self")],
                 args_var: None,
                 keyword_only: vec![param!("indent", none!())],
                 kwargs_var: None,
             },
-            body: ast![stmt_pass!()],
-            decorators: vec![],
-            is_async: false,
-        });
+            [stmt_pass!()]
+        );
         assert_stmt_eq!(input, expected_ast);
     }
 
@@ -779,23 +769,19 @@ class Foo:
             parents: vec![],
             metaclass: None,
             body: ast![
-                stmt!(StatementKind::FunctionDef {
-                    name: ident!("__init__"),
-                    args: params![param!("self")],
-                    body: ast![stmt_assign!(member_access!(var!("self"), "x"), int!(0))],
-                    decorators: vec![],
-                    is_async: false,
-                }),
-                stmt!(StatementKind::FunctionDef {
-                    name: ident!("bar"),
-                    args: params![param!("self")],
-                    body: ast![stmt_expr!(func_call!(
+                stmt_def!(
+                    "__init__",
+                    params![param!("self")],
+                    [stmt_assign!(member_access!(var!("self"), "x"), int!(0))]
+                ),
+                stmt_def!(
+                    "bar",
+                    params![param!("self")],
+                    [stmt_expr!(func_call!(
                         "print",
                         call_args![member_access!(var!("self"), "x")]
-                    ))],
-                    decorators: vec![],
-                    is_async: false,
-                }),
+                    ))]
+                ),
             ],
         });
         assert_stmt_eq!(input, expected_ast);
@@ -832,13 +818,11 @@ class Foo:
 def foo():
     import a, b as c
 "#;
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident!("foo"),
-            args: params![],
-            body: ast![stmt_reg_import![import!("a"), import!("b", "c"),]],
-            decorators: vec![],
-            is_async: false,
-        });
+        let expected_ast = stmt_def!(
+            "foo",
+            params![],
+            [stmt_reg_import![import!("a"), import!("b", "c"),]]
+        );
         assert_stmt_eq!(input, expected_ast);
 
         let input = r#"
@@ -1408,45 +1392,41 @@ def outer():
         b = 3
         print(a)
 ";
-        let expected_ast = stmt!(StatementKind::FunctionDef {
-            name: ident!("outer"),
-            args: params![],
-            body: ast![
+        let expected_ast = stmt_def!(
+            "outer",
+            params![],
+            [
                 stmt_assign!(var!("a"), int!(1)),
                 stmt_assign!(var!("b"), int!(2)),
-                stmt!(StatementKind::FunctionDef {
-                    name: ident!("inner"),
-                    args: params![],
-                    body: ast![
+                stmt_def!(
+                    "inner",
+                    params![],
+                    [
                         stmt_assign!(var!("b"), int!(3)),
-                        stmt_expr!(func_call!("print", call_args![var!("a")])),
-                    ],
-                    decorators: vec![],
-                    is_async: false,
-                }),
-            ],
-            decorators: vec![],
-            is_async: false,
-        });
+                        stmt_expr!(func_call!("print", call_args![var!("a")]))
+                    ]
+                ),
+            ]
+        );
         assert_stmt_eq!(input, expected_ast);
     }
 
     #[test]
     fn scope_modifiers() {
         let input = "nonlocal var";
-        let expected_ast = stmt!(StatementKind::Nonlocal(vec![ident!("var")]));
+        let expected_ast = stmt_nonlocal!("var");
         assert_stmt_eq!(input, expected_ast);
 
         let input = "nonlocal var, var2";
-        let expected_ast = stmt!(StatementKind::Nonlocal(vec![ident!("var"), ident!("var2")]));
+        let expected_ast = stmt_nonlocal!("var", "var2");
         assert_stmt_eq!(input, expected_ast);
 
         let input = "global var";
-        let expected_ast = stmt!(StatementKind::Global(vec![ident!("var")]));
+        let expected_ast = stmt_global!("var");
         assert_stmt_eq!(input, expected_ast);
 
         let input = "global var, var2";
-        let expected_ast = stmt!(StatementKind::Global(vec![ident!("var"), ident!("var2")]));
+        let expected_ast = stmt_global!("var", "var2");
         assert_stmt_eq!(input, expected_ast);
     }
 

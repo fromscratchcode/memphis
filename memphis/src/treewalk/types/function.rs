@@ -208,7 +208,9 @@ impl Callable for Container<Function> {
         args: BoundArgs,
     ) -> TreewalkResult<TreewalkValue> {
         let scope = Container::new(Scope::new(args.into_symbol_table()));
-        interpreter.run_function(self.clone(), scope)
+        // User-defined functions can only return a value using a control-flow return signal.
+        interpreter.run_function(self.clone(), scope)?;
+        Ok(TreewalkValue::None)
     }
 
     fn name(&self) -> String {

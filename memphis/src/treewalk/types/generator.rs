@@ -65,8 +65,9 @@ impl Generator {
         state: Container<TreewalkState>,
         body: &Expr,
         clauses: &[ForClause],
+        lineno: usize,
     ) -> Self {
-        let generator_body = Self::build_nested_loops(body, clauses);
+        let generator_body = Self::build_nested_loops(body, clauses, lineno);
         let function = Container::new(Function::new_anonymous_generator(state, generator_body));
         Self::new(Container::new(Scope::default()), function)
     }
@@ -97,10 +98,10 @@ impl Generator {
     // This is a utility which takes the parsed elements found in a generator comprehension and
     // recursively builds a generator function out of them. This will then become the body of the
     // function provided to a generator.
-    fn build_nested_loops(body: &Expr, clauses: &[ForClause]) -> Ast {
+    fn build_nested_loops(body: &Expr, clauses: &[ForClause], lineno: usize) -> Ast {
         if let Some((clause, remaining)) = clauses.split_first() {
             // Recursive case: Build nested loop for the remaining clauses
-            let loop_body = Self::build_nested_loops(body, remaining);
+            let loop_body = Self::build_nested_loops(body, remaining, lineno);
 
             let ForClause {
                 index,
@@ -110,7 +111,7 @@ impl Generator {
 
             let loop_body = if let Some(condition) = &condition {
                 Ast::new(vec![Statement::new(
-                    1,
+                    lineno,
                     StatementKind::IfElse {
                         if_part: ConditionalAst::new(condition.clone(), loop_body),
                         elif_parts: Vec::new(),
@@ -122,7 +123,7 @@ impl Generator {
             };
 
             let for_in_loop = Statement::new(
-                1,
+                lineno,
                 StatementKind::ForInLoop {
                     index: index.clone(),
                     iterable: iterable.clone(),
@@ -134,7 +135,7 @@ impl Generator {
             Ast::new(vec![for_in_loop])
         } else {
             // Base case: Yield the body
-            Ast::from_expr(Expr::Yield(Some(Box::new(body.clone()))))
+            Ast::single_expr(Expr::Yield(Some(Box::new(body.clone()))), lineno)
         }
     }
 }
@@ -163,7 +164,7 @@ impl Pausable for Generator {
         stmt: &Statement,
     ) -> TreewalkResult<StepResult> {
         let step_result = match interpreter.evaluate_statement(stmt) {
-            Ok(_) => Ok(StepResult::Continue),
+            Ok(()) => Ok(StepResult::Continue),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Return(val))) => Ok(StepResult::Exit(
                 FrameExit::Completed(Completion::Return(val)),
             )),

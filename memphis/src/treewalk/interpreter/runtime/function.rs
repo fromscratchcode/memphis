@@ -2,7 +2,7 @@ use crate::{
     core::Container,
     treewalk::{
         Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue, types::Function,
+        types::Function,
     },
 };
 
@@ -11,7 +11,7 @@ impl TreewalkInterpreter {
         &self,
         function: Container<Function>,
         scope: Container<Scope>,
-    ) -> TreewalkResult<TreewalkValue> {
+    ) -> TreewalkResult<()> {
         let cross_module = self.enter_function_context(function.clone(), scope);
 
         // We do not propagate errors here because we still must restore the scopes and things

@@ -30,6 +30,17 @@ pub fn compile_stmt(stmt: Statement) -> Bytecode {
     code.bytecode().to_vec()
 }
 
+// Append a `pass` after this statement so we don't trigger return value logic for final
+// expressions.
+pub fn compile_nonfinal_stmt(stmt: Statement) -> Bytecode {
+    let mut compiler = init();
+    let ast = ast![stmt, stmt_pass!()];
+    let code = compiler
+        .compile(&ast)
+        .expect("Failed to compile test Statement!");
+    code.bytecode().to_vec()
+}
+
 pub fn expect_err(stmt: Statement) -> CompilerError {
     let mut compiler = init();
     let ast = ast![stmt];

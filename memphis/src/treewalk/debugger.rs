@@ -3,7 +3,6 @@ use crate::{
     parser::types::{Expr, Statement, StatementKind},
     treewalk::{
         Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
-        TreewalkValue,
         pausable::{Frame, FrameKind},
         result::Raise,
         state::DebugSnapshot,
@@ -119,14 +118,14 @@ impl TreewalkDebugSession {
         }
     }
 
-    fn execute_statement(&mut self, stmt: &Statement) -> TreewalkResult<TreewalkValue> {
+    fn execute_statement(&mut self, stmt: &Statement) -> TreewalkResult<()> {
         let result = self.interpreter.evaluate_statement(stmt);
 
-        if let Err(TreewalkDisruption::Signal(TreewalkSignal::Return(return_val))) = result {
+        if let Err(TreewalkDisruption::Signal(TreewalkSignal::Return(_))) = result {
             match self.frame().kind {
                 FrameKind::Function { .. } => {
                     self.frame_mut().finish();
-                    return Ok(return_val);
+                    return Ok(());
                 }
                 FrameKind::Block => {
                     // Should this move to the parser? If so, this could be an invariant rather

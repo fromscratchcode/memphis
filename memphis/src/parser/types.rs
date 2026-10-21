@@ -21,9 +21,18 @@ impl Ast {
         Self { statements }
     }
 
-    pub fn from_expr(expr: Expr) -> Self {
-        // TODO we lose the line number here
-        Self::new(vec![Statement::new(1, StatementKind::Expression(expr))])
+    pub fn single_expr_return(expr: Expr, lineno: usize) -> Self {
+        Self::new(vec![Statement::new(
+            lineno,
+            StatementKind::Return(vec![expr]),
+        )])
+    }
+
+    pub fn single_expr(expr: Expr, lineno: usize) -> Self {
+        Self::new(vec![Statement::new(
+            lineno,
+            StatementKind::Expression(expr),
+        )])
     }
 
     pub fn has_yield(&self) -> bool {
@@ -58,14 +67,8 @@ impl Ast {
         self.statements.iter()
     }
 
-    /// This simulates CPython `eval` mode, rather than `exec` mode. We currently assume this WAY
-    /// too many places.
-    pub fn rewrite_last_expr_to_return(&mut self) {
-        if let Some(stmt) = self.statements.last_mut()
-            && let StatementKind::Expression(expr) = &stmt.kind
-        {
-            stmt.kind = StatementKind::Return(vec![expr.clone()]);
-        }
+    pub fn split_last(&self) -> Option<(&Statement, &[Statement])> {
+        self.statements.split_last()
     }
 }
 
@@ -571,9 +574,9 @@ pub enum StatementKind {
         right: Expr,
     },
     CompoundAssignment {
-        target: Box<Expr>,
+        target: Expr,
         op: BinOp,
-        value: Box<Expr>,
+        value: Expr,
     },
     FunctionDef {
         name: Identifier,

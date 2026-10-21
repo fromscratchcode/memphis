@@ -116,7 +116,7 @@ impl Pausable for Coroutine {
         stmt: &Statement,
     ) -> TreewalkResult<StepResult> {
         let step_result = match interpreter.evaluate_statement(stmt) {
-            Ok(_) => Ok(StepResult::Continue),
+            Ok(()) => Ok(StepResult::Continue),
             Err(TreewalkDisruption::Signal(TreewalkSignal::Sleep(s))) => {
                 Ok(StepResult::Exit(FrameExit::Suspended(Suspension::Sleep(s))))
             }

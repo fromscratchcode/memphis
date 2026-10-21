@@ -5,7 +5,7 @@ use crate::{
     },
     core::{LogLevel, log},
     domain::{Context, ModuleName},
-    parser::types::{Ast, LoopIndex},
+    parser::types::{Ast, LoopIndex, StatementKind},
 };
 
 use super::opcode::UnsignedOffset;
@@ -47,11 +47,40 @@ impl Compiler {
     pub fn compile(&mut self, ast: &Ast) -> CompilerResult<CodeObject> {
         assert!(self.code_stack.is_empty());
         let spec = CodeSpec::new_root(self.module_name.clone(), &self.filename);
-        let code = self.compile_ast_with_spec(ast, spec)?;
+        self.code_stack.push(CodeGenFrame::new(spec));
+        self.compile_top_ast(ast)?;
+        let code_gen_frame = self.code_stack.pop().expect("Code stack underflow!");
+        log(LogLevel::Debug, || {
+            code_gen_frame.debug_disasm_with_labels()
+        });
         assert!(self.code_stack.is_empty());
-        Ok(code)
+        Ok(code_gen_frame.finalize())
     }
 
+    /// Compile all statements of the AST, returning the final expression result. This is
+    /// "cell"-style similar to Jupyter, used by our unit tests.
+    fn compile_top_ast(&mut self, ast: &Ast) -> CompilerResult<()> {
+        match ast.split_last() {
+            None => Ok(()),
+            Some((last, stmts)) => {
+                for stmt in stmts {
+                    self.compile_stmt(stmt)?;
+                }
+
+                match &last.kind {
+                    StatementKind::Expression(expr) => {
+                        self.enter_stmt(last);
+                        self.compile_expr(expr)?;
+                        self.emit(Opcode::ReturnValue);
+                        Ok(())
+                    }
+                    _ => self.compile_stmt(last),
+                }
+            }
+        }
+    }
+
+    /// Compile all statements of the AST, discarding expression results.
     fn compile_ast(&mut self, ast: &Ast) -> CompilerResult<()> {
         ast.iter().try_fold((), |_, stmt| self.compile_stmt(stmt))
     }

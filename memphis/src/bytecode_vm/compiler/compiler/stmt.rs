@@ -11,8 +11,12 @@ use crate::{
 };
 
 impl Compiler {
-    pub fn compile_stmt(&mut self, stmt: &Statement) -> CompilerResult<()> {
+    pub fn enter_stmt(&mut self, stmt: &Statement) {
         self.line_number = stmt.start_line;
+    }
+
+    pub fn compile_stmt(&mut self, stmt: &Statement) -> CompilerResult<()> {
+        self.enter_stmt(stmt);
 
         match &stmt.kind {
             StatementKind::Pass => {}
@@ -610,7 +614,7 @@ mod tests_bytecode_stmt {
     #[test]
     fn expression_as_statement() {
         let s = stmt_expr!(func_call!("print"));
-        let bytecode = compile_stmt(s);
+        let bytecode = compile_nonfinal_stmt(s);
         assert_eq!(
             bytecode,
             &[

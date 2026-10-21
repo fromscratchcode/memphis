@@ -154,7 +154,12 @@ impl TreewalkInterpreter {
         body: &Expr,
         clauses: &[ForClause],
     ) -> TreewalkResult<TreewalkValue> {
-        let generator = Generator::new_from_comprehension(self.state.clone(), body, clauses);
+        let generator = Generator::new_from_comprehension(
+            self.state.clone(),
+            body,
+            clauses,
+            self.memphis_state.line_number(),
+        );
         let iterator = GeneratorIter::new(generator, self.clone());
         Ok(TreewalkValue::Generator(iterator))
     }
@@ -342,7 +347,7 @@ impl TreewalkInterpreter {
     }
 
     fn evaluate_lambda(&self, params: &AstParams, expr: &Expr) -> TreewalkResult<TreewalkValue> {
-        let block = Ast::from_expr(expr.clone());
+        let block = Ast::single_expr_return(expr.clone(), self.memphis_state.line_number());
         let runtime_params = self.evaluate_params(params)?;
 
         let function = Container::new(Function::new_lambda(

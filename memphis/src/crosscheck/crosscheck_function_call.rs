@@ -35,6 +35,14 @@ hello()
 world()
 "#;
     assert_crosscheck_return!(text, none!());
+
+    let text = r#"
+def foo():
+    2 + 11
+
+foo()
+"#;
+    assert_crosscheck_return!(text, none!());
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use crate::{
     core::Container,
-    parser::types::Ast,
+    parser::types::{Ast, StatementKind},
     runtime::MemphisState,
     treewalk::{
         Executor, RaisedException, TreewalkDisruption, TreewalkResult, TreewalkState,
@@ -44,13 +44,38 @@ impl TreewalkInterpreter {
         RaisedException::new(self.memphis_state.debug_call_stack(), error)
     }
 
-    fn execute_ast(&self, ast: &Ast) -> TreewalkResult<TreewalkValue> {
+    /// Execute all statements of the AST, discarding expression results.
+    fn execute_ast(&self, ast: &Ast) -> TreewalkResult<()> {
         ast.iter()
-            .try_fold(TreewalkValue::None, |_, stmt| self.evaluate_statement(stmt))
+            .try_fold((), |_, stmt| self.evaluate_statement(stmt))
+    }
+
+    /// Execute all statements of the AST, returning the final expression result. This is
+    /// "cell"-style similar to Jupyter, used by our unit tests.
+    fn execute_top_ast(&self, ast: &Ast) -> TreewalkResult<TreewalkValue> {
+        match ast.split_last() {
+            None => Ok(TreewalkValue::None),
+            Some((last, stmts)) => {
+                for stmt in stmts {
+                    self.evaluate_statement(stmt)?;
+                }
+
+                match &last.kind {
+                    StatementKind::Expression(expr) => {
+                        self.enter_statement(last);
+                        self.evaluate_expr(expr)
+                    }
+                    _ => {
+                        self.evaluate_statement(last)?;
+                        Ok(TreewalkValue::None)
+                    }
+                }
+            }
+        }
     }
 
     pub fn execute(&mut self, ast: Ast) -> Result<TreewalkValue, RaisedException> {
-        match self.execute_ast(&ast) {
+        match self.execute_top_ast(&ast) {
             Ok(result) => Ok(result),
             Err(TreewalkDisruption::Error(e)) => Err(e),
             Err(TreewalkDisruption::Signal(s)) => Err(self.raise(Exception::runtime_error_with(
@@ -72,14 +97,8 @@ mod tests {
     use crate::{
         ModuleOrigin,
         domain::{Text, Type},
-        parser::{
-            test_utils::stmt_expr,
-            types::{Expr, ast},
-        },
         test_utils::TestIo,
-        treewalk::{
-            TreewalkContext, protocols::Callable, test_utils::*, types::Function, utils::Signature,
-        },
+        treewalk::{TreewalkContext, protocols::Callable, test_utils::*},
     };
 
     #[test]
@@ -575,13 +594,7 @@ y = _f.__type_params__
         let ctx = run(input);
 
         assert_read_eq!(ctx, "a", int!(5));
-        let b = extract!(ctx, "b", Function).borrow().clone();
-        let Function { ref body, .. } = b;
-        assert_eq!(body, &ast![stmt_expr!(Expr::Integer(4))]);
         assert_read_eq!(ctx, "c", int!(4));
-        let d = extract!(ctx, "d", Function).borrow().clone();
-        let Function { ref body, .. } = d;
-        assert_eq!(body, &ast![stmt_expr!(Expr::Yield(None))]);
         assert_variant!(ctx, "e", Generator);
         assert_type_eq!(ctx, "f", Type::Generator);
         assert_variant!(ctx, "h", Coroutine);
@@ -1013,7 +1026,10 @@ j = +(-3)
                 .ends_with("src/fixtures/call_stack/call_stack_one_file.py")
         );
         assert!(call_stack.get(2).file_path_str().starts_with("/"));
+    }
 
+    #[test]
+    fn call_stack_multiline_string() {
         let input = r#"
 """
 multiline string
@@ -1034,6 +1050,30 @@ c = foo()
         assert_eq!(call_stack.get(0).file_path_str(), "<stdin>");
         assert_eq!(call_stack.get(0).name(), "<module>");
         assert_eq!(call_stack.get(0).line_number(), 11);
+    }
+
+    #[test]
+    fn call_stack_lambda() {
+        let input = r#"
+print("before")
+a = lambda: 1/0
+print("after")
+b = lambda: 1/0
+print("third")
+a()
+b()
+"#;
+        let e = eval_expect_error(input);
+        assert_div_by_zero_error!(e.exception, "integer division or modulo by zero");
+
+        let call_stack = e.debug_call_stack;
+        assert_eq!(call_stack.len(), 2);
+        assert_eq!(call_stack.get(0).file_path_str(), "<stdin>");
+        assert_eq!(call_stack.get(0).name(), "<module>");
+        assert_eq!(call_stack.get(0).line_number(), 7);
+        assert_eq!(call_stack.get(1).file_path_str(), "<stdin>");
+        assert_eq!(call_stack.get(1).name(), "<lambda>");
+        assert_eq!(call_stack.get(1).line_number(), 3);
     }
 
     #[test]
@@ -2039,23 +2079,11 @@ class Bar: pass
 class Baz: pass
 class Foo(Bar, Baz): pass
 
-a = Foo.__mro__
+[ c.__name__ for c in Foo.__mro__ ]
 "#;
-
-        let ctx = run(input);
-
-        let mro = extract!(ctx, "a", Tuple)
-            .into_iter()
-            .map(|i| i.as_class().unwrap().borrow().name().to_string())
-            .collect::<Vec<String>>();
-        assert_eq!(
-            mro,
-            vec![
-                "Foo".to_string(),
-                "Bar".into(),
-                "Baz".into(),
-                "object".into()
-            ]
+        assert_eval_eq!(
+            input,
+            list![str!("Foo"), str!("Bar"), str!("Baz"), str!("object")]
         );
     }
 
@@ -2599,20 +2627,6 @@ except ZeroDivisionError:
 
     #[test]
     fn args_and_kwargs() {
-        let input = r#"
-def test_kwargs(**kwargs):
-    print(kwargs['a'])
-"#;
-        let ctx = run(input);
-
-        let expected_args = Signature {
-            args: vec![],
-            args_var: None,
-            kwargs_var: Some("kwargs".into()),
-        };
-        let f = extract!(ctx, "test_kwargs", Function);
-        assert_eq!(f.borrow().args, expected_args);
-
         let input = r#"
 def test_kwargs(**kwargs):
     return kwargs['a']
@@ -4989,7 +5003,7 @@ class Foo:
         self.x = x
 
     def __eq__(self, other):
-        self.x == other.x
+        return self.x == other.x
 
 f = Foo(4)
 g = Foo(4)

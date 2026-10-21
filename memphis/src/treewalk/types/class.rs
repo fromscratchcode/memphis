@@ -1,11 +1,11 @@
 use crate::{
     core::{Container, LogLevel, log},
-    domain::Type,
+    domain::{Dunder, Type},
     treewalk::{
         SymbolTable, TreewalkInterpreter, TreewalkResult, TreewalkValue,
         protocols::{Callable, MemberRead, MemberWrite},
         result::Raise,
-        types::Exception,
+        types::{Exception, Str},
         utils::{BoundArgs, InvokeArgs, Signature},
     },
 };
@@ -34,10 +34,12 @@ impl Class {
         name: impl Into<String>,
         metaclass: Option<Container<Class>>,
         parent_classes: Vec<Container<Class>>,
-        symbol_table: SymbolTable,
+        mut symbol_table: SymbolTable,
     ) -> Self {
+        let name = name.into();
+        symbol_table.insert(&Dunder::Name, TreewalkValue::Str(Str::new(name.clone())));
         Self {
-            name: name.into(),
+            name,
             parent_classes,
             metaclass,
             symbol_table,
@@ -50,11 +52,14 @@ impl Class {
         metaclass: Option<Container<Class>>,
         parent_classes: Vec<Container<Class>>,
     ) -> Self {
+        let name = String::from(&type_);
+        let mut symbol_table = SymbolTable::default();
+        symbol_table.insert(&Dunder::Name, TreewalkValue::Str(Str::new(name.clone())));
         Self {
-            name: String::from(&type_),
+            name,
             parent_classes,
             metaclass,
-            symbol_table: SymbolTable::default(),
+            symbol_table,
             builtin_type: Some(type_),
         }
     }

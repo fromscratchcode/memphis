@@ -49,10 +49,8 @@ impl VmContext {
     }
 
     pub fn compile(&self, text: &Text) -> Result<CodeObject, CompilerError> {
-        let mut ast =
+        let ast =
             Parser::parse_text(text).map_err(|e| CompilerError::SyntaxError(e.to_string()))?;
-        ast.rewrite_last_expr_to_return();
-
         let mut compiler = Compiler::new(&self.module_name, &self.package, &self.path_str);
         compiler.compile(&ast)
     }

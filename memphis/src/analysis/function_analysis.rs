@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{
     core::{LogLevel, log},
     domain::Identifier,
-    parser::types::{Ast, Expr, Statement, StatementKind},
+    parser::types::{Expr, Statement, StatementKind},
 };
 
 use super::visitor::Visitor;
@@ -105,8 +105,6 @@ impl FunctionAnalysisVisitor {
 }
 
 impl Visitor for FunctionAnalysisVisitor {
-    fn visit_ast(&mut self, _program: &Ast) {}
-
     fn visit_statement(&mut self, statement: &Statement) {
         log(LogLevel::Trace, || format!("Visiting {statement:?}"));
 

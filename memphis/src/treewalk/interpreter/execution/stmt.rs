@@ -16,19 +16,21 @@ use crate::{
 };
 
 impl TreewalkInterpreter {
-    pub fn evaluate_statement(&self, stmt: &Statement) -> TreewalkResult<TreewalkValue> {
+    pub fn enter_statement(&self, stmt: &Statement) {
         self.memphis_state.set_line_number(stmt.start_line);
+    }
 
-        // These are the only types of statements that will return a value.
+    pub fn evaluate_statement(&self, stmt: &Statement) -> TreewalkResult<()> {
+        self.enter_statement(stmt);
+
         match &stmt.kind {
-            StatementKind::Expression(expr) => return self.evaluate_expr(expr),
-            StatementKind::Return(expr) => return self.evaluate_return(expr),
-            _ => {}
-        };
-
-        let result = match &stmt.kind {
-            // These are handled above
-            StatementKind::Expression(_) | StatementKind::Return(_) => unreachable!(),
+            // Return exits the current function through a control-flow signal.
+            // All other statements evaluate for side effects and produce None.
+            StatementKind::Return(exprs) => self.evaluate_return(exprs),
+            StatementKind::Expression(expr) => {
+                let _ = self.evaluate_expr(expr)?;
+                Ok(())
+            }
             StatementKind::Pass => Ok(()),
             StatementKind::Break => Err(TreewalkDisruption::Signal(TreewalkSignal::Break)),
             StatementKind::Continue => Err(TreewalkDisruption::Signal(TreewalkSignal::Continue)),
@@ -89,15 +91,10 @@ impl TreewalkInterpreter {
                 variable,
                 block,
             } => self.evaluate_context_manager(expr, variable, block),
-        };
-
-        // Return an error if one is thrown, otherwise all statements will return None.
-        result?;
-
-        Ok(TreewalkValue::None)
+        }
     }
 
-    fn evaluate_return(&self, exprs: &[Expr]) -> TreewalkResult<TreewalkValue> {
+    fn evaluate_return(&self, exprs: &[Expr]) -> TreewalkResult<()> {
         let results = exprs
             .iter()
             .map(|arg| self.evaluate_expr(arg))
