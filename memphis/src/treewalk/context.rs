@@ -1,5 +1,12 @@
 use crate::{
-    HostIo, analysis::validate, core::Container, domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text}, interpreter::Interpreter, parser::Parser, runtime::MemphisState, treewalk::{
+    HostIo,
+    analysis::validate,
+    core::Container,
+    domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
+    interpreter::Interpreter,
+    parser::Parser,
+    runtime::MemphisState,
+    treewalk::{
         RaisedException, TreewalkInterpreter, TreewalkState, TreewalkValue,
         types::{Exception, Module},
     },

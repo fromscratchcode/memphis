@@ -19,6 +19,7 @@ impl Display for SemanticError {
     }
 }
 
+#[derive(Debug, PartialEq)]
 enum Context {
     Module,
     Function,
@@ -45,6 +46,14 @@ impl SemanticAnalyzer {
     fn context(&self) -> &Context {
         self.context_stack.last().expect("Context stack underflow")
     }
+
+    fn exit_context(&mut self, expected: Context) {
+        let actual = self.context_stack.pop().expect("Context stack underflow");
+        assert_eq!(
+            actual, expected,
+            "Semantic context stack exited a different scope than it entered"
+        );
+    }
 }
 
 impl Visitor for SemanticAnalyzer {
@@ -61,7 +70,7 @@ impl Visitor for SemanticAnalyzer {
     }
 
     fn exit_function_body(&mut self, _statement: &Statement) {
-        self.context_stack.pop();
+        self.exit_context(Context::Function);
     }
 
     fn enter_class_body(&mut self, _statement: &Statement) {
@@ -69,7 +78,7 @@ impl Visitor for SemanticAnalyzer {
     }
 
     fn exit_class_body(&mut self, _statement: &Statement) {
-        self.context_stack.pop();
+        self.exit_context(Context::Class);
     }
 }
 
