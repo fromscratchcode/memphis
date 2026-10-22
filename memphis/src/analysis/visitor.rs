@@ -12,6 +12,12 @@ pub trait Visitor {
     fn should_enter_function_body(&self) -> bool {
         true
     }
+
+    fn enter_function_body(&mut self, _statement: &Statement) {}
+    fn exit_function_body(&mut self, _statement: &Statement) {}
+
+    fn enter_class_body(&mut self, _statement: &Statement) {}
+    fn exit_class_body(&mut self, _statement: &Statement) {}
 }
 
 /// Trait for anything that can be visited by a `Visitor`.
@@ -223,7 +229,9 @@ impl AcceptsVisitor for Statement {
                 }
                 args.accept(visitor);
                 if visitor.should_enter_function_body() {
+                    visitor.enter_function_body(self);
                     body.accept(visitor);
+                    visitor.exit_function_body(self);
                 }
             }
             StatementKind::WhileLoop(cond_ast) => {
@@ -272,7 +280,9 @@ impl AcceptsVisitor for Statement {
                 for parent in parents {
                     parent.accept(visitor);
                 }
+                visitor.enter_class_body(self);
                 body.accept(visitor);
+                visitor.exit_class_body(self);
             }
             StatementKind::Global(_) | StatementKind::Nonlocal(_) => {}
             StatementKind::RegularImport(_)
