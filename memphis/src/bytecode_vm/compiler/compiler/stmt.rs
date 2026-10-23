@@ -627,10 +627,10 @@ mod tests_bytecode_stmt {
 
     #[test]
     fn while_loop() {
-        let s = stmt!(StatementKind::WhileLoop(ConditionalAst {
-            condition: cmp_op!(int!(4), LessThan, int!(5)),
-            ast: ast![],
-        }));
+        let s = stmt!(StatementKind::WhileLoop(ConditionalAst::new(
+            cmp_op!(int!(4), LessThan, int!(5)),
+            ast![],
+        )));
         let bytecode = compile_stmt(s);
         assert_eq!(
             bytecode,
@@ -700,10 +700,10 @@ mod tests_bytecode_stmt {
     #[test]
     fn if_else_only_if() {
         let s = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(int!(4), LessThan, int!(5)),
-                ast: ast![stmt_assign!(var!("a"), int!(-1))],
-            },
+            if_part: ConditionalAst::new(
+                cmp_op!(int!(4), LessThan, int!(5)),
+                ast![stmt_assign!(var!("a"), int!(-1))],
+            ),
             elif_parts: vec![],
             else_part: None,
         });
@@ -724,10 +724,10 @@ mod tests_bytecode_stmt {
     #[test]
     fn if_else_with_else() {
         let s = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(int!(4), LessThan, int!(5)),
-                ast: ast![stmt_assign!(var!("a"), int!(-3))],
-            },
+            if_part: ConditionalAst::new(
+                cmp_op!(int!(4), LessThan, int!(5)),
+                ast![stmt_assign!(var!("a"), int!(-3))],
+            ),
             elif_parts: vec![],
             else_part: Some(ast![stmt_assign!(var!("a"), int!(3))]),
         });
@@ -750,14 +750,14 @@ mod tests_bytecode_stmt {
     #[test]
     fn if_else_with_elif() {
         let s = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(int!(4), GreaterThan, int!(5)),
-                ast: ast![stmt_assign!(var!("a"), int!(-1))],
-            },
-            elif_parts: vec![ConditionalAst {
-                condition: cmp_op!(int!(4), GreaterThan, int!(4)),
-                ast: ast![stmt_assign!(var!("a"), int!(-2))],
-            }],
+            if_part: ConditionalAst::new(
+                cmp_op!(int!(4), GreaterThan, int!(5)),
+                ast![stmt_assign!(var!("a"), int!(-1))],
+            ),
+            elif_parts: vec![ConditionalAst::new(
+                cmp_op!(int!(4), GreaterThan, int!(4)),
+                ast![stmt_assign!(var!("a"), int!(-2))],
+            )],
             else_part: None,
         });
         let bytecode = compile_stmt(s);
@@ -786,14 +786,14 @@ mod tests_bytecode_stmt {
     #[test]
     fn if_else_with_elif_and_else() {
         let s = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(int!(4), GreaterThan, int!(5)),
-                ast: ast![stmt_assign!(var!("a"), int!(-1))],
-            },
-            elif_parts: vec![ConditionalAst {
-                condition: cmp_op!(int!(4), GreaterThan, int!(4)),
-                ast: ast![stmt_assign!(var!("a"), int!(-2))],
-            }],
+            if_part: ConditionalAst::new(
+                cmp_op!(int!(4), GreaterThan, int!(5)),
+                ast![stmt_assign!(var!("a"), int!(-1))],
+            ),
+            elif_parts: vec![ConditionalAst::new(
+                cmp_op!(int!(4), GreaterThan, int!(4)),
+                ast![stmt_assign!(var!("a"), int!(-2))],
+            )],
             else_part: Some(ast![stmt_assign!(var!("a"), int!(3))]),
         });
         let bytecode = compile_stmt(s);

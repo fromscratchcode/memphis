@@ -131,10 +131,7 @@ mod tests {
             "foo",
             params!(),
             [stmt!(StatementKind::IfElse {
-                if_part: ConditionalAst {
-                    condition: bool!(true),
-                    ast: ast![stmt_return!()],
-                },
+                if_part: ConditionalAst::new(bool!(true), ast![stmt_return!()],),
                 elif_parts: vec![],
                 else_part: None,
             })]

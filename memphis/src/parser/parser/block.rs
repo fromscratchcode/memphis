@@ -105,10 +105,7 @@ if True: a = 4
 else: a = 6
 ";
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: bool!(true),
-                ast: ast![stmt_assign!(var!("a"), int!(4))],
-            },
+            if_part: ConditionalAst::new(bool!(true), ast![stmt_assign!(var!("a"), int!(4))],),
             elif_parts: vec![],
             else_part: Some(ast![stmt_assign!(var!("a"), int!(6))]),
         });
@@ -122,13 +119,13 @@ if True: a = 4; b = 8
 else: a = 6; b = 7
 ";
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: bool!(true),
-                ast: ast![
+            if_part: ConditionalAst::new(
+                bool!(true),
+                ast![
                     stmt_assign!(var!("a"), int!(4)),
                     stmt_assign!(var!("b"), int!(8))
                 ],
-            },
+            ),
             elif_parts: vec![],
             else_part: Some(ast![
                 stmt_assign!(var!("a"), int!(6)),
@@ -145,13 +142,13 @@ if True:
     a = 4; b = 8
 ";
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: bool!(true),
-                ast: ast![
+            if_part: ConditionalAst::new(
+                bool!(true),
+                ast![
                     stmt_assign!(var!("a"), int!(4)),
                     stmt_assign!(var!("b"), int!(8))
                 ],
-            },
+            ),
             elif_parts: vec![],
             else_part: None,
         });
