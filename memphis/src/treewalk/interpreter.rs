@@ -4285,12 +4285,6 @@ foo()
 "#;
         let e = eval_expect_error(input);
         assert_syntax_error!(e.exception, "'a' not found in nonlocal environment");
-
-        let input = r#"
-nonlocal a
-"#;
-        let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception, "'nonlocal' cannot be used at module level");
     }
 
     #[test]

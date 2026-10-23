@@ -9,12 +9,16 @@ use super::visitor::Visitor;
 #[derive(Clone, Debug)]
 pub enum SemanticError {
     ReturnOutsideFunction,
+    NonlocalAtModuleLevel,
 }
 
 impl Display for SemanticError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
             SemanticError::ReturnOutsideFunction => write!(f, "'return' outside function"),
+            SemanticError::NonlocalAtModuleLevel => {
+                write!(f, "'nonlocal' cannot be used at module level")
+            }
         }
     }
 }
@@ -63,6 +67,12 @@ impl Visitor for SemanticAnalyzer {
         {
             self.errors.push(SemanticError::ReturnOutsideFunction);
         }
+
+        if matches!(statement.kind, StatementKind::Nonlocal(_))
+            && !matches!(self.context(), Context::Function)
+        {
+            self.errors.push(SemanticError::NonlocalAtModuleLevel);
+        }
     }
 
     fn enter_function_body(&mut self, _statement: &Statement) {
@@ -107,5 +117,12 @@ mod tests {
         let ast = ast![stmt_return!()];
         let err = validate(&ast).expect_err("Expected error");
         assert!(matches!(err, SemanticError::ReturnOutsideFunction));
+    }
+
+    #[test]
+    fn nonlocal_at_module_level() {
+        let ast = ast![stmt_nonlocal!()];
+        let err = validate(&ast).expect_err("Expected error");
+        assert!(matches!(err, SemanticError::NonlocalAtModuleLevel));
     }
 }

@@ -155,13 +155,6 @@ impl TreewalkInterpreter {
             .raise(self);
         }
 
-        // `nonlocal` cannot be used at the module-level (outside of a function,
-        // i.e. captured environment).
-        if self.state.current_captured_environment().is_none() {
-            return Exception::syntax_error("'nonlocal' cannot be used at module level")
-                .raise(self);
-        }
-
         Ok(())
     }
 

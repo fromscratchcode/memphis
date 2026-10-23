@@ -10,4 +10,11 @@ return True
 "#;
     let e = crosscheck_expect_error!(input);
     assert_syntax_error!(e.exception, "'return' outside function");
+
+    let input = r#"
+1/0
+nonlocal a
+"#;
+    let e = crosscheck_expect_error!(input);
+    assert_syntax_error!(e.exception, "'nonlocal' cannot be used at module level");
 }
