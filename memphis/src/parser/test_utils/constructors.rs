@@ -149,7 +149,20 @@ macro_rules! stmt_def {
                 is_async: false,
             }
         )
-    }
+    };
+}
+
+macro_rules! stmt_class {
+    ($name:expr, [$($body:expr),* $(,)?]) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::ClassDef {
+                name: $crate::parser::test_utils::ident!($name),
+                parents: vec![],
+                metaclass: None,
+                body: $crate::parser::types::Ast::new(vec![$($body),*]),
+            }
+        )
+    };
 }
 
 macro_rules! stmt_global {
@@ -622,6 +635,7 @@ pub(crate) use slice;
 pub(crate) use slice_op;
 pub(crate) use stmt;
 pub(crate) use stmt_assign;
+pub(crate) use stmt_class;
 pub(crate) use stmt_compound_assign;
 pub(crate) use stmt_def;
 pub(crate) use stmt_expr;

@@ -141,24 +141,17 @@ mod tests {
 
     #[test]
     fn return_inside_class_body_invalid() {
-        let ast = ast![stmt!(StatementKind::ClassDef {
-            name: ident!("Foo"),
-            parents: vec![],
-            metaclass: None,
-            body: ast![stmt_return!()],
-        })];
+        let ast = ast![stmt_class!("Foo", [stmt_return!()])];
         let err = validate(&ast).expect_err("Expected error");
         assert!(matches!(err, SemanticError::ReturnOutsideFunction));
     }
 
     #[test]
     fn return_inside_method_valid() {
-        let ast = ast![stmt!(StatementKind::ClassDef {
-            name: ident!("Foo"),
-            parents: vec![],
-            metaclass: None,
-            body: ast![stmt_def!("bar", params!(), [stmt_return!()])],
-        })];
+        let ast = ast![stmt_class!(
+            "Foo",
+            [stmt_def!("bar", params!(), [stmt_return!()])]
+        )];
         validate(&ast).expect("Expected no error");
     }
 

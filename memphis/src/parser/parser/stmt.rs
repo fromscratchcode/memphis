@@ -758,11 +758,9 @@ class Foo:
     def bar(self):
         print(self.x)
 "#;
-        let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident!("Foo"),
-            parents: vec![],
-            metaclass: None,
-            body: ast![
+        let expected_ast = stmt_class!(
+            "Foo",
+            [
                 stmt_def!(
                     "__init__",
                     params![param!("self")],
@@ -776,8 +774,8 @@ class Foo:
                         call_args![member_access!(var!("self"), "x")]
                     ))]
                 ),
-            ],
-        });
+            ]
+        );
         assert_stmt_eq!(input, expected_ast);
 
         let input = "class Foo(Bar, Baz): pass";
