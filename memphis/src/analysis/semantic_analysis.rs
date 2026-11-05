@@ -10,6 +10,7 @@ use super::visitor::Visitor;
 pub enum SemanticError {
     ReturnOutsideFunction,
     NonlocalAtModuleLevel,
+    SymbolNotFoundInNonlocalEnvironment(String),
 }
 
 impl Display for SemanticError {
@@ -18,6 +19,9 @@ impl Display for SemanticError {
             SemanticError::ReturnOutsideFunction => write!(f, "'return' outside function"),
             SemanticError::NonlocalAtModuleLevel => {
                 write!(f, "'nonlocal' cannot be used at module level")
+            }
+            SemanticError::SymbolNotFoundInNonlocalEnvironment(symbol) => {
+                write!(f, "'{symbol}' not found in nonlocal environment")
             }
         }
     }
@@ -160,5 +164,66 @@ mod tests {
         let ast = ast![stmt_nonlocal!()];
         let err = validate(&ast).expect_err("Expected error");
         assert!(matches!(err, SemanticError::NonlocalAtModuleLevel));
+    }
+
+    #[test]
+    fn nonlocal_not_found() {
+        // no enclosing binding
+        let ast = ast![stmt_def!("foo", params!(), [stmt_nonlocal!("x")])];
+        let err = validate(&ast).expect_err("Expected error");
+        assert!(
+            matches!(err, SemanticError::SymbolNotFoundInNonlocalEnvironment(sym) if sym == "x")
+        );
+
+        // module-level binding only
+        let ast = ast![
+            stmt_assign!(var!("x"), int!(10)),
+            stmt_def!("foo", params!(), [stmt_nonlocal!("x")])
+        ];
+        let err = validate(&ast).expect_err("Expected error");
+        assert!(
+            matches!(err, SemanticError::SymbolNotFoundInNonlocalEnvironment(sym) if sym == "x")
+        );
+
+        let ast = ast![stmt_def!(
+            "outer",
+            params!(),
+            [
+                stmt_assign!(var!("x"), int!(10)),
+                stmt_def!("inner", params!(), [stmt_nonlocal!("x")])
+            ]
+        )];
+        validate(&ast).expect("Expected no error");
+
+        let ast = ast![stmt_def!(
+            "outer",
+            params!(),
+            [
+                stmt_def!("inner", params!(), [stmt_nonlocal!("x")]),
+                stmt_assign!(var!("x"), int!(10))
+            ]
+        )];
+        validate(&ast).expect("Expected no error");
+
+        let ast = ast![stmt_def!(
+            "outer",
+            params!(param!("x")),
+            [stmt_def!("inner", params!(), [stmt_nonlocal!("x")])]
+        )];
+        validate(&ast).expect("Expected no error");
+
+        let ast = ast![stmt_def!(
+            "outer",
+            params!(),
+            [
+                stmt_assign!(var!("x"), int!(10)),
+                stmt_def!(
+                    "middle",
+                    params!(),
+                    [stmt_def!("inner", params!(), [stmt_nonlocal!("x")])]
+                )
+            ]
+        )];
+        validate(&ast).expect("Expected no error");
     }
 }
