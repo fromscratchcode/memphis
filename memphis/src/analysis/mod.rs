@@ -1,3 +1,4 @@
+mod bindings;
 mod function_analysis;
 mod semantic_analysis;
 mod visitor;

@@ -1,7 +1,7 @@
 use crate::{
-    analysis::AcceptsVisitor,
+    analysis::{AcceptsVisitor, bindings::collect_function_bindings},
     domain::Identifier,
-    parser::types::{Ast, Expr, Statement, StatementKind},
+    parser::types::{Ast, Statement, StatementKind},
 };
 use std::{
     collections::HashSet,
@@ -122,7 +122,17 @@ impl Visitor for SemanticAnalyzer {
 
     fn enter_function_body(&mut self, statement: &Statement) {
         self.context_stack.push(Context::Function);
-        let bindings = collect_function_bindings(statement);
+        let StatementKind::FunctionDef {
+            name: _,
+            args,
+            body,
+            decorators: _,
+            is_async: _,
+        } = &statement.kind
+        else {
+            panic!("Expected statement");
+        };
+        let bindings = collect_function_bindings(args, body);
         let function_scope = FunctionScope::new(bindings);
         self.function_scopes.push(function_scope);
     }
@@ -139,39 +149,6 @@ impl Visitor for SemanticAnalyzer {
     fn exit_class_body(&mut self, _statement: &Statement) {
         self.exit_context(Context::Class);
     }
-}
-
-fn collect_function_bindings(statement: &Statement) -> HashSet<Identifier> {
-    let mut bindings = HashSet::new();
-    match &statement.kind {
-        StatementKind::FunctionDef {
-            name: _,
-            args,
-            body,
-            decorators: _,
-            is_async: _,
-        } => {
-            for name in args.names() {
-                bindings.insert(name.clone());
-            }
-
-            for stmt in body.iter() {
-                match &stmt.kind {
-                    StatementKind::Assignment { left, right: _ } => {
-                        match left {
-                            Expr::Variable(v) => {
-                                bindings.insert(v.clone());
-                            }
-                            _ => {}
-                        };
-                    }
-                    _ => {}
-                }
-            }
-        }
-        _ => panic!("only expecting function def"),
-    }
-    bindings
 }
 
 pub fn validate(ast: &Ast) -> Result<(), SemanticError> {
