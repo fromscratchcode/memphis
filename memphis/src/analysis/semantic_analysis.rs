@@ -1,8 +1,12 @@
 use crate::{
     analysis::AcceptsVisitor,
-    parser::types::{Ast, Statement, StatementKind},
+    domain::Identifier,
+    parser::types::{Ast, Expr, Statement, StatementKind},
 };
-use std::fmt::{Display, Error, Formatter};
+use std::{
+    collections::HashSet,
+    fmt::{Display, Error, Formatter},
+};
 
 use super::visitor::Visitor;
 
@@ -27,6 +31,20 @@ impl Display for SemanticError {
     }
 }
 
+struct FunctionScope {
+    bindings: HashSet<Identifier>,
+}
+
+impl FunctionScope {
+    fn new(bindings: HashSet<Identifier>) -> Self {
+        Self { bindings }
+    }
+
+    fn contains(&self, name: &Identifier) -> bool {
+        self.bindings.contains(name)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum Context {
     Module,
@@ -36,6 +54,7 @@ enum Context {
 
 pub struct SemanticAnalyzer {
     context_stack: Vec<Context>,
+    function_scopes: Vec<FunctionScope>,
     errors: Vec<SemanticError>,
 }
 
@@ -43,6 +62,7 @@ impl SemanticAnalyzer {
     fn new() -> Self {
         Self {
             context_stack: vec![Context::Module],
+            function_scopes: vec![],
             errors: Vec::new(),
         }
     }
@@ -72,18 +92,43 @@ impl Visitor for SemanticAnalyzer {
             self.errors.push(SemanticError::ReturnOutsideFunction);
         }
 
-        if matches!(statement.kind, StatementKind::Nonlocal(_))
-            && !matches!(self.context(), Context::Function)
-        {
-            self.errors.push(SemanticError::NonlocalAtModuleLevel);
+        if let StatementKind::Nonlocal(names) = &statement.kind {
+            if !matches!(self.context(), Context::Function) {
+                self.errors.push(SemanticError::NonlocalAtModuleLevel);
+            } else {
+                let enclosing_scopes = match self.context() {
+                    Context::Class => todo!(),
+                    Context::Module => unreachable!("handled elsewhere"),
+                    // skip ourselves, but go all the way because global scope is no in this list
+                    Context::Function => &self.function_scopes[..self.function_scopes.len() - 1],
+                };
+
+                for name in names {
+                    let found = enclosing_scopes
+                        .iter()
+                        .rev()
+                        .any(|scope| scope.contains(name));
+
+                    if !found {
+                        self.errors
+                            .push(SemanticError::SymbolNotFoundInNonlocalEnvironment(
+                                name.to_string(),
+                            ));
+                    }
+                }
+            }
         }
     }
 
-    fn enter_function_body(&mut self, _statement: &Statement) {
+    fn enter_function_body(&mut self, statement: &Statement) {
         self.context_stack.push(Context::Function);
+        let bindings = collect_function_bindings(statement);
+        let function_scope = FunctionScope::new(bindings);
+        self.function_scopes.push(function_scope);
     }
 
     fn exit_function_body(&mut self, _statement: &Statement) {
+        self.function_scopes.pop();
         self.exit_context(Context::Function);
     }
 
@@ -94,6 +139,39 @@ impl Visitor for SemanticAnalyzer {
     fn exit_class_body(&mut self, _statement: &Statement) {
         self.exit_context(Context::Class);
     }
+}
+
+fn collect_function_bindings(statement: &Statement) -> HashSet<Identifier> {
+    let mut bindings = HashSet::new();
+    match &statement.kind {
+        StatementKind::FunctionDef {
+            name: _,
+            args,
+            body,
+            decorators: _,
+            is_async: _,
+        } => {
+            for name in args.names() {
+                bindings.insert(name.clone());
+            }
+
+            for stmt in body.iter() {
+                match &stmt.kind {
+                    StatementKind::Assignment { left, right: _ } => {
+                        match left {
+                            Expr::Variable(v) => {
+                                bindings.insert(v.clone());
+                            }
+                            _ => {}
+                        };
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => panic!("only expecting function def"),
+    }
+    bindings
 }
 
 pub fn validate(ast: &Ast) -> Result<(), SemanticError> {
