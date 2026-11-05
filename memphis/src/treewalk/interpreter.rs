@@ -4215,13 +4215,9 @@ def global_modified():
     global_var_two = 9
 global_modified()
 
-a = global_var_one
-b = global_var_two
+global_var_one, global_var_two
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(10));
-        assert_read_eq!(ctx, "b", int!(9));
+        assert_eval_eq!(input, tuple![int!(10), int!(9)]);
 
         let input = r#"
 def nonlocal_shadow():
@@ -4239,13 +4235,9 @@ def nonlocal_modified():
     f()
     return var
 
-a = nonlocal_shadow()
-b = nonlocal_modified()
+nonlocal_shadow(), nonlocal_modified()
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "a", int!(5));
-        assert_read_eq!(ctx, "b", int!(4));
+        assert_eval_eq!(input, tuple![int!(5), int!(4)]);
 
         let input = r#"
 def outer():
@@ -4262,29 +4254,11 @@ def outer():
     middle()
     return x
 
-a = outer()
+outer()
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, int!(20));
 
-        assert_read_eq!(ctx, "a", int!(20));
-
-        let input = r#"
-def foo():
-    def inner():
-        nonlocal a
-    inner()
-foo()
-"#;
-        let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception, "'a' not found in nonlocal environment");
-
-        let input = r#"
-def foo():
-    nonlocal a
-foo()
-"#;
-        let e = eval_expect_error(input);
-        assert_syntax_error!(e.exception, "'a' not found in nonlocal environment");
+        // error cases have been moved to crosscheck, now happen during semantic analysis
     }
 
     #[test]
