@@ -26,8 +26,8 @@ impl ModulePath {
         self.0.iter().map(|s| s.to_string()).collect::<Vec<_>>()
     }
 
-    pub fn head(&self) -> Option<&str> {
-        self.0.first().map(|s| s.as_str())
+    pub fn head(&self) -> Option<&Identifier> {
+        self.0.first()
     }
 
     #[cfg(test)]
@@ -96,6 +96,8 @@ impl FromImportPath {
 
 #[cfg(test)]
 mod test_module_path {
+    use crate::parser::test_utils::ident;
+
     use super::*;
 
     #[test]
@@ -107,7 +109,7 @@ mod test_module_path {
     #[test]
     fn module_path_head() {
         let p = ModulePath::from("a.b");
-        assert_eq!(p.head(), Some("a"));
+        assert_eq!(p.head(), Some(&ident!("a")));
     }
 }
 

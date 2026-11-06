@@ -137,7 +137,15 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
                 collect_bindings_from_stmt(stmt, bindings);
             }
         }
-        StatementKind::RegularImport(_) => todo!(),
+        StatementKind::RegularImport(imports) => {
+            for import in imports {
+                if let Some(alias) = &import.alias {
+                    bindings.insert(alias.clone());
+                } else {
+                    bindings.insert(import.module_path.head().expect("No head!").clone());
+                }
+            }
+        }
         StatementKind::SelectiveImport { import_path, mode } => todo!(),
         StatementKind::Pass
         | StatementKind::Break
@@ -280,6 +288,21 @@ mod tests {
                 ident!("d"),
                 ident!("e")
             ])
+        );
+    }
+
+    #[test]
+    fn regular_import() {
+        let body = ast![stmt_reg_import![import!("a"), import!("b", "c"),]];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("c"),])
+        );
+
+        let body = ast![stmt_reg_import![import!("a.b.c.d"), import!("w.x.y.z", "q"),]];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("q"),])
         );
     }
 }
