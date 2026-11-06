@@ -275,6 +275,17 @@ macro_rules! stmt_unpacking {
     };
 }
 
+macro_rules! stmt_multiple_assign {
+    ($left:expr, $right:expr) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::MultipleAssignment {
+                left: $left,
+                right: $right,
+            }
+        )
+    };
+}
+
 macro_rules! bin_op {
     ($left:expr, $op:ident, $right:expr) => {
         $crate::parser::types::Expr::BinaryOperation {
@@ -641,6 +652,7 @@ pub(crate) use stmt_def;
 pub(crate) use stmt_expr;
 pub(crate) use stmt_from_import;
 pub(crate) use stmt_global;
+pub(crate) use stmt_multiple_assign;
 pub(crate) use stmt_nonlocal;
 pub(crate) use stmt_pass;
 pub(crate) use stmt_raise;

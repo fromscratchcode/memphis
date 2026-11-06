@@ -1439,10 +1439,7 @@ a, b = b, a
     #[test]
     fn multiple_assignment() {
         let input = "a = b = True";
-        let expected_ast = stmt!(StatementKind::MultipleAssignment {
-            left: vec![var!("a"), var!("b")],
-            right: bool!(true),
-        });
+        let expected_ast = stmt_multiple_assign!(vec![var!("a"), var!("b")], bool!(true));
         assert_stmt_eq!(input, expected_ast);
     }
 }
