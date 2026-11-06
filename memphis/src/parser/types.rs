@@ -456,6 +456,13 @@ impl ExceptHandler {
     pub fn is_default(&self) -> bool {
         matches!(self.kind, HandlerKind::Default)
     }
+
+    pub fn alias(&self) -> Option<&Identifier> {
+        match &self.kind {
+            HandlerKind::Default => None,
+            HandlerKind::Typed { expr: _, alias } => alias.as_ref(),
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", derive(Serialize))]

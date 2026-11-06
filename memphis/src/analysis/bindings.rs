@@ -102,7 +102,29 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
             handlers,
             else_block,
             finally_block,
-        } => todo!(),
+        } => {
+            for stmt in try_block.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+            for handler in handlers {
+                if let Some(alias) = handler.alias() {
+                    bindings.insert(alias.clone());
+                }
+                for stmt in handler.block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+            if let Some(else_block) = else_block {
+                for stmt in else_block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+            if let Some(finally_block) = finally_block {
+                for stmt in finally_block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+        }
         StatementKind::ContextManager {
             expr: _,
             variable,
@@ -234,6 +256,30 @@ mod tests {
         assert_eq!(
             collect_bindings(&body),
             HashSet::from([ident!("f"), ident!("b")])
+        );
+    }
+
+    #[test]
+    fn try_except() {
+        let body = ast![stmt!(StatementKind::TryExcept {
+            try_block: ast![stmt_assign!(var!("a"), int!(10))],
+            handlers: vec![ExceptHandler::typed(
+                var!("ZeroDivisionError"),
+                Some(ident!("e")),
+                ast![stmt_assign!(var!("b"), int!(2))]
+            )],
+            else_block: Some(ast![stmt_assign!(var!("c"), int!(4))]),
+            finally_block: Some(ast![stmt_assign!(var!("d"), int!(3))]),
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([
+                ident!("a"),
+                ident!("b"),
+                ident!("c"),
+                ident!("d"),
+                ident!("e")
+            ])
         );
     }
 }
