@@ -22,7 +22,12 @@ fn collect_bindings(body: &Ast) -> HashSet<Identifier> {
 
 fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifier>) {
     match &stmt.kind {
-        StatementKind::Assignment { left, right: _ } => {
+        StatementKind::Assignment { left, right: _ }
+        | StatementKind::CompoundAssignment {
+            target: left,
+            op: _,
+            value: _,
+        } => {
             if let Some(name) = left.as_variable() {
                 bindings.insert(name.clone());
             }
@@ -54,6 +59,21 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
                 }
             }
         }
+        StatementKind::FunctionDef {
+            name,
+            args: _,
+            body: _,
+            decorators: _,
+            is_async: _,
+        }
+        | StatementKind::ClassDef {
+            name,
+            parents: _,
+            metaclass: _,
+            body: _,
+        } => {
+            bindings.insert(name.clone());
+        }
         _ => {}
     }
 }
@@ -67,6 +87,12 @@ mod tests {
     #[test]
     fn direct_assignment() {
         let body = ast![stmt_assign!(var!("x"), int!(10))];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("x")]));
+    }
+
+    #[test]
+    fn compound_assignment() {
+        let body = ast![stmt_compound_assign!(var!("x"), Add, int!(10))];
         assert_eq!(collect_bindings(&body), HashSet::from([ident!("x")]));
     }
 
@@ -105,5 +131,21 @@ mod tests {
             collect_bindings(&body),
             HashSet::from([ident!("a"), ident!("b"), ident!("c")])
         );
+    }
+
+    #[test]
+    fn function_def() {
+        let body = ast![stmt_def!(
+            "foo",
+            params!(),
+            [stmt_assign!(var!("x"), int!(10))]
+        )];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("foo")]));
+    }
+
+    #[test]
+    fn class_def() {
+        let body = ast![stmt_class!("Foo", [stmt_assign!(var!("x"), int!(10))])];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("Foo")]));
     }
 }
