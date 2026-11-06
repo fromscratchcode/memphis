@@ -535,6 +535,15 @@ pub enum LoopIndex {
     Tuple(Vec<Identifier>),
 }
 
+impl LoopIndex {
+    pub fn names(&self) -> &[Identifier] {
+        match self {
+            Self::Variable(name) => std::slice::from_ref(name),
+            Self::Tuple(names) => names,
+        }
+    }
+}
+
 #[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct Statement {

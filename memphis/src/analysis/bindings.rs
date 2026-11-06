@@ -81,10 +81,22 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
         }
         StatementKind::ForInLoop {
             index,
-            iterable,
+            iterable: _,
             body,
             else_block,
-        } => todo!(),
+        } => {
+            for name in index.names() {
+                bindings.insert(name.clone());
+            }
+            for stmt in body.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+            if let Some(else_block) = else_block {
+                for stmt in else_block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+        }
         StatementKind::TryExcept {
             try_block,
             handlers,
@@ -189,5 +201,19 @@ mod tests {
             ast![stmt_assign!(var!("a"), int!(10))]
         )))];
         assert_eq!(collect_bindings(&body), HashSet::from([ident!("a")]));
+    }
+
+    #[test]
+    fn for_in_loop() {
+        let body = ast![stmt!(StatementKind::ForInLoop {
+            index: loop_index!["k", "v"],
+            iterable: var!("z"),
+            body: ast![stmt_assign!(var!("a"), int!(10))],
+            else_block: Some(ast![stmt_assign!(var!("b"), int!(10))]),
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("k"), ident!("v"), ident!("a"), ident!("b")])
+        );
     }
 }
