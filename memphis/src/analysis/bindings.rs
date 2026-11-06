@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     domain::Identifier,
-    parser::types::{Ast, AstParams, Expr, StatementKind},
+    parser::types::{Ast, AstParams, Statement, StatementKind},
 };
 
 pub fn collect_function_bindings(args: &AstParams, body: &Ast) -> HashSet<Identifier> {
@@ -15,30 +15,47 @@ pub fn collect_function_bindings(args: &AstParams, body: &Ast) -> HashSet<Identi
 fn collect_bindings(body: &Ast) -> HashSet<Identifier> {
     let mut bindings = HashSet::new();
     for stmt in body.iter() {
-        match &stmt.kind {
-            StatementKind::Assignment { left, right: _ } => {
-                match left {
-                    Expr::Variable(v) => {
-                        bindings.insert(v.clone());
-                    }
-                    _ => {}
-                };
-            }
-            StatementKind::UnpackingAssignment { left, right: _ }
-            | StatementKind::MultipleAssignment { left, right: _ } => {
-                for name in left {
-                    match name {
-                        Expr::Variable(v) => {
-                            bindings.insert(v.clone());
-                        }
-                        _ => {}
-                    };
-                }
-            }
-            _ => {}
-        }
+        collect_bindings_from_stmt(stmt, &mut bindings);
     }
     bindings
+}
+
+fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifier>) {
+    match &stmt.kind {
+        StatementKind::Assignment { left, right: _ } => {
+            if let Some(name) = left.as_variable() {
+                bindings.insert(name.clone());
+            }
+        }
+        StatementKind::UnpackingAssignment { left, right: _ }
+        | StatementKind::MultipleAssignment { left, right: _ } => {
+            for name in left {
+                if let Some(name) = name.as_variable() {
+                    bindings.insert(name.clone());
+                }
+            }
+        }
+        StatementKind::IfElse {
+            if_part,
+            elif_parts,
+            else_part,
+        } => {
+            for stmt in if_part.ast.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+            for elif_part in elif_parts {
+                for stmt in elif_part.ast.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+            if let Some(else_part) = else_part {
+                for stmt in else_part.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]
@@ -68,6 +85,25 @@ mod tests {
         assert_eq!(
             collect_bindings(&body),
             HashSet::from([ident!("x"), ident!("y")])
+        );
+    }
+
+    #[test]
+    fn if_else() {
+        let body = ast![stmt!(StatementKind::IfElse {
+            if_part: ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(0)),
+                ast![stmt_assign!(var!("a"), int!(10))]
+            ),
+            elif_parts: vec![ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(-10)),
+                ast![stmt_assign!(var!("b"), int!(10))]
+            )],
+            else_part: Some(ast![stmt_assign!(var!("c"), int!(10))]),
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("b"), ident!("c")])
         );
     }
 }
