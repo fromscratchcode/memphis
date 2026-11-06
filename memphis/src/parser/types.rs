@@ -485,6 +485,15 @@ pub enum FromImportMode {
     List(Vec<FromImportItem>),
 }
 
+impl FromImportMode {
+    pub fn names(&self) -> Vec<Identifier> {
+        match self {
+            Self::All => vec![],
+            Self::List(items) => items.iter().map(|i| i.imported().clone()).collect(),
+        }
+    }
+}
+
 /// This represents one of the comma-separated values being imported. This is only used in
 /// selective imports right now.
 ///

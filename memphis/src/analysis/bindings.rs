@@ -146,7 +146,14 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
                 }
             }
         }
-        StatementKind::SelectiveImport { import_path, mode } => todo!(),
+        StatementKind::SelectiveImport {
+            import_path: _,
+            mode,
+        } => {
+            for name in mode.names() {
+                bindings.insert(name);
+            }
+        }
         StatementKind::Pass
         | StatementKind::Break
         | StatementKind::Continue
@@ -299,10 +306,37 @@ mod tests {
             HashSet::from([ident!("a"), ident!("c"),])
         );
 
-        let body = ast![stmt_reg_import![import!("a.b.c.d"), import!("w.x.y.z", "q"),]];
+        let body = ast![stmt_reg_import![
+            import!("a.b.c.d"),
+            import!("w.x.y.z", "q"),
+        ]];
         assert_eq!(
             collect_bindings(&body),
             HashSet::from([ident!("a"), ident!("q"),])
+        );
+    }
+
+    #[test]
+    fn selective_import() {
+        let body = ast![stmt_from_import!("other", from_import_all!())];
+        assert_eq!(collect_bindings(&body), HashSet::from([]));
+
+        let body = ast![stmt_from_import!(
+            "other",
+            from_import_list![from_import_item!("a"), from_import_item!("b", "c")]
+        )];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("c"),])
+        );
+
+        let body = ast![stmt_from_import!(
+            "other.module",
+            from_import_list![from_import_item!("a"), from_import_item!("b", "c")]
+        )];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("c"),])
         );
     }
 }
