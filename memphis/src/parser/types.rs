@@ -492,6 +492,10 @@ impl FromImportMode {
             Self::List(items) => items.iter().map(|i| i.imported().clone()).collect(),
         }
     }
+
+    pub fn is_all(&self) -> bool {
+        matches!(self, FromImportMode::All)
+    }
 }
 
 /// This represents one of the comma-separated values being imported. This is only used in

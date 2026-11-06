@@ -13,6 +13,7 @@ use super::visitor::Visitor;
 #[derive(Clone, Debug)]
 pub enum SemanticError {
     ReturnOutsideFunction,
+    ImportStarNotAtModuleLevel,
     NonlocalAtModuleLevel,
     SymbolNotFoundInNonlocalEnvironment(String),
 }
@@ -21,6 +22,9 @@ impl Display for SemanticError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
             SemanticError::ReturnOutsideFunction => write!(f, "'return' outside function"),
+            SemanticError::ImportStarNotAtModuleLevel => {
+                write!(f, "import * only allowed at module level")
+            }
             SemanticError::NonlocalAtModuleLevel => {
                 write!(f, "'nonlocal' cannot be used at module level")
             }
@@ -90,6 +94,18 @@ impl Visitor for SemanticAnalyzer {
             && !matches!(self.context(), Context::Function)
         {
             self.errors.push(SemanticError::ReturnOutsideFunction);
+            return;
+        }
+
+        match &statement.kind {
+            StatementKind::SelectiveImport {
+                import_path: _,
+                mode,
+            } if mode.is_all() && !matches!(self.context(), Context::Module) => {
+                self.errors.push(SemanticError::ImportStarNotAtModuleLevel);
+                return;
+            }
+            _ => {}
         }
 
         if let StatementKind::Nonlocal(names) = &statement.kind {
@@ -297,15 +313,34 @@ mod tests {
                 stmt_class!("Inner", [stmt_nonlocal!("x")]),
             ]
         )];
-
         validate(&ast).expect("Expected no error");
     }
 
     #[test]
     fn nonlocal_in_module_level_class_is_invalid() {
         let ast = ast![stmt_class!("Inner", [stmt_nonlocal!("x")])];
-
         let err = validate(&ast).expect_err("Expected error");
         assert!(matches!(err, SemanticError::NonlocalAtModuleLevel));
+    }
+
+    #[test]
+    fn import_star_not_allowed_inside_class() {
+        let ast = ast![stmt_class!(
+            "Foo",
+            [stmt_from_import!("x", from_import_all!())]
+        )];
+        let err = validate(&ast).expect_err("Expected error");
+        assert!(matches!(err, SemanticError::ImportStarNotAtModuleLevel));
+    }
+
+    #[test]
+    fn import_star_not_allowed_inside_function() {
+        let ast = ast![stmt_def!(
+            "foo",
+            params!(),
+            [stmt_from_import!("x", from_import_all!())]
+        )];
+        let err = validate(&ast).expect_err("Expected error");
+        assert!(matches!(err, SemanticError::ImportStarNotAtModuleLevel));
     }
 }
