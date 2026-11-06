@@ -378,8 +378,8 @@ impl Compiler {
                 .as_ref()
                 .map(|alias| self.frame_mut().get_or_set_nonlocal_index(alias.as_str()))
                 .unwrap_or_else(|| {
-                    let head = item.module_path.head().expect("No head!");
-                    self.frame_mut().get_or_set_nonlocal_index(head.as_str())
+                    self.frame_mut()
+                        .get_or_set_nonlocal_index(item.module_path.head().as_str())
                 });
             self.emit(Opcode::StoreGlobal(symbol_index));
         }

@@ -142,7 +142,7 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
                 if let Some(alias) = &import.alias {
                     bindings.insert(alias.clone());
                 } else {
-                    bindings.insert(import.module_path.head().expect("No head!").clone());
+                    bindings.insert(import.module_path.head().clone());
                 }
             }
         }

@@ -801,8 +801,11 @@ class Foo:
     fn regular_import() {
         let input = "import other";
         let expected_ast = stmt_reg_import![import!("other")];
-
         assert_stmt_eq!(input, expected_ast);
+
+        let input = "import";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
 
         // We test this inside a function so that it will attempt to parse more than one statement,
         // which is what originally caught the bug related to parsing the comma and beyond.
@@ -833,6 +836,10 @@ pass
         let input = "from other import a";
         let expected_ast = stmt_from_import!("other", from_import_list![from_import_item!("a")]);
         assert_stmt_eq!(input, expected_ast);
+
+        let input = "from import a";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
 
         let input = "from other import a, b";
         let expected_ast = stmt_from_import!(
