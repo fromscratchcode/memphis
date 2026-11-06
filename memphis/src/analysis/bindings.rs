@@ -74,7 +74,40 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
         } => {
             bindings.insert(name.clone());
         }
-        _ => {}
+        StatementKind::WhileLoop(ast) => {
+            for stmt in ast.ast.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+        }
+        StatementKind::ForInLoop {
+            index,
+            iterable,
+            body,
+            else_block,
+        } => todo!(),
+        StatementKind::TryExcept {
+            try_block,
+            handlers,
+            else_block,
+            finally_block,
+        } => todo!(),
+        StatementKind::ContextManager {
+            expr,
+            variable,
+            block,
+        } => todo!(),
+        StatementKind::RegularImport(_) => todo!(),
+        StatementKind::SelectiveImport { import_path, mode } => todo!(),
+        StatementKind::Pass
+        | StatementKind::Break
+        | StatementKind::Continue
+        | StatementKind::Assert(_)
+        | StatementKind::Delete(_)
+        | StatementKind::Return(_)
+        | StatementKind::Nonlocal(_)
+        | StatementKind::Global(_)
+        | StatementKind::Raise(_)
+        | StatementKind::Expression(_) => {}
     }
 }
 
@@ -147,5 +180,14 @@ mod tests {
     fn class_def() {
         let body = ast![stmt_class!("Foo", [stmt_assign!(var!("x"), int!(10))])];
         assert_eq!(collect_bindings(&body), HashSet::from([ident!("Foo")]));
+    }
+
+    #[test]
+    fn while_loop() {
+        let body = ast![stmt!(StatementKind::WhileLoop(ConditionalAst::new(
+            bool!(true),
+            ast![stmt_assign!(var!("a"), int!(10))]
+        )))];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("a")]));
     }
 }
