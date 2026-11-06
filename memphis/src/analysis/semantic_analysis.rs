@@ -1,7 +1,7 @@
 use crate::{
     analysis::{AcceptsVisitor, bindings::collect_function_bindings},
     domain::Identifier,
-    parser::types::{Ast, Statement, StatementKind},
+    parser::types::{Ast, FromImportMode, Statement, StatementKind},
 };
 use std::{
     collections::HashSet,
@@ -86,58 +86,62 @@ impl SemanticAnalyzer {
             "Semantic context stack exited a different scope than it entered"
         );
     }
+
+    fn validate_return(&mut self) {
+        if !matches!(self.context(), Context::Function) {
+            self.errors.push(SemanticError::ReturnOutsideFunction);
+        }
+    }
+
+    fn validate_selective_import(&mut self, mode: &FromImportMode) {
+        if mode.is_all() && !matches!(self.context(), Context::Module) {
+            self.errors.push(SemanticError::ImportStarNotAtModuleLevel);
+        }
+    }
+
+    fn validate_nonlocal(&mut self, names: &[Identifier]) {
+        let enclosing_scopes = match self.context() {
+            Context::Module => {
+                self.errors.push(SemanticError::NonlocalAtModuleLevel);
+                return;
+            }
+            Context::Class if self.function_scopes.is_empty() => {
+                self.errors.push(SemanticError::NonlocalAtModuleLevel);
+                return;
+            }
+            // the nearest function must exist and enclose this class body
+            Context::Class => &self.function_scopes,
+            // skip ourselves because the current function cannot satify its own nonlocal, but
+            // go all the way because global scope is not in this list
+            Context::Function => &self.function_scopes[..self.function_scopes.len() - 1],
+        };
+
+        for name in names {
+            let found = enclosing_scopes
+                .iter()
+                .rev()
+                .any(|scope| scope.contains(name));
+
+            if !found {
+                self.errors
+                    .push(SemanticError::SymbolNotFoundInNonlocalEnvironment(
+                        name.to_string(),
+                    ));
+            }
+        }
+    }
 }
 
 impl Visitor for SemanticAnalyzer {
     fn visit_statement(&mut self, statement: &Statement) {
-        if matches!(statement.kind, StatementKind::Return(_))
-            && !matches!(self.context(), Context::Function)
-        {
-            self.errors.push(SemanticError::ReturnOutsideFunction);
-            return;
-        }
-
         match &statement.kind {
+            StatementKind::Return(_) => self.validate_return(),
             StatementKind::SelectiveImport {
                 import_path: _,
                 mode,
-            } if mode.is_all() && !matches!(self.context(), Context::Module) => {
-                self.errors.push(SemanticError::ImportStarNotAtModuleLevel);
-                return;
-            }
+            } => self.validate_selective_import(mode),
+            StatementKind::Nonlocal(names) => self.validate_nonlocal(names),
             _ => {}
-        }
-
-        if let StatementKind::Nonlocal(names) = &statement.kind {
-            let enclosing_scopes = match self.context() {
-                Context::Module => {
-                    self.errors.push(SemanticError::NonlocalAtModuleLevel);
-                    return;
-                }
-                Context::Class if self.function_scopes.is_empty() => {
-                    self.errors.push(SemanticError::NonlocalAtModuleLevel);
-                    return;
-                }
-                // the nearest function must exist and enclose this class body
-                Context::Class => &self.function_scopes,
-                // skip ourselves because the current function cannot satify its own nonlocal, but
-                // go all the way because global scope is not in this list
-                Context::Function => &self.function_scopes[..self.function_scopes.len() - 1],
-            };
-
-            for name in names {
-                let found = enclosing_scopes
-                    .iter()
-                    .rev()
-                    .any(|scope| scope.contains(name));
-
-                if !found {
-                    self.errors
-                        .push(SemanticError::SymbolNotFoundInNonlocalEnvironment(
-                            name.to_string(),
-                        ));
-                }
-            }
         }
     }
 
