@@ -93,28 +93,33 @@ impl Visitor for SemanticAnalyzer {
         }
 
         if let StatementKind::Nonlocal(names) = &statement.kind {
-            if !matches!(self.context(), Context::Function) {
-                self.errors.push(SemanticError::NonlocalAtModuleLevel);
-            } else {
-                let enclosing_scopes = match self.context() {
-                    Context::Class => todo!(),
-                    Context::Module => unreachable!("handled elsewhere"),
-                    // skip ourselves, but go all the way because global scope is no in this list
-                    Context::Function => &self.function_scopes[..self.function_scopes.len() - 1],
-                };
+            let enclosing_scopes = match self.context() {
+                Context::Module => {
+                    self.errors.push(SemanticError::NonlocalAtModuleLevel);
+                    return;
+                }
+                Context::Class if self.function_scopes.is_empty() => {
+                    self.errors.push(SemanticError::NonlocalAtModuleLevel);
+                    return;
+                }
+                // the nearest function must exist and enclose this class body
+                Context::Class => &self.function_scopes,
+                // skip ourselves because the current function cannot satify its own nonlocal, but
+                // go all the way because global scope is not in this list
+                Context::Function => &self.function_scopes[..self.function_scopes.len() - 1],
+            };
 
-                for name in names {
-                    let found = enclosing_scopes
-                        .iter()
-                        .rev()
-                        .any(|scope| scope.contains(name));
+            for name in names {
+                let found = enclosing_scopes
+                    .iter()
+                    .rev()
+                    .any(|scope| scope.contains(name));
 
-                    if !found {
-                        self.errors
-                            .push(SemanticError::SymbolNotFoundInNonlocalEnvironment(
-                                name.to_string(),
-                            ));
-                    }
+                if !found {
+                    self.errors
+                        .push(SemanticError::SymbolNotFoundInNonlocalEnvironment(
+                            name.to_string(),
+                        ));
                 }
             }
         }
@@ -280,5 +285,27 @@ mod tests {
             ]
         )];
         validate(&ast).expect("Expected no error");
+    }
+
+    #[test]
+    fn nonlocal_in_class_body_can_bind_an_enclosing_function_local() {
+        let ast = ast![stmt_def!(
+            "outer",
+            params!(),
+            [
+                stmt_assign!(var!("x"), int!(10)),
+                stmt_class!("Inner", [stmt_nonlocal!("x")]),
+            ]
+        )];
+
+        validate(&ast).expect("Expected no error");
+    }
+
+    #[test]
+    fn nonlocal_in_module_level_class_is_invalid() {
+        let ast = ast![stmt_class!("Inner", [stmt_nonlocal!("x")])];
+
+        let err = validate(&ast).expect_err("Expected error");
+        assert!(matches!(err, SemanticError::NonlocalAtModuleLevel));
     }
 }
