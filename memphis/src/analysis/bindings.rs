@@ -104,10 +104,17 @@ fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifie
             finally_block,
         } => todo!(),
         StatementKind::ContextManager {
-            expr,
+            expr: _,
             variable,
             block,
-        } => todo!(),
+        } => {
+            if let Some(name) = variable {
+                bindings.insert(name.clone());
+            }
+            for stmt in block.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+        }
         StatementKind::RegularImport(_) => todo!(),
         StatementKind::SelectiveImport { import_path, mode } => todo!(),
         StatementKind::Pass
@@ -214,6 +221,19 @@ mod tests {
         assert_eq!(
             collect_bindings(&body),
             HashSet::from([ident!("k"), ident!("v"), ident!("a"), ident!("b")])
+        );
+    }
+
+    #[test]
+    fn context_manager() {
+        let body = ast![stmt!(StatementKind::ContextManager {
+            expr: var!("a"),
+            variable: Some(ident!("f")),
+            block: ast![stmt_assign!(var!("b"), int!(10))],
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("f"), ident!("b")])
         );
     }
 }
