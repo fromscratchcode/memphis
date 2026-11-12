@@ -1,5 +1,6 @@
 use crate::{
     HostIo,
+    analysis::validate,
     bytecode_vm::{
         Compiler, CompilerError, Runtime, VirtualMachine, VmResult, VmValue, compiler::CodeObject,
     },
@@ -50,7 +51,8 @@ impl VmContext {
 
     pub fn compile(&self, text: &Text) -> Result<CodeObject, CompilerError> {
         let ast =
-            Parser::parse_text(text).map_err(|e| CompilerError::SyntaxError(e.to_string()))?;
+            Parser::parse_text(text).map_err(|e| CompilerError::syntax_error(e.to_string()))?;
+        validate(&ast).map_err(|e| CompilerError::syntax_error(e.to_string()))?;
         let mut compiler = Compiler::new(&self.module_name, &self.package, &self.path_str);
         compiler.compile(&ast)
     }

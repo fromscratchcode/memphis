@@ -1,5 +1,6 @@
 use crate::{
     HostIo,
+    analysis::validate,
     core::Container,
     domain::{MemphisResult, MemphisValue, ModuleName, ModuleOrigin, Text},
     interpreter::Interpreter,
@@ -33,6 +34,10 @@ impl TreewalkContext {
 
     pub fn eval_inner(&mut self, text: Text) -> Result<TreewalkValue, RaisedException> {
         let ast = Parser::parse_text(&text).map_err(|e| {
+            self.interpreter
+                .raise(Exception::syntax_error(e.to_string()))
+        })?;
+        validate(&ast).map_err(|e| {
             self.interpreter
                 .raise(Exception::syntax_error(e.to_string()))
         })?;

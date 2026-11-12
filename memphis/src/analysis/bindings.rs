@@ -1,0 +1,342 @@
+use std::collections::HashSet;
+
+use crate::{
+    domain::Identifier,
+    parser::types::{Ast, AstParams, Statement, StatementKind},
+};
+
+pub fn collect_function_bindings(args: &AstParams, body: &Ast) -> HashSet<Identifier> {
+    let mut bindings = collect_bindings(body);
+    bindings.extend(args.names().cloned());
+    bindings
+}
+
+// This works on a lexical scope, meaning it does not enter functions or classes
+fn collect_bindings(body: &Ast) -> HashSet<Identifier> {
+    let mut bindings = HashSet::new();
+    for stmt in body.iter() {
+        collect_bindings_from_stmt(stmt, &mut bindings);
+    }
+    bindings
+}
+
+fn collect_bindings_from_stmt(stmt: &Statement, bindings: &mut HashSet<Identifier>) {
+    match &stmt.kind {
+        StatementKind::Assignment { left, right: _ }
+        | StatementKind::CompoundAssignment {
+            target: left,
+            op: _,
+            value: _,
+        } => {
+            if let Some(name) = left.as_variable() {
+                bindings.insert(name.clone());
+            }
+        }
+        StatementKind::UnpackingAssignment { left, right: _ }
+        | StatementKind::MultipleAssignment { left, right: _ } => {
+            for name in left {
+                if let Some(name) = name.as_variable() {
+                    bindings.insert(name.clone());
+                }
+            }
+        }
+        StatementKind::IfElse {
+            if_part,
+            elif_parts,
+            else_part,
+        } => {
+            for stmt in if_part.ast.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+            for elif_part in elif_parts {
+                for stmt in elif_part.ast.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+            if let Some(else_part) = else_part {
+                for stmt in else_part.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+        }
+        StatementKind::FunctionDef {
+            name,
+            args: _,
+            body: _,
+            decorators: _,
+            is_async: _,
+        }
+        | StatementKind::ClassDef {
+            name,
+            parents: _,
+            metaclass: _,
+            body: _,
+        } => {
+            bindings.insert(name.clone());
+        }
+        StatementKind::WhileLoop(ast) => {
+            for stmt in ast.ast.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+        }
+        StatementKind::ForInLoop {
+            index,
+            iterable: _,
+            body,
+            else_block,
+        } => {
+            for name in index.names() {
+                bindings.insert(name.clone());
+            }
+            for stmt in body.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+            if let Some(else_block) = else_block {
+                for stmt in else_block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+        }
+        StatementKind::TryExcept {
+            try_block,
+            handlers,
+            else_block,
+            finally_block,
+        } => {
+            for stmt in try_block.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+            for handler in handlers {
+                if let Some(alias) = handler.alias() {
+                    bindings.insert(alias.clone());
+                }
+                for stmt in handler.block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+            if let Some(else_block) = else_block {
+                for stmt in else_block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+            if let Some(finally_block) = finally_block {
+                for stmt in finally_block.iter() {
+                    collect_bindings_from_stmt(stmt, bindings);
+                }
+            }
+        }
+        StatementKind::ContextManager {
+            expr: _,
+            variable,
+            block,
+        } => {
+            if let Some(name) = variable {
+                bindings.insert(name.clone());
+            }
+            for stmt in block.iter() {
+                collect_bindings_from_stmt(stmt, bindings);
+            }
+        }
+        StatementKind::RegularImport(imports) => {
+            for import in imports {
+                if let Some(alias) = &import.alias {
+                    bindings.insert(alias.clone());
+                } else {
+                    bindings.insert(import.module_path.head().clone());
+                }
+            }
+        }
+        StatementKind::SelectiveImport {
+            import_path: _,
+            mode,
+        } => {
+            for name in mode.names() {
+                bindings.insert(name);
+            }
+        }
+        StatementKind::Pass
+        | StatementKind::Break
+        | StatementKind::Continue
+        | StatementKind::Assert(_)
+        | StatementKind::Delete(_)
+        | StatementKind::Return(_)
+        | StatementKind::Nonlocal(_)
+        | StatementKind::Global(_)
+        | StatementKind::Raise(_)
+        | StatementKind::Expression(_) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::{test_utils::*, types::*};
+
+    use super::*;
+
+    #[test]
+    fn direct_assignment() {
+        let body = ast![stmt_assign!(var!("x"), int!(10))];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("x")]));
+    }
+
+    #[test]
+    fn compound_assignment() {
+        let body = ast![stmt_compound_assign!(var!("x"), Add, int!(10))];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("x")]));
+    }
+
+    #[test]
+    fn unpacking_assignment() {
+        let body = ast![stmt_unpacking!(vec![var!("x"), var!("y")], int!(10))];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("x"), ident!("y")])
+        );
+    }
+
+    #[test]
+    fn multiple_assignment() {
+        let body = ast![stmt_multiple_assign!(vec![var!("x"), var!("y")], int!(10))];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("x"), ident!("y")])
+        );
+    }
+
+    #[test]
+    fn if_else() {
+        let body = ast![stmt!(StatementKind::IfElse {
+            if_part: ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(0)),
+                ast![stmt_assign!(var!("a"), int!(10))]
+            ),
+            elif_parts: vec![ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(-10)),
+                ast![stmt_assign!(var!("b"), int!(10))]
+            )],
+            else_part: Some(ast![stmt_assign!(var!("c"), int!(10))]),
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("b"), ident!("c")])
+        );
+    }
+
+    #[test]
+    fn function_def() {
+        let body = ast![stmt_def!(
+            "foo",
+            params!(),
+            [stmt_assign!(var!("x"), int!(10))]
+        )];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("foo")]));
+    }
+
+    #[test]
+    fn class_def() {
+        let body = ast![stmt_class!("Foo", [stmt_assign!(var!("x"), int!(10))])];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("Foo")]));
+    }
+
+    #[test]
+    fn while_loop() {
+        let body = ast![stmt!(StatementKind::WhileLoop(ConditionalAst::new(
+            bool!(true),
+            ast![stmt_assign!(var!("a"), int!(10))]
+        )))];
+        assert_eq!(collect_bindings(&body), HashSet::from([ident!("a")]));
+    }
+
+    #[test]
+    fn for_in_loop() {
+        let body = ast![stmt!(StatementKind::ForInLoop {
+            index: loop_index!["k", "v"],
+            iterable: var!("z"),
+            body: ast![stmt_assign!(var!("a"), int!(10))],
+            else_block: Some(ast![stmt_assign!(var!("b"), int!(10))]),
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("k"), ident!("v"), ident!("a"), ident!("b")])
+        );
+    }
+
+    #[test]
+    fn context_manager() {
+        let body = ast![stmt!(StatementKind::ContextManager {
+            expr: var!("a"),
+            variable: Some(ident!("f")),
+            block: ast![stmt_assign!(var!("b"), int!(10))],
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("f"), ident!("b")])
+        );
+    }
+
+    #[test]
+    fn try_except() {
+        let body = ast![stmt!(StatementKind::TryExcept {
+            try_block: ast![stmt_assign!(var!("a"), int!(10))],
+            handlers: vec![ExceptHandler::typed(
+                var!("ZeroDivisionError"),
+                Some(ident!("e")),
+                ast![stmt_assign!(var!("b"), int!(2))]
+            )],
+            else_block: Some(ast![stmt_assign!(var!("c"), int!(4))]),
+            finally_block: Some(ast![stmt_assign!(var!("d"), int!(3))]),
+        })];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([
+                ident!("a"),
+                ident!("b"),
+                ident!("c"),
+                ident!("d"),
+                ident!("e")
+            ])
+        );
+    }
+
+    #[test]
+    fn regular_import() {
+        let body = ast![stmt_reg_import![import!("a"), import!("b", "c"),]];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("c"),])
+        );
+
+        let body = ast![stmt_reg_import![
+            import!("a.b.c.d"),
+            import!("w.x.y.z", "q"),
+        ]];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("q"),])
+        );
+    }
+
+    #[test]
+    fn selective_import() {
+        let body = ast![stmt_from_import!("other", from_import_all!())];
+        assert_eq!(collect_bindings(&body), HashSet::from([]));
+
+        let body = ast![stmt_from_import!(
+            "other",
+            from_import_list![from_import_item!("a"), from_import_item!("b", "c")]
+        )];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("c"),])
+        );
+
+        let body = ast![stmt_from_import!(
+            "other.module",
+            from_import_list![from_import_item!("a"), from_import_item!("b", "c")]
+        )];
+        assert_eq!(
+            collect_bindings(&body),
+            HashSet::from([ident!("a"), ident!("c"),])
+        );
+    }
+}

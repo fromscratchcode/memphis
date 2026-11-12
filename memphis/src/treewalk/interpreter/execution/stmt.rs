@@ -142,32 +142,8 @@ impl TreewalkInterpreter {
         Ok(())
     }
 
-    /// TODO This should be moved to the semantic analysis
-    fn validate_nonlocal_context(&self, name: &Identifier) -> TreewalkResult<()> {
-        // We could not find the variable `name` in an enclosing context.
-        if let Some(env) = self.state.current_captured_environment()
-            && env.borrow().read(name.as_str()).is_none()
-        {
-            return Exception::syntax_error(format!(
-                "'{}' not found in nonlocal environment",
-                name
-            ))
-            .raise(self);
-        }
-
-        // `nonlocal` cannot be used at the module-level (outside of a function,
-        // i.e. captured environment).
-        if self.state.current_captured_environment().is_none() {
-            return Exception::syntax_error("'nonlocal' cannot be used at module level")
-                .raise(self);
-        }
-
-        Ok(())
-    }
-
     fn evaluate_nonlocal(&self, names: &[Identifier]) -> TreewalkResult<()> {
         for name in names {
-            self.validate_nonlocal_context(name)?;
             self.state.mark_nonlocal(name.as_str());
         }
 

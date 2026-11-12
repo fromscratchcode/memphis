@@ -1,13 +1,13 @@
 use crate::{
     domain::{FromImportPath, Identifier, ModulePath},
     lexer::Token,
-    parser::{Parser, ParserResult},
+    parser::{Parser, ParserError, ParserResult},
 };
 
 impl Parser<'_> {
-    pub fn parse_module_path(&mut self) -> ParserResult<ModulePath> {
+    pub fn parse_optional_module_path(&mut self) -> ParserResult<Option<ModulePath>> {
         if !matches!(self.current_token(), Token::Identifier(_)) {
-            return Ok(ModulePath::default());
+            return Ok(None);
         }
 
         let mut path = vec![self.parse_identifier()?];
@@ -15,7 +15,12 @@ impl Parser<'_> {
             self.consume(&Token::Dot)?;
             path.push(self.parse_identifier()?);
         }
-        Ok(ModulePath::new(path))
+        Ok(Some(ModulePath::new(path)))
+    }
+
+    pub fn parse_module_path(&mut self) -> ParserResult<ModulePath> {
+        self.parse_optional_module_path()?
+            .ok_or(ParserError::syntax_error("invalid syntax"))
     }
 
     pub fn parse_import_path(&mut self) -> ParserResult<FromImportPath> {
@@ -27,12 +32,11 @@ impl Parser<'_> {
                     levels += 1;
                 }
 
-                let path = self.parse_module_path()?;
-                Ok(FromImportPath::Relative(levels, path))
+                let path = self.parse_optional_module_path()?;
+                Ok(FromImportPath::Relative { levels, path })
             }
             _ => {
                 let path = self.parse_module_path()?;
-                assert!(!path.segments().is_empty());
                 Ok(FromImportPath::Absolute(path))
             }
         }

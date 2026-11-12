@@ -633,14 +633,14 @@ else:
     print("Less")
 "#;
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(var!("x"), GreaterThan, int!(0)),
-                ast: ast![stmt_expr!(func_call!("print", call_args![str!("Greater")]))],
-            },
-            elif_parts: vec![ConditionalAst {
-                condition: cmp_op!(var!("x"), GreaterThan, int!(-10)),
-                ast: ast![stmt_expr!(func_call!("print", call_args![str!("Medium")]))],
-            }],
+            if_part: ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(0)),
+                ast![stmt_expr!(func_call!("print", call_args![str!("Greater")]))],
+            ),
+            elif_parts: vec![ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(-10)),
+                ast![stmt_expr!(func_call!("print", call_args![str!("Medium")]))]
+            )],
             else_part: Some(ast![stmt_expr!(func_call!(
                 "print",
                 call_args![str!("Less")]
@@ -657,19 +657,19 @@ elif x > -20:
     print("Less")
 "#;
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(var!("x"), GreaterThan, int!(0)),
-                ast: ast![stmt_expr!(func_call!("print", call_args![str!("Greater")]))],
-            },
+            if_part: ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(0)),
+                ast![stmt_expr!(func_call!("print", call_args![str!("Greater")]))],
+            ),
             elif_parts: vec![
-                ConditionalAst {
-                    condition: cmp_op!(var!("x"), GreaterThan, int!(-10)),
-                    ast: ast![stmt_expr!(func_call!("print", call_args![str!("Medium")]))],
-                },
-                ConditionalAst {
-                    condition: cmp_op!(var!("x"), GreaterThan, int!(-20)),
-                    ast: ast![stmt_expr!(func_call!("print", call_args![str!("Less")]))],
-                },
+                ConditionalAst::new(
+                    cmp_op!(var!("x"), GreaterThan, int!(-10)),
+                    ast![stmt_expr!(func_call!("print", call_args![str!("Medium")]))],
+                ),
+                ConditionalAst::new(
+                    cmp_op!(var!("x"), GreaterThan, int!(-20)),
+                    ast![stmt_expr!(func_call!("print", call_args![str!("Less")]))],
+                ),
             ],
             else_part: None,
         });
@@ -680,10 +680,10 @@ if x > 0:
     print("Greater")
 "#;
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: cmp_op!(var!("x"), GreaterThan, int!(0)),
-                ast: ast![stmt_expr!(func_call!("print", call_args![str!("Greater")]))],
-            },
+            if_part: ConditionalAst::new(
+                cmp_op!(var!("x"), GreaterThan, int!(0)),
+                ast![stmt_expr!(func_call!("print", call_args![str!("Greater")]))],
+            ),
             elif_parts: vec![],
             else_part: None,
         });
@@ -693,10 +693,7 @@ if x > 0:
 if True: return False
 "#;
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: bool!(true),
-                ast: ast![stmt_return![bool!(false)]],
-            },
+            if_part: ConditionalAst::new(bool!(true), ast![stmt_return![bool!(false)]],),
             elif_parts: vec![],
             else_part: None,
         });
@@ -709,14 +706,14 @@ if (a == 1
     pass
 "#;
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: logic_op!(
+            if_part: ConditionalAst::new(
+                logic_op!(
                     logic_op!(cmp_op!(var!("a"), Equals, int!(1)), And, var!("b")),
                     And,
                     var!("c")
                 ),
-                ast: ast![stmt_pass!()],
-            },
+                ast![stmt_pass!()],
+            ),
             elif_parts: vec![],
             else_part: None,
         });
@@ -728,10 +725,7 @@ if (a
     pass
 "#;
         let expected_ast = stmt!(StatementKind::IfElse {
-            if_part: ConditionalAst {
-                condition: logic_op!(var!("a"), Or, var!("b")),
-                ast: ast![stmt_pass!()],
-            },
+            if_part: ConditionalAst::new(logic_op!(var!("a"), Or, var!("b")), ast![stmt_pass!()],),
             elif_parts: vec![],
             else_part: None,
         });
@@ -744,13 +738,13 @@ if (a
 while True:
     print(\"busy loop\")
 ";
-        let expected_ast = stmt!(StatementKind::WhileLoop(ConditionalAst {
-            condition: bool!(true),
-            ast: ast![stmt_expr!(func_call!(
+        let expected_ast = stmt!(StatementKind::WhileLoop(ConditionalAst::new(
+            bool!(true),
+            ast![stmt_expr!(func_call!(
                 "print",
                 call_args![str!("busy loop")]
             ))],
-        }));
+        )));
         assert_stmt_eq!(input, expected_ast);
     }
 
@@ -764,11 +758,9 @@ class Foo:
     def bar(self):
         print(self.x)
 "#;
-        let expected_ast = stmt!(StatementKind::ClassDef {
-            name: ident!("Foo"),
-            parents: vec![],
-            metaclass: None,
-            body: ast![
+        let expected_ast = stmt_class!(
+            "Foo",
+            [
                 stmt_def!(
                     "__init__",
                     params![param!("self")],
@@ -782,8 +774,8 @@ class Foo:
                         call_args![member_access!(var!("self"), "x")]
                     ))]
                 ),
-            ],
-        });
+            ]
+        );
         assert_stmt_eq!(input, expected_ast);
 
         let input = "class Foo(Bar, Baz): pass";
@@ -809,8 +801,11 @@ class Foo:
     fn regular_import() {
         let input = "import other";
         let expected_ast = stmt_reg_import![import!("other")];
-
         assert_stmt_eq!(input, expected_ast);
+
+        let input = "import";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
 
         // We test this inside a function so that it will attempt to parse more than one statement,
         // which is what originally caught the bug related to parsing the comma and beyond.
@@ -841,6 +836,10 @@ pass
         let input = "from other import a";
         let expected_ast = stmt_from_import!("other", from_import_list![from_import_item!("a")]);
         assert_stmt_eq!(input, expected_ast);
+
+        let input = "from import a";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
 
         let input = "from other import a, b";
         let expected_ast = stmt_from_import!(
@@ -1447,10 +1446,7 @@ a, b = b, a
     #[test]
     fn multiple_assignment() {
         let input = "a = b = True";
-        let expected_ast = stmt!(StatementKind::MultipleAssignment {
-            left: vec![var!("a"), var!("b")],
-            right: bool!(true),
-        });
+        let expected_ast = stmt_multiple_assign!(vec![var!("a"), var!("b")], bool!(true));
         assert_stmt_eq!(input, expected_ast);
     }
 }

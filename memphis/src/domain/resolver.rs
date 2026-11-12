@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::{Dunder, FromImportPath, ModuleName, ModulePath, ResolvedModule, ScriptPath};
 
+#[derive(Debug)]
 pub enum ImportResolutionError {
     NoParentPackage,
     BeyondTopLevel,
@@ -22,7 +23,7 @@ pub fn resolve_import_path(
 ) -> Result<ModuleName, ImportResolutionError> {
     match import_path {
         FromImportPath::Absolute(mp) => Ok(resolve_absolute_path(mp)),
-        FromImportPath::Relative(levels, tail) => {
+        FromImportPath::Relative { levels, path } => {
             if let Some(package) = current_package {
                 // - One leading dot (`.`) refers to the current package
                 // - Additional dots (`..`, `...`) walk upward in the package hierarchy
@@ -32,7 +33,11 @@ pub fn resolve_import_path(
                 let base = package
                     .strip_last(*levels - 1)
                     .ok_or(ImportResolutionError::BeyondTopLevel)?;
-                Ok(base.join(tail.segments_as_str()))
+                if let Some(path) = path {
+                    Ok(base.join(path.segments_as_str()))
+                } else {
+                    Ok(base)
+                }
             } else {
                 Err(ImportResolutionError::NoParentPackage)
             }
@@ -137,5 +142,18 @@ mod tests {
         let segments = [];
 
         let _ = expand_path(path, &segments);
+    }
+
+    #[test]
+    fn relative_resolves_to_current_package() {
+        let module_name = resolve_import_path(
+            &FromImportPath::Relative {
+                levels: 1,
+                path: None,
+            },
+            &Some(ModuleName::from_segments(&["foo"])),
+        )
+        .unwrap();
+        assert_eq!(module_name, ModuleName::from_segments(&["foo"]));
     }
 }

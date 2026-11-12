@@ -456,6 +456,13 @@ impl ExceptHandler {
     pub fn is_default(&self) -> bool {
         matches!(self.kind, HandlerKind::Default)
     }
+
+    pub fn alias(&self) -> Option<&Identifier> {
+        match &self.kind {
+            HandlerKind::Default => None,
+            HandlerKind::Typed { expr: _, alias } => alias.as_ref(),
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", derive(Serialize))]
@@ -476,6 +483,19 @@ impl ConditionalAst {
 pub enum FromImportMode {
     All, // represents '*'
     List(Vec<FromImportItem>),
+}
+
+impl FromImportMode {
+    pub fn names(&self) -> Vec<Identifier> {
+        match self {
+            Self::All => vec![],
+            Self::List(items) => items.iter().map(|i| i.imported().clone()).collect(),
+        }
+    }
+
+    pub fn is_all(&self) -> bool {
+        matches!(self, FromImportMode::All)
+    }
 }
 
 /// This represents one of the comma-separated values being imported. This is only used in
@@ -533,6 +553,15 @@ pub enum LoopIndex {
     ///     ...
     /// ```
     Tuple(Vec<Identifier>),
+}
+
+impl LoopIndex {
+    pub fn names(&self) -> &[Identifier] {
+        match self {
+            Self::Variable(name) => std::slice::from_ref(name),
+            Self::Tuple(names) => names,
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", derive(Serialize))]

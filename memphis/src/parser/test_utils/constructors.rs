@@ -149,7 +149,20 @@ macro_rules! stmt_def {
                 is_async: false,
             }
         )
-    }
+    };
+}
+
+macro_rules! stmt_class {
+    ($name:expr, [$($body:expr),* $(,)?]) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::ClassDef {
+                name: $crate::parser::test_utils::ident!($name),
+                parents: vec![],
+                metaclass: None,
+                body: $crate::parser::types::Ast::new(vec![$($body),*]),
+            }
+        )
+    };
 }
 
 macro_rules! stmt_global {
@@ -255,6 +268,17 @@ macro_rules! stmt_unpacking {
     ($left:expr, $right:expr) => {
         $crate::parser::test_utils::stmt!(
             $crate::parser::types::StatementKind::UnpackingAssignment {
+                left: $left,
+                right: $right,
+            }
+        )
+    };
+}
+
+macro_rules! stmt_multiple_assign {
+    ($left:expr, $right:expr) => {
+        $crate::parser::test_utils::stmt!(
+            $crate::parser::types::StatementKind::MultipleAssignment {
                 left: $left,
                 right: $right,
             }
@@ -475,13 +499,13 @@ macro_rules! func_call_callee {
 macro_rules! import {
     ($module:expr) => {
         $crate::parser::types::RegularImport {
-            module_path: $crate::domain::ModulePath::from($module),
+            module_path: $crate::domain::ModulePath::from($module).unwrap(),
             alias: None,
         }
     };
     ($module:expr, $alias:expr) => {
         $crate::parser::types::RegularImport {
-            module_path: $crate::domain::ModulePath::from($module),
+            module_path: $crate::domain::ModulePath::from($module).unwrap(),
             alias: Some($crate::domain::Identifier::new($alias).unwrap()),
         }
     };
@@ -622,11 +646,13 @@ pub(crate) use slice;
 pub(crate) use slice_op;
 pub(crate) use stmt;
 pub(crate) use stmt_assign;
+pub(crate) use stmt_class;
 pub(crate) use stmt_compound_assign;
 pub(crate) use stmt_def;
 pub(crate) use stmt_expr;
 pub(crate) use stmt_from_import;
 pub(crate) use stmt_global;
+pub(crate) use stmt_multiple_assign;
 pub(crate) use stmt_nonlocal;
 pub(crate) use stmt_pass;
 pub(crate) use stmt_raise;
