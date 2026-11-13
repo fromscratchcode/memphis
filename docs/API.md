@@ -23,6 +23,7 @@ For language-level feature support by engine, see [SUPPORTED.md](./SUPPORTED.md)
 | `next` | |
 | `print` | |
 | `sorted` | |
+| `sum` | |
 
 ### Builtin Modules
 

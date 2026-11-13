@@ -5622,4 +5622,46 @@ first, second, third, fourth
 "#;
         assert_eval_eq!(input, tuple![int!(23), int!(23), int!(23), int!(23),]);
     }
+
+    #[test]
+    fn sum_builtin() {
+        let input = "sum([])";
+        assert_eval_eq!(input, int!(0));
+
+        let input = "sum([], 10)";
+        assert_eval_eq!(input, int!(10));
+
+        let input = "sum([1,2,3])";
+        assert_eval_eq!(input, int!(6));
+
+        let input = "sum([1,2,3], 0.5)";
+        assert_eval_eq!(input, float!(6.5));
+
+        let input = "sum(x * x for x in range(5))";
+        assert_eval_eq!(input, int!(30));
+
+        let input = "sum((x * x for x in range(1,5)), 10)";
+        assert_eval_eq!(input, int!(40));
+
+        let input = "sum(range(10))";
+        assert_eval_eq!(input, int!(45));
+
+        let input = "sum(range(1, 10, 2))";
+        assert_eval_eq!(input, int!(25));
+
+        let input = r#"sum(["a", "b"])"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "unsupported operand type(s) for +");
+
+        let input = r#"sum(["a", "b"], "")"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "sum() can't sum strings [use ''.join(seq) instead]"
+        );
+
+        let input = r#"sum(c for c in "abc")"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "unsupported operand type(s) for +");
+    }
 }

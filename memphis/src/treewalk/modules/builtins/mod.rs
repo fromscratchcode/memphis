@@ -4,7 +4,7 @@ use crate::{
     runtime::{HostIoError, InputResult},
     treewalk::{
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
-        iterator::{collect, count},
+        iterator::{collect, count, for_each_mut},
         protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableCallable,
@@ -29,6 +29,7 @@ fn builtins() -> Vec<Box<dyn CloneableCallable>> {
         Box::new(NextBuiltin),
         Box::new(PrintBuiltin),
         Box::new(InputBuiltin),
+        Box::new(SumBuiltin),
     ]
 }
 
@@ -79,6 +80,8 @@ pub struct NextBuiltin;
 pub struct PrintBuiltin;
 #[derive(Clone)]
 pub struct InputBuiltin;
+#[derive(Clone)]
+pub struct SumBuiltin;
 
 impl Callable for CallableBuiltin {
     fn signature(&self) -> Signature {
@@ -465,5 +468,36 @@ impl Callable for SortedBuiltin {
 
     fn name(&self) -> String {
         "sorted".into()
+    }
+}
+
+impl Callable for SumBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::new([
+            Parameter::required("iterable").positional_only(),
+            Parameter::optional("start", TreewalkValue::Int(0)),
+        ])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let iter = args.get("iterable").as_iterator().raise(interpreter)?;
+        let mut total = args.get("start").clone();
+        if total.as_str().is_ok() {
+            return Exception::type_error("sum() can't sum strings [use ''.join(seq) instead]")
+                .raise(interpreter);
+        }
+        for_each_mut(iter, &mut |item| {
+            total = interpreter.call_method(&total, Dunder::Add, args![item])?;
+            Ok(())
+        })?;
+        Ok(total)
+    }
+
+    fn name(&self) -> String {
+        "sum".into()
     }
 }

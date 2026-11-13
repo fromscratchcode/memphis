@@ -136,7 +136,7 @@ For builtin modules, builtin types, and method-level API details, see [API.md](.
 |`sorted`|✅||
 |`staticmethod`|✅||
 |`str`|✅||
-|`sum`|||
+|`sum`|✅||
 |`super`|✅||
 |`tuple`|✅|✅|
 |`type`|✅|✅|
