@@ -74,9 +74,9 @@ For builtin modules, builtin types, and method-level API details, see [API.md](.
 |-|-|-|
 |`abs`|||
 |`aiter`|||
-|`all`|||
+|`all`|✅||
 |`anext`|||
-|`any`|||
+|`any`|✅||
 |`ascii`|||
 |`bin`|||
 |`bool`|✅|✅|

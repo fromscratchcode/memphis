@@ -1,6 +1,6 @@
 use crate::{
     domain::Dunder,
-    parser::types::{BinOp, CompareOp, LogicalOp, UnaryOp},
+    parser::types::{BinOp, CompareOp, UnaryOp},
     treewalk::{
         TreewalkInterpreter, TreewalkResult, TreewalkValue, result::Raise, types::Exception,
         utils::args,
@@ -8,32 +8,6 @@ use crate::{
 };
 
 impl TreewalkInterpreter {
-    pub fn invoke_logical_op(
-        &self,
-        left: TreewalkValue,
-        op: &LogicalOp,
-        right: TreewalkValue,
-    ) -> TreewalkResult<TreewalkValue> {
-        let left_truthy = left.coerce_to_bool();
-
-        match op {
-            LogicalOp::And => {
-                if left_truthy {
-                    Ok(right)
-                } else {
-                    Ok(left)
-                }
-            }
-            LogicalOp::Or => {
-                if left_truthy {
-                    Ok(left)
-                } else {
-                    Ok(right)
-                }
-            }
-        }
-    }
-
     pub fn invoke_binary_op(
         &self,
         left: TreewalkValue,

@@ -283,8 +283,14 @@ impl TreewalkInterpreter {
         right: &Expr,
     ) -> TreewalkResult<TreewalkValue> {
         let left = self.evaluate_expr(left)?;
-        let right = self.evaluate_expr(right)?;
-        self.invoke_logical_op(left, op, right)
+
+        // these should short-circuit if necessary
+        match op {
+            LogicalOp::And if left.coerce_to_bool() => self.evaluate_expr(right),
+            LogicalOp::And => Ok(left),
+            LogicalOp::Or if left.coerce_to_bool() => Ok(left),
+            LogicalOp::Or => self.evaluate_expr(right),
+        }
     }
 
     fn evaluate_ternary_operation(

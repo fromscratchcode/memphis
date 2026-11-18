@@ -314,76 +314,8 @@ c = type(a.join)
     }
 
     #[test]
-    fn boolean_operators() {
-        let input = "True and False";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "True or False";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not (True or False)";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "True and not False";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not False";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "not True";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "None or []";
-        assert_eval_eq!(input, list![]);
-
-        let input = "None and []";
-        assert_eval_eq!(input, none!());
-    }
-
-    // Confirm that the interpreter can evaluate boolean expressions.
-    #[test]
     fn comparison_operators() {
-        let input = "2 == 1";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 == 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 == 2.0";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2.0 == 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 != 1";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 != 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 > 1";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 < 1";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "1 <= 1";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 >= 1";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "4 in range(5)";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "4 in range(3)";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "4 not in range(5)";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "4 not in range(3)";
-        assert_eval_eq!(input, bool!(true));
+        // the rest of these cases have been moved to crosscheck
 
         let input = r#""a" in "abc""#;
         assert_eval_eq!(input, bool!(true));
@@ -393,121 +325,6 @@ c = type(a.join)
 
         let input = r#""cd" in "bcd""#;
         assert_eval_eq!(input, bool!(true));
-
-        let input = "4 is None";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "4 is not None";
-        assert_eval_eq!(input, bool!(true));
-    }
-
-    #[test]
-    fn operator_chaining() {
-        // Equal chains
-        let input = "2 == 2 == 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 == 2 == 3";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 == 2 == 3 == 3";
-        assert_eval_eq!(input, bool!(false));
-
-        // Increasing chain
-        let input = "1 < 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 < 2 < 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "1 < 3 < 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "1 < 2 < 3 < 4";
-        assert_eval_eq!(input, bool!(true));
-
-        // Mixed increasing / equality
-        let input = "1 < 2 == 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 < 2 == 3 < 4";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed with >= and <=
-        let input = "3 >= 2 > 1";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "3 >= 2 > 2";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 <= 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 <= 1 < 3";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed equality and less-than
-        let input = "2 == 2 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 == 3 < 4";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2 < 3 == 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 < 3 == 4";
-        assert_eval_eq!(input, bool!(false));
-
-        // Descending chain
-        let input = "5 > 4 > 3 > 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "5 > 4 > 5";
-        assert_eval_eq!(input, bool!(false));
-
-        // With floats mixed in
-        let input = "1 < 2.0 < 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1.0 < 2 < 1.5";
-        assert_eval_eq!(input, bool!(false));
-
-        let input = "2.0 == 2 < 3.0";
-        assert_eval_eq!(input, bool!(true));
-
-        // Not-equals chain
-        let input = "1 != 2 != 3";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 != 1 != 2";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mix of == and !=
-        let input = "1 == 1 != 2";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "1 == 2 != 3";
-        assert_eval_eq!(input, bool!(false));
-
-        // Chained in — both true
-        let input = "2 in [1,2,3] in [[1,2,3],[4,5,6]]";
-        assert_eval_eq!(input, bool!(true));
-
-        let input = "2 in [1,2,3] in [[2,3,4],[4,5,6]]";
-        assert_eval_eq!(input, bool!(false));
-
-        // Chained not in
-        let input = "4 not in [1,2,3] not in [[1,2,3],[4,5,6]]";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed in / not in
-        let input = "2 in [1,2,3] not in [[1,2,3],[4,5,6]]";
-        assert_eval_eq!(input, bool!(false));
-
-        // Mixed not in / in
-        let input = "4 not in [1,2,3] in [[4,5,6],[7,8,9]]";
-        assert_eval_eq!(input, bool!(false));
     }
 
     #[test]
@@ -5663,5 +5480,44 @@ first, second, third, fourth
         let input = r#"sum(c for c in "abc")"#;
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "unsupported operand type(s) for +");
+    }
+
+    #[test]
+    fn any_builtin() {
+        let input = "any([])";
+        assert_eval_eq!(input, bool!(false));
+
+        let input = r#"any([0, "", False, 3])"#;
+        assert_eval_eq!(input, bool!(true));
+
+        let input = r#"any([0, "", False])"#;
+        assert_eval_eq!(input, bool!(false));
+
+        let input = r#"any(x > 3 for x in range(5))"#;
+        assert_eval_eq!(input, bool!(true));
+
+        let input = r#"any(x == 0 or 1 / x for x in [1,0])"#;
+        assert_eval_eq!(input, bool!(true));
+
+        let input = r#"any(x == 1 or 1 / 0 for x in [1,2])"#;
+        assert_eval_eq!(input, bool!(true));
+    }
+
+    #[test]
+    fn all_builtin() {
+        let input = "all([])";
+        assert_eval_eq!(input, bool!(true));
+
+        let input = r#"all([1, "x", True])"#;
+        assert_eval_eq!(input, bool!(true));
+
+        let input = r#"all([1, 0, "x"])"#;
+        assert_eval_eq!(input, bool!(false));
+
+        let input = r#"all(x < 5 for x in range(5))"#;
+        assert_eval_eq!(input, bool!(true));
+
+        let input = r#"all(0 if x == 0 else 1 / 0 for x in [0,1])"#;
+        assert_eval_eq!(input, bool!(false));
     }
 }

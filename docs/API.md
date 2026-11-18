@@ -10,6 +10,8 @@ For language-level feature support by engine, see [SUPPORTED.md](./SUPPORTED.md)
 
 | Name | Notes |
 | - | - |
+| `all` | |
+| `any` | |
 | `callable` | |
 | `dir` | |
 | `getattr` | Supports a default value |

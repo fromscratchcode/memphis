@@ -4,7 +4,7 @@ use crate::{
     runtime::{HostIoError, InputResult},
     treewalk::{
         DomainResult, TreewalkInterpreter, TreewalkResult, TreewalkValue, TypeRegistry,
-        iterator::{collect, count, for_each_mut},
+        iterator::{all, any, collect, count, for_each_mut},
         protocols::{Callable, Iterable, NextResult},
         result::Raise,
         type_system::CloneableCallable,
@@ -30,6 +30,8 @@ fn builtins() -> Vec<Box<dyn CloneableCallable>> {
         Box::new(PrintBuiltin),
         Box::new(InputBuiltin),
         Box::new(SumBuiltin),
+        Box::new(AnyBuiltin),
+        Box::new(AllBuiltin),
     ]
 }
 
@@ -82,6 +84,10 @@ pub struct PrintBuiltin;
 pub struct InputBuiltin;
 #[derive(Clone)]
 pub struct SumBuiltin;
+#[derive(Clone)]
+pub struct AnyBuiltin;
+#[derive(Clone)]
+pub struct AllBuiltin;
 
 impl Callable for CallableBuiltin {
     fn signature(&self) -> Signature {
@@ -499,5 +505,45 @@ impl Callable for SumBuiltin {
 
     fn name(&self) -> String {
         "sum".into()
+    }
+}
+
+impl Callable for AnyBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["iterable"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let iter = args.get("iterable").as_iterator().raise(interpreter)?;
+        let found = any(iter, |i| i.coerce_to_bool())?;
+        Ok(TreewalkValue::Bool(found))
+    }
+
+    fn name(&self) -> String {
+        "any".into()
+    }
+}
+
+impl Callable for AllBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["iterable"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let iter = args.get("iterable").as_iterator().raise(interpreter)?;
+        let found = all(iter, |i| i.coerce_to_bool())?;
+        Ok(TreewalkValue::Bool(found))
+    }
+
+    fn name(&self) -> String {
+        "all".into()
     }
 }

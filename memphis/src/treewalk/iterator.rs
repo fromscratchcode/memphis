@@ -42,6 +42,19 @@ where
     Ok(false)
 }
 
+pub fn all<F>(mut iter: Box<dyn CloneableIterable>, f: F) -> TreewalkResult<bool>
+where
+    F: Fn(TreewalkValue) -> bool,
+{
+    while let NextResult::Yielded(val) = iter.try_next()? {
+        if !f(val) {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 pub enum LoopControl {
     Continue,
     Break,
