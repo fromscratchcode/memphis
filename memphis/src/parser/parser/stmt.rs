@@ -5,8 +5,8 @@ use crate::{
     parser::{
         Parser, ParserError, ParserResult,
         types::{
-            BinOp, ConditionalAst, ExceptHandler, Expr, FromImportItem, FromImportMode, LoopIndex,
-            RaiseKind, RegularImport, Statement, StatementKind,
+            BinOp, CollectionItem, ConditionalAst, ExceptHandler, Expr, FromImportItem,
+            FromImportMode, LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
         },
     },
 };
@@ -76,10 +76,23 @@ impl Parser<'_> {
         if self.current_token() == &Token::Assign {
             self.consume(&Token::Assign)?;
             match left {
-                Expr::Tuple(vars) => Ok(StatementKind::UnpackingAssignment {
-                    left: vars,
-                    right: self.parse_expr()?,
-                }),
+                Expr::Tuple(vars) => {
+                    let mut exprs = vec![];
+                    for var in vars {
+                        match var {
+                            CollectionItem::Expr(expr) => exprs.push(expr),
+                            CollectionItem::Unpack(_) => {
+                                return Err(ParserError::syntax_error(
+                                    "Unpacking on the LHS of assignment is not yet supported",
+                                ));
+                            }
+                        }
+                    }
+                    Ok(StatementKind::UnpackingAssignment {
+                        left: exprs,
+                        right: self.parse_expr()?,
+                    })
+                }
                 _ => {
                     let mut left_items = vec![left];
 

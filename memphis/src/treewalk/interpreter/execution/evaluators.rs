@@ -29,7 +29,7 @@ impl TreewalkInterpreter {
             LeftShift => self.call_method(&left, &Dunder::Lshift, args![right]),
             RightShift => self.call_method(&left, &Dunder::Rshift, args![right]),
             Expo => self.call_method(&left, &Dunder::Pow, args![right]),
-            MatMul => todo!(),
+            MatMul => self.call_method(&left, &Dunder::MatMul, args![right]),
         }
     }
 
@@ -86,22 +86,6 @@ impl TreewalkInterpreter {
                     })
                     .raise(self)?;
                 Ok(TreewalkValue::Int(!i))
-            }
-            Unpack => {
-                let list = right
-                    .as_list()
-                    // Attempted to unpack a non-iterable
-                    .map_err(|_| {
-                        Exception::type_error(format!(
-                            "Value after * must be an iterable, not {}",
-                            right.get_type()
-                        ))
-                    })
-                    .raise(self)?;
-                Ok(TreewalkValue::List(list))
-            }
-            DictUnpack => {
-                todo!()
             }
         }
     }

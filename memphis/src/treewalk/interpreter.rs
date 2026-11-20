@@ -954,6 +954,15 @@ t.extend([3,4])
         let input = "list([1,2,3], [1,2])";
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "Expected 2, found 3 args");
+
+        let input = r#"[*[1,2],3]"#;
+        assert_eval_eq!(input, list![int!(1), int!(2), int!(3),]);
+
+        let input = r#"[*range(3), *"ab"]"#;
+        assert_eval_eq!(
+            input,
+            list![int!(0), int!(1), int!(2), str!("a"), str!("b")]
+        );
     }
 
     #[test]
@@ -996,6 +1005,12 @@ l = {1} <= {2}
         let input = "set({1,2,3}, {1,2})";
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "Expected 2, found 3 args");
+
+        let input = r#"{*[1,2],3}"#;
+        assert_eval_eq!(input, set![int!(1), int!(2), int!(3),]);
+
+        let input = r#"{*[1, 2, 2, 3]}"#;
+        assert_eval_eq!(input, set![int!(1), int!(2), int!(3),]);
     }
 
     #[test]
@@ -1026,8 +1041,18 @@ l = {1} <= {2}
         let input = r#"(4,)"#;
         assert_eval_eq!(input, tuple![int!(4),]);
 
-        let input = r#"9, 10"#;
-        assert_eval_eq!(input, tuple![int!(9), int!(10),]);
+        let input = r#"
+l = [1,2]
+(*l,)
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
+
+        let input = r#"(*[1,2],3)"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2), int!(3)]);
+
+        let input = r#"(*5,)"#;
+        let e = eval_expect_error(input);
+        assert_type_error!(e.exception, "'int' object is not iterable");
 
         let input = r#"
 g = iter(())
@@ -1058,6 +1083,41 @@ del d[0]
 "#;
         let e = eval_expect_error(input);
         assert_type_error!(e.exception, "'tuple' object does not support item deletion");
+    }
+
+    #[test]
+    fn free_tuples() {
+        let input = r#"9,"#;
+        assert_eval_eq!(input, tuple![int!(9)]);
+
+        let input = r#"9, 10"#;
+        assert_eval_eq!(input, tuple![int!(9), int!(10),]);
+
+        let input = r#"9, 10,"#;
+        assert_eval_eq!(input, tuple![int!(9), int!(10),]);
+
+        let input = r#"*[], 1, *()"#;
+        assert_eval_eq!(input, tuple![int!(1),]);
+
+        let input = r#"
+items = [2,3]
+1, *items
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2), int!(3)]);
+
+        let input = r#"
+items = [2,3]
+result = 1, *items
+result
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2), int!(3)]);
+
+        let input = r#"
+first = [1,2]
+second = [4,5]
+*first, 3, *second
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2), int!(3), int!(4), int!(5)]);
     }
 
     #[test]
@@ -1953,25 +2013,26 @@ dict((k, k*k) for k in range(3))
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
-v = sorted([ val for val in a ])
-w = sorted({ key for key, value in a.items() })
+sorted([ val for val in a ])
 "#;
-        let ctx = run(input);
-
-        assert_read_eq!(ctx, "v", list![str!("b"), str!("c"),]);
-        assert_read_eq!(ctx, "w", list![str!("b"), str!("c"),]);
+        assert_eval_eq!(input, list![str!("b"), str!("c"),]);
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
-b = a.get("b")
-c = a.get("d")
-d = a.get("d", 99)
+sorted({ key for key, value in a.items() })
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, list![str!("b"), str!("c"),]);
 
-        assert_read_eq!(ctx, "b", int!(4));
-        assert_read_eq!(ctx, "c", none!());
-        assert_read_eq!(ctx, "d", int!(99));
+        let input = r#"{ "b": 4, 'c': 5 }.get("b")"#;
+        assert_eval_eq!(input, int!(4));
+
+        let input = r#"{ "b": 4, 'c': 5 }.get("d")
+"#;
+        assert_eval_eq!(input, none!());
+
+        let input = r#"{ "b": 4, 'c': 5 }.get("d", 99)
+"#;
+        assert_eval_eq!(input, int!(99));
 
         let input = r#"
 a = { "b": 4, 'c': 5 }
@@ -1981,13 +2042,15 @@ a = { "b": 4, 'c': 5 }
 
         let input = r#"
 inner = { 'key': 'inner' }
-b = { 'key': 'outer', **inner }
-c = { **inner, 'key': 'outer' }
+{ 'key': 'outer', **inner }
 "#;
-        let ctx = run(input);
+        assert_eval_eq!(input, dict!({ str!("key") => str!("inner") }));
 
-        assert_read_eq!(ctx, "b", dict!({ str!("key") => str!("inner") }));
-        assert_read_eq!(ctx, "c", dict!({ str!("key") => str!("outer") }));
+        let input = r#"
+inner = { 'key': 'inner' }
+{ **inner, 'key': 'outer' }
+"#;
+        assert_eval_eq!(input, dict!({ str!("key") => str!("outer") }));
     }
 
     #[test]
@@ -4212,35 +4275,34 @@ d = Child.two()
     }
 
     #[test]
-    fn unpacking() {
+    fn unpacking_assignment() {
         let input = r#"
 def foo():
     return 2, 3
 
-a = foo()
-b, c = foo()
+foo()
 "#;
+        assert_eval_eq!(input, tuple![int!(2), int!(3)]);
 
-        let ctx = run(input);
+        let input = r#"
+def foo():
+    return 2, 3
 
-        assert_read_eq!(ctx, "a", tuple![int!(2), int!(3)]);
-        assert_read_eq!(ctx, "b", int!(2));
-        assert_read_eq!(ctx, "c", int!(3));
+b, c = foo()
+b, c
+"#;
+        assert_eval_eq!(input, tuple![int!(2), int!(3)]);
 
         let input = r#"
 b, c = [1, 2, 3]
 "#;
-
         let e = eval_expect_error(input);
-
         assert_value_error!(e.exception, "too many values to unpack (expected 2)");
 
         let input = r#"
 a, b, c = [2, 3]
 "#;
-
         let e = eval_expect_error(input);
-
         assert_value_error!(
             e.exception,
             "not enough values to unpack (expected 3, got 2)"
@@ -4248,54 +4310,27 @@ a, b, c = [2, 3]
 
         let input = r#"
 b, c = (1, 2)
-d, e = [1, 2]
-h, i, j = range(1, 4)
+b, c
 "#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
 
-        let ctx = run(input);
+        let input = r#"
+d, e = [1, 2]
+d, e
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
 
-        assert_read_eq!(ctx, "b", int!(1));
-        assert_read_eq!(ctx, "c", int!(2));
-        assert_read_eq!(ctx, "d", int!(1));
-        assert_read_eq!(ctx, "e", int!(2));
-        assert_read_eq!(ctx, "h", int!(1));
-        assert_read_eq!(ctx, "i", int!(2));
-        assert_read_eq!(ctx, "j", int!(3));
+        let input = r#"
+h, i, j = range(1, 4)
+h, i, j
+"#;
+        assert_eval_eq!(input, tuple![int!(1), int!(2), int!(3)]);
 
         let input = r#"
 f, g = {1, 2}
 { f, g } == { 1, 2 }
 "#;
         assert_eval_eq!(input, bool!(true));
-
-        let input = r#"
-l = [1,2]
-(*l,)
-"#;
-        assert_eval_eq!(input, tuple![int!(1), int!(2)]);
-
-        let input = r#"(*5)"#;
-        let e = eval_expect_error(input);
-        assert_type_error!(e.exception, "Value after * must be an iterable, not int");
-
-        // TODO not sure where to detect this, probably in semantic analysis
-        //         let input = r#"
-        // l = [1,2]
-        // a = (*l)
-        // "#;
-        //
-        //         let mut context = init(input);
-        //
-        //         match context.run() {
-        //             Err(e) => assert_eq!(
-        //                 e,
-        //                 MemphisError::Interpreter(InterpreterError::ValueError(
-        //                     "not enough values to unpack (expected 3, got 2)".into(),
-        //                     interpreter.state.call_stack()
-        //                 ))
-        //             ),
-        //             Ok(interpreter) => panic!("Expected an error!"),
-        //         }
     }
 
     #[test]
@@ -5519,5 +5554,24 @@ first, second, third, fourth
 
         let input = r#"all(0 if x == 0 else 1 / 0 for x in [0,1])"#;
         assert_eval_eq!(input, bool!(false));
+    }
+
+    #[test]
+    fn matmul_dunder() {
+        let input = "4 @ 4";
+        let e = eval_expect_error(input);
+        assert_type_error!(
+            e.exception,
+            "unsupported operand type(s) for @: 'int' and 'int'"
+        );
+
+        let input = r#"
+class Matrix:
+    def __matmul__(self, other):
+        return "works"
+
+Matrix() @ Matrix()
+"#;
+        assert_eval_eq!(input, str!("works"));
     }
 }

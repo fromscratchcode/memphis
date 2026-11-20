@@ -5,8 +5,8 @@ use crate::{
     },
     domain::{FromImportPath, FunctionType, Identifier, resolve_import_path},
     parser::types::{
-        Ast, AstParams, BinOp, ConditionalAst, ExceptHandler, Expr, FromImportMode, HandlerKind,
-        LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
+        Ast, AstParams, BinOp, CollectionItem, ConditionalAst, ExceptHandler, Expr, FromImportMode,
+        HandlerKind, LoopIndex, RaiseKind, RegularImport, Statement, StatementKind,
     },
 };
 
@@ -88,11 +88,17 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_return(&mut self, expr: &[Expr]) -> CompilerResult<()> {
-        match expr.len() {
+    fn compile_return(&mut self, exprs: &[Expr]) -> CompilerResult<()> {
+        match exprs.len() {
             0 => self.compile_none(),
-            1 => self.compile_expr(&expr[0])?,
-            _ => self.compile_tuple(expr)?,
+            1 => self.compile_expr(&exprs[0])?,
+            _ => {
+                let mut items = vec![];
+                for expr in exprs {
+                    items.push(CollectionItem::Expr(expr.clone()));
+                }
+                self.compile_tuple(&items)?
+            }
         }
 
         self.emit(Opcode::ReturnValue);

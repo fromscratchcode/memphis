@@ -2,8 +2,8 @@ use crate::{
     core::Container,
     domain::{Identifier, MemphisValue},
     parser::types::{
-        Ast, AstInvokeArgs, AstParams, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart,
-        ForClause, FormatOption, LogicalOp, SliceParams, TypeNode, UnaryOp,
+        Ast, AstInvokeArgs, AstParams, BinOp, Callee, CollectionItem, CompareOp, DictOperation,
+        Expr, FStringPart, ForClause, FormatOption, LogicalOp, SliceParams, TypeNode, UnaryOp,
     },
     treewalk::{
         Scope, TreewalkDisruption, TreewalkInterpreter, TreewalkResult, TreewalkSignal,
@@ -82,20 +82,30 @@ impl TreewalkInterpreter {
         }
     }
 
-    fn evaluate_list(&self, items: &[Expr]) -> TreewalkResult<TreewalkValue> {
-        items
-            .iter()
-            .map(|arg| self.evaluate_expr(arg))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|l| TreewalkValue::List(Container::new(List::new(l))))
+    fn evaluate_list(&self, items: &[CollectionItem]) -> TreewalkResult<TreewalkValue> {
+        let mut list = vec![];
+        self.for_each_collection_item(items, |item| {
+            list.push(item);
+            Ok(())
+        })?;
+        Ok(TreewalkValue::List(Container::new(List::new(list))))
     }
 
-    fn evaluate_set(&self, items: &[Expr]) -> TreewalkResult<TreewalkValue> {
+    fn evaluate_tuple(&self, items: &[CollectionItem]) -> TreewalkResult<TreewalkValue> {
+        let mut results = vec![];
+        self.for_each_collection_item(items, |item| {
+            results.push(item);
+            Ok(())
+        })?;
+        Ok(TreewalkValue::Tuple(Tuple::new(results)))
+    }
+
+    fn evaluate_set(&self, items: &[CollectionItem]) -> TreewalkResult<TreewalkValue> {
         let mut set = Set::default();
-        for item in items {
-            let value = self.evaluate_expr(item)?;
-            set.add(value).raise(self)?;
-        }
+        self.for_each_collection_item(items, |item| {
+            set.add(item).raise(self)?;
+            Ok(())
+        })?;
         Ok(TreewalkValue::Set(Container::new(set)))
     }
 
@@ -123,30 +133,6 @@ impl TreewalkInterpreter {
         }
 
         Ok(TreewalkValue::Dict(Container::new(dict)))
-    }
-
-    fn evaluate_tuple(&self, items: &[Expr]) -> TreewalkResult<TreewalkValue> {
-        let mut results = vec![];
-        for item in items {
-            let evaluated = self.evaluate_expr(item)?;
-            match item {
-                Expr::UnaryOperation {
-                    op: UnaryOp::Unpack,
-                    ..
-                } => {
-                    let iter = evaluated.as_iterator().raise(self)?;
-                    for_each_mut(iter, &mut |val| {
-                        results.push(val);
-                        Ok(())
-                    })?;
-                }
-                _ => {
-                    results.push(evaluated);
-                }
-            }
-        }
-
-        Ok(TreewalkValue::Tuple(Tuple::new(results)))
     }
 
     fn evaluate_generator_comprehension(
@@ -475,5 +461,28 @@ impl TreewalkInterpreter {
             Callee::Expr(callee) => self.evaluate_expr(callee)?.as_callable().raise(self),
             Callee::Symbol(name) => self.load_callable(name.as_str()),
         }
+    }
+
+    fn for_each_collection_item<F>(
+        &self,
+        items: &[CollectionItem],
+        mut add: F,
+    ) -> TreewalkResult<()>
+    where
+        F: FnMut(TreewalkValue) -> TreewalkResult<()>,
+    {
+        for item in items {
+            match item {
+                CollectionItem::Expr(expr) => {
+                    let value = self.evaluate_expr(expr)?;
+                    add(value)?;
+                }
+                CollectionItem::Unpack(expr) => {
+                    let iter = self.evaluate_expr(expr)?.as_iterator().raise(self)?;
+                    for_each_mut(iter, &mut |value| add(value))?;
+                }
+            }
+        }
+        Ok(())
     }
 }

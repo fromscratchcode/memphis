@@ -1,7 +1,7 @@
 use crate::parser::types::{
-    Ast, AstInvokeArgs, AstParams, Callee, ConditionalAst, DictOperation, ExceptHandler, Expr,
-    ExprFormat, FStringPart, ForClause, HandlerKind, KwargsOperation, Param, RaiseKind,
-    SliceParams, Statement, StatementKind,
+    Ast, AstInvokeArgs, AstParams, Callee, CollectionItem, ConditionalAst, DictOperation,
+    ExceptHandler, Expr, ExprFormat, FStringPart, ForClause, HandlerKind, KwargsOperation, Param,
+    RaiseKind, SliceParams, Statement, StatementKind,
 };
 
 /// Core visitor trait used to traverse the AST.
@@ -177,6 +177,14 @@ impl AcceptsVisitor for ForClause {
         iterable.accept(visitor);
         if let Some(condition) = condition {
             condition.accept(visitor);
+        }
+    }
+}
+
+impl AcceptsVisitor for CollectionItem {
+    fn accept<V: Visitor>(&self, visitor: &mut V) {
+        match self {
+            CollectionItem::Expr(expr) | CollectionItem::Unpack(expr) => expr.accept(visitor),
         }
     }
 }

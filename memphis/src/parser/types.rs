@@ -89,6 +89,19 @@ pub(crate) use ast;
 
 #[cfg_attr(feature = "wasm", derive(Serialize))]
 #[derive(Clone, PartialEq, Debug)]
+pub enum CollectionItem {
+    Expr(Expr),
+    Unpack(Expr),
+}
+
+impl From<Expr> for CollectionItem {
+    fn from(value: Expr) -> Self {
+        Self::Expr(value)
+    }
+}
+
+#[cfg_attr(feature = "wasm", derive(Serialize))]
+#[derive(Clone, PartialEq, Debug)]
 pub enum DictOperation {
     Pair(Expr, Expr),
     Unpack(Expr),
@@ -181,8 +194,6 @@ pub enum UnaryOp {
     Minus,
     Plus,
     BitwiseNot,
-    Unpack,     // single asterisk *
-    DictUnpack, // double asterisk **
 }
 
 #[cfg_attr(feature = "wasm", derive(Serialize))]
@@ -325,10 +336,10 @@ pub enum Expr {
     Variable(Identifier),
     StringLiteral(String),
     BytesLiteral(Vec<u8>),
-    List(Vec<Expr>),
-    Set(Vec<Expr>),
+    List(Vec<CollectionItem>),
+    Set(Vec<CollectionItem>),
     Dict(Vec<DictOperation>),
-    Tuple(Vec<Expr>),
+    Tuple(Vec<CollectionItem>),
     FString(Vec<FStringPart>),
     Yield(Option<Box<Expr>>),
     YieldFrom(Box<Expr>),

@@ -37,6 +37,7 @@ impl_method_provider!(
         LeBuiltin,
         GtBuiltin,
         GeBuiltin,
+        MatMulBuiltin,
         ContainsBuiltin,
         HashBuiltin,
         StrBuiltin
@@ -280,6 +281,8 @@ struct LeBuiltin;
 struct LtBuiltin;
 #[derive(Clone)]
 struct GeBuiltin;
+#[derive(Clone)]
+struct MatMulBuiltin;
 #[derive(Clone)]
 struct GtBuiltin;
 #[derive(Clone)]
@@ -626,6 +629,32 @@ impl Callable for GeBuiltin {
 
     fn name(&self) -> String {
         Dunder::Ge.into()
+    }
+}
+
+impl Callable for MatMulBuiltin {
+    fn signature(&self) -> Signature {
+        Signature::positional_only(["self", "b"])
+    }
+
+    fn call(
+        &self,
+        interpreter: &TreewalkInterpreter,
+        args: BoundArgs,
+    ) -> TreewalkResult<TreewalkValue> {
+        let a_type = args.get("self").get_type();
+        let b_type = args.get("b").get_type();
+
+        // This is only implemented for int and float
+        Exception::type_error(format!(
+            "unsupported operand type(s) for @: '{}' and '{}'",
+            a_type, b_type
+        ))
+        .raise(interpreter)
+    }
+
+    fn name(&self) -> String {
+        Dunder::MatMul.into()
     }
 }
 

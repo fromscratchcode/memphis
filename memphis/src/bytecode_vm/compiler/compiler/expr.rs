@@ -5,8 +5,8 @@ use crate::{
     },
     domain::{FunctionType, Identifier},
     parser::types::{
-        AstInvokeArgs, BinOp, Callee, CompareOp, DictOperation, Expr, FStringPart, ForClause,
-        FormatOption, LogicalOp, UnaryOp,
+        AstInvokeArgs, BinOp, Callee, CollectionItem, CompareOp, DictOperation, Expr, FStringPart,
+        ForClause, FormatOption, LogicalOp, UnaryOp,
     },
 };
 
@@ -80,13 +80,13 @@ impl Compiler {
         self.compile_constant(Constant::String(value.to_string()));
     }
 
-    fn compile_list(&mut self, items: &[Expr]) -> CompilerResult<()> {
+    fn compile_list(&mut self, items: &[CollectionItem]) -> CompilerResult<()> {
         self.compile_expr_slice(items)?;
         self.emit(Opcode::BuildList(items.len()));
         Ok(())
     }
 
-    pub fn compile_tuple(&mut self, items: &[Expr]) -> CompilerResult<()> {
+    pub fn compile_tuple(&mut self, items: &[CollectionItem]) -> CompilerResult<()> {
         self.compile_expr_slice(items)?;
         self.emit(Opcode::BuildTuple(items.len()));
         Ok(())
@@ -114,7 +114,6 @@ impl Compiler {
             UnaryOp::Plus => None,
             UnaryOp::Not => Some(Opcode::UnaryNot),
             UnaryOp::BitwiseNot => Some(Opcode::UnaryInvert),
-            _ => return Err(CompilerError::Unsupported(format!("unary op: {op:?}"))),
         };
         if let Some(opcode) = opcode {
             self.emit(opcode);
@@ -387,9 +386,18 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_expr_slice(&mut self, items: &[Expr]) -> CompilerResult<()> {
+    fn compile_expr_slice(&mut self, items: &[CollectionItem]) -> CompilerResult<()> {
         for item in items {
-            self.compile_expr(item)?;
+            match item {
+                CollectionItem::Expr(expr) => {
+                    self.compile_expr(expr)?;
+                }
+                CollectionItem::Unpack(_) => {
+                    return Err(CompilerError::Unsupported(
+                        "Unpacking not yet supported in bytecode VM.".to_string(),
+                    ));
+                }
+            }
         }
         Ok(())
     }

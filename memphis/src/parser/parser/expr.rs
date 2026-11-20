@@ -5,9 +5,9 @@ use crate::{
     parser::{
         Parser, ParserError, ParserResult,
         types::{
-            AstInvokeArgs, BinOp, CallArg, Callee, CompareOp, DictOperation, Expr, ExprFormat,
-            FStringPart, ForClause, FormatOption, KwargsOperation, LogicalOp, SliceParams,
-            TypeNode, UnaryOp,
+            AstInvokeArgs, BinOp, CallArg, Callee, CollectionItem, CompareOp, DictOperation, Expr,
+            ExprFormat, FStringPart, ForClause, FormatOption, KwargsOperation, LogicalOp,
+            SliceParams, TypeNode, UnaryOp,
         },
     },
 };
@@ -26,27 +26,32 @@ impl Parser<'_> {
     /// All other expression parsing is immediately delegated to `parse_simple_expr`.
     pub fn parse_expr(&mut self) -> ParserResult<Expr> {
         log(LogLevel::Trace, || "parse_expr".to_string());
-        let left = self.parse_simple_expr()?;
+        let left = self.parse_collection_item()?;
 
-        if self.current_token() == &Token::Comma {
-            let mut items = vec![left];
-            while self.current_token() == &Token::Comma {
-                self.consume(&Token::Comma)?;
-
-                // We need this for the case of a trailing comma, which is most often used for a
-                // tuple with a single element.
-                //
-                // The [`Token::Assign`] is when this happens on the LHS.
-                if self.end_of_statement() || self.current_token() == &Token::Assign {
-                    break;
-                }
-                items.push(self.parse_simple_expr()?);
-            }
-
-            Ok(Expr::Tuple(items))
-        } else {
-            Ok(left)
+        if self.current_token() != &Token::Comma {
+            return match left {
+                CollectionItem::Expr(expr) => Ok(expr),
+                CollectionItem::Unpack(_) => Err(ParserError::syntax_error(
+                    "cannot use starred expression here",
+                )),
+            };
         }
+
+        let mut items = vec![left];
+        while self.current_token() == &Token::Comma {
+            self.consume(&Token::Comma)?;
+
+            // We need this for the case of a trailing comma, which is most often used for a
+            // tuple with a single element.
+            //
+            // The [`Token::Assign`] is when this happens on the LHS.
+            if self.end_of_statement() || self.current_token() == &Token::Assign {
+                break;
+            }
+            items.push(self.parse_collection_item()?);
+        }
+
+        Ok(Expr::Tuple(items))
     }
 
     /// Parse an expression where open tuples are not expected. If you need to support this in a
@@ -466,22 +471,6 @@ impl Parser<'_> {
         match self.current_token().clone() {
             Token::Minus => self.parse_minus(),
             Token::Plus => self.parse_plus(),
-            Token::Asterisk => {
-                self.consume(&Token::Asterisk)?;
-                let right = self.parse_simple_expr()?;
-                Ok(Expr::UnaryOperation {
-                    op: UnaryOp::Unpack,
-                    right: Box::new(right),
-                })
-            }
-            Token::DoubleAsterisk => {
-                self.consume(&Token::DoubleAsterisk)?;
-                let right = self.parse_simple_expr()?;
-                Ok(Expr::UnaryOperation {
-                    op: UnaryOp::DictUnpack,
-                    right: Box::new(right),
-                })
-            }
             Token::Yield => {
                 self.consume(&Token::Yield)?;
 
@@ -559,7 +548,7 @@ impl Parser<'_> {
             }
             Token::LParen => self.parse_tuple(),
             Token::LBracket => self.parse_list(),
-            Token::LBrace => self.parse_set(),
+            Token::LBrace => self.parse_brace_collection(),
             Token::Lambda => self.parse_lambda(),
             Token::StringLiteral(literal) => {
                 self.consume(&Token::StringLiteral(literal.clone()))?;
@@ -627,37 +616,34 @@ impl Parser<'_> {
 
         self.consume(&Token::LBracket)?;
         while self.current_token() != &Token::RBracket {
-            let expr = self.parse_simple_expr()?;
-            items.push(expr.clone());
-
-            if self.current_token() == &Token::Comma {
-                self.consume(&Token::Comma)?;
-
-                // Handle trailing comma
-                if self.current_token() == &Token::RBracket {
-                    self.consume(&Token::RBracket)?;
-                    return Ok(Expr::List(items));
+            let item = self.parse_collection_item()?;
+            match self.current_token() {
+                Token::Comma => {
+                    self.consume(&Token::Comma)?;
+                    items.push(item);
                 }
-            } else if self.current_token() == &Token::RBracket {
-                self.consume(&Token::RBracket)?;
-                return Ok(Expr::List(items));
-            }
+                Token::RBracket => {
+                    items.push(item);
+                    break;
+                }
+                Token::For => match item {
+                    CollectionItem::Expr(expr) if items.is_empty() => {
+                        let clauses = self.parse_comprehension_clauses()?;
+                        self.consume(&Token::RBracket)?;
 
-            if self.current_token() == &Token::For {
-                let clauses = self.parse_comprehension_clauses()?;
-                self.consume(&Token::RBracket)?;
-
-                return Ok(Expr::ListComprehension {
-                    body: Box::new(expr),
-                    clauses,
-                });
+                        return Ok(Expr::ListComprehension {
+                            body: Box::new(expr),
+                            clauses,
+                        });
+                    }
+                    _ => return Err(ParserError::syntax_error("invalid syntax")),
+                },
+                _ => return Err(ParserError::UnexpectedToken(self.current_token().clone())),
             }
         }
 
-        // You should only get here if this was an empty literal.
-        assert_eq!(items.len(), 0);
         self.consume(&Token::RBracket)?;
-        Ok(Expr::List(vec![]))
+        Ok(Expr::List(items))
     }
 
     fn parse_f_string(&mut self) -> ParserResult<Expr> {
@@ -712,74 +698,111 @@ impl Parser<'_> {
         Ok(Expr::FString(parts))
     }
 
-    fn parse_set(&mut self) -> ParserResult<Expr> {
-        log(LogLevel::Trace, || "parse_set".to_string());
+    fn parse_brace_collection(&mut self) -> ParserResult<Expr> {
+        log(LogLevel::Trace, || "parse_brace_collection".to_string());
         let mut pairs = vec![];
         let mut set = vec![];
 
         self.consume(&Token::LBrace)?;
         while self.current_token() != &Token::RBrace {
-            let key = self.parse_simple_expr()?;
-
             match self.current_token() {
-                // A Comma or an RBrace indicates the end of an element, which means this element
-                // will not be a key-value (i.e. have a colon). However, only an RBrace indicates
-                // an end to the entire literal.
-                Token::Comma | Token::RBrace => {
-                    match key {
-                        Expr::UnaryOperation {
-                            op: UnaryOp::DictUnpack,
-                            right,
-                        } => {
-                            pairs.push(DictOperation::Unpack(*right));
-                        }
-                        _ => {
-                            set.push(key);
-                        }
-                    };
-                    self.consume_optional(&Token::Comma);
-                    if self.current_token() == &Token::RBrace {
-                        break;
-                    }
-                }
-                Token::For => {
-                    let clauses = self.parse_comprehension_clauses()?;
-                    self.consume(&Token::RBrace)?;
-                    return Ok(Expr::SetComprehension {
-                        body: Box::new(key),
-                        clauses,
-                    });
-                }
-                Token::Colon => {
-                    self.consume(&Token::Colon)?;
-                    let value = self.parse_simple_expr()?;
-
+                Token::DoubleAsterisk => {
+                    self.consume(&Token::DoubleAsterisk)?;
+                    let expr = self.parse_simple_expr()?;
+                    pairs.push(DictOperation::Unpack(expr));
                     match self.current_token() {
-                        // A Comma or an RBrace indicates the end of an element, which means this
-                        // element _will_ be a key-value (i.e. have a colon). Only an RBrace
-                        // indicates an end to the entire literal.
-                        Token::Comma | Token::RBrace => {
-                            pairs.push(DictOperation::Pair(key, value));
-                            self.consume_optional(&Token::Comma);
-                            if self.current_token() == &Token::RBrace {
-                                break;
-                            }
+                        Token::RBrace => {
+                            break;
+                        }
+                        Token::Comma => {
+                            self.consume(&Token::Comma)?;
                         }
                         Token::For => {
+                            return Err(ParserError::syntax_error("invalid syntax"));
+                        }
+                        _ => {
+                            return Err(ParserError::UnexpectedToken(self.current_token().clone()));
+                        }
+                    };
+                }
+                Token::Asterisk => {
+                    self.consume(&Token::Asterisk)?;
+                    let expr = self.parse_simple_expr()?;
+                    set.push(CollectionItem::Unpack(expr));
+                    match self.current_token() {
+                        Token::RBrace => {
+                            break;
+                        }
+                        Token::Comma => {
+                            self.consume(&Token::Comma)?;
+                        }
+                        Token::For => {
+                            return Err(ParserError::syntax_error("invalid syntax"));
+                        }
+                        _ => {
+                            return Err(ParserError::UnexpectedToken(self.current_token().clone()));
+                        }
+                    };
+                }
+                _ => {
+                    let key = self.parse_simple_expr()?;
+                    match self.current_token() {
+                        Token::RBrace => {
+                            set.push(CollectionItem::Expr(key));
+                            break;
+                        }
+                        Token::Comma => {
+                            self.consume(&Token::Comma)?;
+                            set.push(CollectionItem::Expr(key));
+                        }
+                        Token::For => {
+                            if !pairs.is_empty() || !set.is_empty() {
+                                return Err(ParserError::syntax_error("invalid syntax"));
+                            }
                             let clauses = self.parse_comprehension_clauses()?;
                             self.consume(&Token::RBrace)?;
-                            return Ok(Expr::DictComprehension {
+                            return Ok(Expr::SetComprehension {
+                                body: Box::new(key),
                                 clauses,
-                                key_body: Box::new(key),
-                                value_body: Box::new(value),
                             });
+                        }
+                        Token::Colon => {
+                            self.consume(&Token::Colon)?;
+                            let value = self.parse_simple_expr()?;
+
+                            match self.current_token() {
+                                Token::RBrace => {
+                                    pairs.push(DictOperation::Pair(key, value));
+                                    break;
+                                }
+                                Token::Comma => {
+                                    pairs.push(DictOperation::Pair(key, value));
+                                    self.consume(&Token::Comma)?;
+                                }
+                                Token::For => {
+                                    if !pairs.is_empty() || !set.is_empty() {
+                                        return Err(ParserError::syntax_error("invalid syntax"));
+                                    }
+                                    let clauses = self.parse_comprehension_clauses()?;
+                                    self.consume(&Token::RBrace)?;
+                                    return Ok(Expr::DictComprehension {
+                                        clauses,
+                                        key_body: Box::new(key),
+                                        value_body: Box::new(value),
+                                    });
+                                }
+                                _ => {
+                                    return Err(ParserError::UnexpectedToken(
+                                        self.current_token().clone(),
+                                    ));
+                                }
+                            }
                         }
                         _ => {
                             return Err(ParserError::UnexpectedToken(self.current_token().clone()));
                         }
                     }
                 }
-                _ => return Err(ParserError::UnexpectedToken(self.current_token().clone())),
             }
         }
 
@@ -789,8 +812,20 @@ impl Parser<'_> {
         } else if pairs.is_empty() {
             Ok(Expr::Set(set))
         } else {
-            // Can the user actually get here?
-            Err(ParserError::syntax_error("invalid dict"))
+            Err(ParserError::syntax_error("invalid syntax"))
+        }
+    }
+
+    fn parse_collection_item(&mut self) -> ParserResult<CollectionItem> {
+        match self.current_token() {
+            Token::DoubleAsterisk => Err(ParserError::syntax_error(
+                "cannot use double starred expression here",
+            )),
+            Token::Asterisk => {
+                self.consume(&Token::Asterisk)?;
+                Ok(CollectionItem::Unpack(self.parse_simple_expr()?))
+            }
+            _ => Ok(CollectionItem::Expr(self.parse_simple_expr()?)),
         }
     }
 
@@ -806,33 +841,44 @@ impl Parser<'_> {
         log(LogLevel::Trace, || "parse_tuple".to_string());
         self.consume(&Token::LParen)?;
 
-        let mut args = Vec::new();
+        let mut items = Vec::new();
         let mut is_single_element = true;
         while self.current_token() != &Token::RParen {
-            let expr = self.parse_simple_expr()?;
-            args.push(expr.clone());
+            let item = self.parse_collection_item()?;
+            match self.current_token() {
+                Token::Comma => {
+                    self.consume(&Token::Comma)?;
+                    is_single_element = false;
+                    items.push(item);
+                }
+                Token::RParen => {
+                    items.push(item);
+                    break;
+                }
+                Token::For => match item {
+                    CollectionItem::Expr(expr) if items.is_empty() => {
+                        let gen_comp = self.parse_generator_comprehension(&expr)?;
 
-            if self.current_token() == &Token::Comma {
-                self.consume(&Token::Comma)?;
-                is_single_element = false;
-            }
-
-            if self.current_token() == &Token::For {
-                // If you saw a For token, we must be in list comprehension.
-                assert_eq!(args.len(), 1);
-                let gen_comp = self.parse_generator_comprehension(&expr)?;
-
-                self.consume(&Token::RParen)?;
-                return Ok(gen_comp);
+                        self.consume(&Token::RParen)?;
+                        return Ok(gen_comp);
+                    }
+                    _ => return Err(ParserError::syntax_error("invalid syntax")),
+                },
+                _ => return Err(ParserError::UnexpectedToken(self.current_token().clone())),
             }
         }
 
         self.consume(&Token::RParen)?;
 
-        if args.len() == 1 && is_single_element {
-            Ok(args.into_iter().next().unwrap())
+        if items.len() == 1 && is_single_element {
+            match items.pop().unwrap() {
+                CollectionItem::Expr(expr) => Ok(expr),
+                CollectionItem::Unpack(_) => Err(ParserError::syntax_error(
+                    "cannot use starred expression here",
+                )),
+            }
         } else {
-            Ok(Expr::Tuple(args))
+            Ok(Expr::Tuple(items))
         }
     }
 
@@ -1300,10 +1346,6 @@ deprecated("collections.abc.ByteString",
         let expected_ast = unary_op!(BitwiseNot, var!("a"));
         assert_expr_eq!(input, expected_ast);
 
-        let input = "(*l,)";
-        let expected_ast = tuple![unary_op!(Unpack, var!("l"))];
-        assert_expr_eq!(input, expected_ast);
-
         let input = "a % b";
         let expected_ast = bin_op!(var!("a"), Mod, var!("b"));
         assert_expr_eq!(input, expected_ast);
@@ -1441,6 +1483,43 @@ deprecated("collections.abc.ByteString",
         let input = "list([1, 2, 3])";
         let expected_ast = func_call!("list", call_args![list![int!(1), int!(2), int!(3)]]);
         assert_expr_eq!(input, expected_ast);
+
+        let input = "[*items]";
+        let expected_ast = list![unpack!(var!("items"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[*items,]";
+        let expected_ast = list![unpack!(var!("items"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "[**l]";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
+
+        let input = "[**l,]";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
+
+        let input = "[x, y for z in values]";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "[*x for x in values]";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "[**x for x in values]";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
     }
 
     #[test]
@@ -1474,6 +1553,42 @@ deprecated("collections.abc.ByteString",
 }"#;
         let expected_ast = set![int!(1), int!(2), int!(3),];
         assert_expr_eq!(input, expected_ast);
+
+        let input = "{*s}";
+        let expected_ast = set![unpack!(var!("s"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{*s,}";
+        let expected_ast = set![unpack!(var!("s"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{x, y for z in values}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{1, **d}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{**d, 1}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{*items, 2: 1}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{**d, x for x in values}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{*x for x in values}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{**x for x in values}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
     }
 
     #[test]
@@ -1509,6 +1624,75 @@ tuple((1,
 "#;
         let expected_ast = func_call!("tuple", call_args![tuple![int!(1), int!(2), int!(3)]]);
         assert_expr_eq!(input, expected_ast);
+
+        let input = "(*l,)";
+        let expected_ast = tuple![unpack!(var!("l"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "(*l)";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use starred expression here".to_string())
+        );
+
+        let input = "(**l)";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
+
+        let input = "(**l,)";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
+
+        let input = "(x, y for z in values)";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "(*x for x in values)";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "(**x for x in values)";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
+    }
+
+    #[test]
+    fn free_tuples() {
+        let input = "*items,";
+        let expected_ast = tuple![unpack!(var!("items"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "1, *items";
+        let expected_ast = tuple![int!(1), unpack!(var!("items"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "*first, 2, *second,";
+        let expected_ast = tuple![unpack!(var!("first")), int!(2), unpack!(var!("second")),];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "*items";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use starred expression here".to_string())
+        );
+
+        let input = "**items,";
+        let e = expect_error!(input);
+        assert_eq!(
+            e,
+            ParserError::SyntaxError("cannot use double starred expression here".to_string())
+        );
     }
 
     #[test]
@@ -1538,11 +1722,23 @@ tuple((1,
 
         let input = "{ 2, **second }";
         let e = expect_error!(input);
-        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
 
         let input = "{ 2, **second, }";
         let e = expect_error!(input);
-        assert_eq!(e, ParserError::SyntaxError("invalid dict".to_string()));
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
+
+        let input = "{**s}";
+        let expected_ast = dict![dict_unpack!(var!("s"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{**s,}";
+        let expected_ast = dict![dict_unpack!(var!("s"))];
+        assert_expr_eq!(input, expected_ast);
+
+        let input = "{a: b, c: d for z in values}";
+        let e = expect_error!(input);
+        assert_eq!(e, ParserError::SyntaxError("invalid syntax".to_string()));
     }
 
     #[test]

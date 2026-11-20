@@ -70,6 +70,12 @@ macro_rules! dict_unpack {
     };
 }
 
+macro_rules! unpack {
+    ($val:expr) => {
+        $crate::parser::types::CollectionItem::Unpack($val)
+    };
+}
+
 macro_rules! dict {
     ($($expr:expr),* $(,)?) => {
         $crate::parser::types::Expr::Dict(vec![
@@ -79,25 +85,25 @@ macro_rules! dict {
 }
 
 macro_rules! list {
-    ($($expr:expr),* $(,)?) => {
+    ($($item:expr),* $(,)?) => {
         $crate::parser::types::Expr::List(vec![
-            $($expr),*
+            $($item.into()),*
         ])
     };
 }
 
 macro_rules! tuple {
-    ($($expr:expr),* $(,)?) => {
+    ($($item:expr),* $(,)?) => {
         $crate::parser::types::Expr::Tuple(vec![
-            $($expr),*
+            $($item.into()),*
         ])
     };
 }
 
 macro_rules! set {
-    ($($expr:expr),* $(,)?) => {
+    ($($item:expr),* $(,)?) => {
         $crate::parser::types::Expr::Set(vec![
-            $($expr),*
+            $($item.into()),*
         ])
     };
 }
@@ -663,6 +669,7 @@ pub(crate) use str;
 pub(crate) use ternary_op;
 pub(crate) use tuple;
 pub(crate) use unary_op;
+pub(crate) use unpack;
 pub(crate) use var;
 pub(crate) use yield_expr;
 pub(crate) use yield_from;
